@@ -3,6 +3,10 @@ import streamlit.components.v1 as components
 import pandas as pd
 import io
 import time
+import json
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
 from database import get_db_connection, log_activity
 from config import branch_dict
 
@@ -45,7 +49,7 @@ def render_all_reports_module(user_branch_name):
         current_tab_ctx = created_tabs[index]
 
         # =========================================================================
-        # ⚙️ TAB 1 REPORT: รายงานสรุปเครื่องจักร & เบรกดาวน์
+        # ⚙️ TAB 1 REPORT: รายงานสรุปเครื่องจักร & เบรกดาวน์ (Excel + Print Matrix)
         # =========================================================================
         if key == "1":
             with current_tab_ctx:
@@ -59,9 +63,11 @@ def render_all_reports_module(user_branch_name):
                     if current_role in ["admin", "manager"]:
                         b_label_t1 = st.selectbox("เลือกสาขา (Tab 1):", options=report_options, key="b_sel_t1")
                         b_id_t1 = "ทั้งหมด" if b_label_t1 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t1]
+                        selected_branch_display = b_label_t1 if b_label_t1 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
                     else:
                         st.info(f"📍 สังกัด: {user_branch_name}")
                         b_id_t1 = st.session_state.branch_id
+                        selected_branch_display = user_branch_name
 
                 try:
                     conn = get_db_connection()
@@ -71,14 +77,14 @@ def render_all_reports_module(user_branch_name):
                                      FROM machine_trans t 
                                      LEFT JOIN branches b ON t.branch_id = b.id 
                                      LEFT JOIN machines m ON t.machine_id = m.id
-                                     WHERE t.record_date BETWEEN %s AND %s ORDER BY t.record_date DESC"""
+                                     WHERE t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"""
                             cur.execute(sql, (start_date_t1, end_date_t1))
                         else:
                             sql = """SELECT t.*, b.branch_name, m.machine_name 
                                      FROM machine_trans t 
                                      LEFT JOIN branches b ON t.branch_id = b.id 
                                      LEFT JOIN machines m ON t.machine_id = m.id
-                                     WHERE t.branch_id = %s AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date DESC"""
+                                     WHERE t.branch_id = %s AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"""
                             cur.execute(sql, (b_id_t1, start_date_t1, end_date_t1))
                         raw_data_t1 = cur.fetchall()
                     conn.close()
@@ -86,6 +92,7 @@ def render_all_reports_module(user_branch_name):
                     if raw_data_t1:
                         pk_col_t1 = list(raw_data_t1[0].keys())[0]
                         
+                        # 1. แสดง DataFrame บนหน้าจอ Streamlit
                         df_display_t1 = []
                         for r in raw_data_t1:
                             df_display_t1.append({
@@ -101,15 +108,456 @@ def render_all_reports_module(user_branch_name):
                         df_t1 = pd.DataFrame(df_display_t1)
                         st.dataframe(df_t1, use_container_width=True)
 
+                        # 2. จัดเตรียมข้อมูล Matrix 1-31 วัน
+                        machines_config = [
+                            {"name": "โต๊ะเลื่อย (≤ 0.15%)", "hex": "E2EFDA"},
+                            {"name": "พัดลมดูดขี้เลื่อย(≤ 0.15%)", "hex": "F2F2F2"},
+                            {"name": "ตาชั่งใหญ่(≤ 0.20%)", "hex": "EDEDED"},
+                            {"name": "ตาชั่งเล็ก(≤ 0.20%)", "hex": "F2F2F2"},
+                            {"name": "รถยก(≤ 0.20%)", "hex": "FCE4D6"},
+                            {"name": "รถคีบ (≤16 ชม.)", "hex": "FFF2CC"},
+                            {"name": "อัดน้ำยา(≤ 0.20%)", "hex": "E2EFDA"},
+                            {"name": "เตาอบปกติ (≤ 0.20%)", "hex": "D9E1F2"},
+                            {"name": "เตาอบ CDK(≤ 0.20%)", "hex": "D9E1F2"},
+                            {"name": "บอยเลอร์(≤ 0.15%)", "hex": "FCE4D6"},
+                            {"name": "ชิปเปอร์(≤ 0.15%)", "hex": "FFF2CC"}
+                        ]
+
+                        matrix_data = {d: {m['name']: {'qty': '', 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, 32)}
+                        breakdown_remarks_list = []
+
+                        for row_m in raw_data_t1:
+                            d_num = pd.to_datetime(row_m['record_date']).day
+                            m_db_name = str(row_m.get('machine_name') or '')
+                            
+                            for m in machines_config:
+                                m_clean = m['name'].split('(')[0].strip()
+                                if m_clean.lower() in m_db_name.lower():
+                                    w_hr = float(row_m.get('working_hours') or 0.0)
+                                    b_hr = float(row_m.get('breakdown_hours') or 0.0)
+                                    qty = int(row_m.get('machine_qty') or 0)
+                                    rem = str(row_m.get('remarks') or '').strip()
+
+                                    matrix_data[d_num][m['name']] = {
+                                        'qty': qty,
+                                        'work': w_hr,
+                                        'break': b_hr,
+                                        'has_data': True
+                                    }
+
+                                    if b_hr > 0 and rem:
+                                        d_str = pd.to_datetime(row_m['record_date']).strftime('%d/%m/%y')
+                                        breakdown_remarks_list.append({
+                                            'date': d_str,
+                                            'machine': m_clean,
+                                            'break': b_hr,
+                                            'remark': rem
+                                        })
+                                    break
+
+                        # คำนวณผลรวม Sum และ %
+                        totals_work = {}
+                        totals_break = {}
+                        percentages = {}
+
+                        for m in machines_config:
+                            m_n = m['name']
+                            tot_w = sum([matrix_data[d][m_n]['work'] for d in range(1, 32)])
+                            tot_b = sum([matrix_data[d][m_n]['break'] for d in range(1, 32)])
+                            
+                            totals_work[m_n] = tot_w
+                            totals_break[m_n] = tot_b
+                            percentages[m_n] = f"{(tot_b / tot_w * 100):.2f}%" if tot_w > 0 else "0.00%"
+
+                        month_thai = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+                        start_dt = pd.to_datetime(start_date_t1)
+                        month_str = month_thai[start_dt.month - 1]
+                        year_buddhist = start_dt.year + 543
+
+                        # -------------------------------------------------------------------------
+                        # 3. สร้างไฟล์ EXCEL (.xlsx) จัดรูปแบบเต็ม Matrix ด้วย OpenPyXL
+                        # -------------------------------------------------------------------------
+                        wb = Workbook()
+                        ws = wb.active
+                        ws.title = "Summary Machine Report"
+                        ws.views.sheetView[0].showGridLines = True
+
+                        # Styles
+                        font_title = Font(name="Sarabun", size=14, bold=True)
+                        font_banner = Font(name="Sarabun", size=12, bold=True)
+                        font_header = Font(name="Sarabun", size=9, bold=True)
+                        font_body = Font(name="Sarabun", size=9)
+                        font_total = Font(name="Sarabun", size=9, bold=True)
+                        font_pct = Font(name="Sarabun", size=10, bold=True, color="FF0000")
+
+                        align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        align_right = Alignment(horizontal="right", vertical="center")
+                        align_left = Alignment(horizontal="left", vertical="center")
+
+                        thin_border = Border(
+                            left=Side(style="thin", color="000000"),
+                            right=Side(style="thin", color="000000"),
+                            top=Side(style="thin", color="000000"),
+                            bottom=Side(style="thin", color="000000")
+                        )
+
+                        fill_banner = PatternFill(start_color="F8CBAD", end_color="F8CBAD", fill_type="solid")
+                        fill_green = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
+
+                        # Total columns = 1 (วันที่) + 11 * 3 = 34 columns (A to AH)
+                        last_col_letter = get_column_letter(1 + len(machines_config) * 3)
+
+                        # Row 1: Title
+                        ws.merge_cells(f"A1:{last_col_letter}1")
+                        ws["A1"] = f"บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}"
+                        ws["A1"].font = font_title
+                        ws["A1"].alignment = align_center
+
+                        # Row 2: Banner
+                        ws.merge_cells(f"A2:{last_col_letter}2")
+                        ws["A2"] = f"สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}"
+                        ws["A2"].font = font_banner
+                        ws["A2"].alignment = align_center
+                        ws["A2"].fill = fill_banner
+                        ws.row_dimensions[2].height = 25
+
+                        # Row 3 & 4: Headers
+                        ws.merge_cells("A3:A4")
+                        ws["A3"] = "วันที่"
+                        ws["A3"].font = font_header
+                        ws["A3"].alignment = align_center
+                        ws["A3"].fill = fill_green
+                        ws["A3"].border = thin_border
+                        ws["A4"].border = thin_border
+
+                        col_idx = 2
+                        for m in machines_config:
+                            start_c = get_column_letter(col_idx)
+                            end_c = get_column_letter(col_idx + 2)
+                            
+                            # Row 3 Group Name
+                            ws.merge_cells(f"{start_c}3:{end_c}3")
+                            ws[f"{start_c}3"] = m["name"]
+                            ws[f"{start_c}3"].font = font_header
+                            ws[f"{start_c}3"].alignment = align_center
+                            ws[f"{start_c}3"].fill = PatternFill(start_color=m["hex"], end_color=m["hex"], fill_type="solid")
+                            
+                            for c in range(col_idx, col_idx + 3):
+                                ws[f"{get_column_letter(c)}3"].border = thin_border
+
+                            # Row 4 Sub-headers
+                            sub_headers = ["เครื่องจักร\nใช้งาน\n(เครื่อง)", "ชั่วโมง\nทำงาน\n(ชม.)", "ชั่วโมง\nเบรกดาวน์\n(ชม.)"]
+                            for i, sh in enumerate(sub_headers):
+                                cell_ref = f"{get_column_letter(col_idx + i)}4"
+                                ws[cell_ref] = sh
+                                ws[cell_ref].font = Font(name="Sarabun", size=8, bold=True)
+                                ws[cell_ref].alignment = align_center
+                                ws[cell_ref].border = thin_border
+
+                            col_idx += 3
+
+                        ws.row_dimensions[3].height = 20
+                        ws.row_dimensions[4].height = 35
+
+                        # Row 5 to 35: Days 1 to 31
+                        current_row = 5
+                        for day in range(1, 32):
+                            ws[f"A{current_row}"] = day
+                            ws[f"A{current_row}"].font = font_header
+                            ws[f"A{current_row}"].alignment = align_center
+                            ws[f"A{current_row}"].border = thin_border
+
+                            c_idx = 2
+                            for m in machines_config:
+                                item = matrix_data[day][m['name']]
+                                cell_q = ws[f"{get_column_letter(c_idx)}{current_row}"]
+                                cell_w = ws[f"{get_column_letter(c_idx+1)}{current_row}"]
+                                cell_b = ws[f"{get_column_letter(c_idx+2)}{current_row}"]
+
+                                if item['has_data']:
+                                    cell_q.value = item['qty']
+                                    cell_w.value = item['work'] if item['work'] > 0 else "-"
+                                    cell_b.value = item['break'] if item['break'] > 0 else "-"
+                                else:
+                                    cell_q.value = ""
+                                    cell_w.value = ""
+                                    cell_b.value = ""
+
+                                cell_q.font = font_body
+                                cell_q.alignment = align_center
+                                cell_q.border = thin_border
+
+                                cell_w.font = font_body
+                                cell_w.alignment = align_right if isinstance(cell_w.value, (int, float)) else align_center
+                                cell_w.border = thin_border
+                                if isinstance(cell_w.value, (int, float)):
+                                    cell_w.number_format = '#,##0.00'
+
+                                cell_b.font = font_body
+                                cell_b.alignment = align_right if isinstance(cell_b.value, (int, float)) else align_center
+                                cell_b.border = thin_border
+                                if isinstance(cell_b.value, (int, float)):
+                                    cell_b.number_format = '#,##0.00'
+
+                                c_idx += 3
+                            current_row += 1
+
+                        # Row 36: แถว "รวม" (Total Row)
+                        ws[f"A{current_row}"] = "รวม"
+                        ws[f"A{current_row}"].font = font_total
+                        ws[f"A{current_row}"].alignment = align_center
+                        ws[f"A{current_row}"].fill = fill_green
+                        ws[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for m in machines_config:
+                            m_n = m['name']
+                            cell_q = ws[f"{get_column_letter(c_idx)}{current_row}"]
+                            cell_w = ws[f"{get_column_letter(c_idx+1)}{current_row}"]
+                            cell_b = ws[f"{get_column_letter(c_idx+2)}{current_row}"]
+
+                            cell_q.value = "-"
+                            cell_q.font = font_total
+                            cell_q.alignment = align_center
+                            cell_q.fill = fill_green
+                            cell_q.border = thin_border
+
+                            cell_w.value = totals_work[m_n] if totals_work[m_n] > 0 else "-"
+                            cell_w.font = font_total
+                            cell_w.alignment = align_right if totals_work[m_n] > 0 else align_center
+                            cell_w.fill = fill_green
+                            cell_w.border = thin_border
+                            if totals_work[m_n] > 0:
+                                cell_w.number_format = '#,##0.00'
+
+                            cell_b.value = totals_break[m_n] if totals_break[m_n] > 0 else "-"
+                            cell_b.font = font_total
+                            cell_b.alignment = align_right if totals_break[m_n] > 0 else align_center
+                            cell_b.fill = fill_green
+                            cell_b.border = thin_border
+                            if totals_break[m_n] > 0:
+                                cell_b.number_format = '#,##0.00'
+
+                            c_idx += 3
+
+                        current_row += 1
+
+                        # Row 37: แถว "คิดเป็น%" (Percentage Row)
+                        ws[f"A{current_row}"] = "คิดเป็น%"
+                        ws[f"A{current_row}"].font = font_pct
+                        ws[f"A{current_row}"].alignment = align_center
+                        ws[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for m in machines_config:
+                            start_c = get_column_letter(c_idx)
+                            end_c = get_column_letter(c_idx + 2)
+                            
+                            ws.merge_cells(f"{start_c}{current_row}:{end_c}{current_row}")
+                            cell_p = ws[f"{start_c}{current_row}"]
+                            cell_p.value = percentages[m['name']]
+                            cell_p.font = font_pct
+                            cell_p.alignment = align_center
+                            
+                            for c in range(c_idx, c_idx + 3):
+                                ws[f"{get_column_letter(c)}{current_row}"].border = thin_border
+
+                            c_idx += 3
+
+                        current_row += 2  # เว้น 1 แถว
+
+                        # Section: ตารางหมายเหตุเบรกดาวน์ด้านล่าง
+                        ws[f"A{current_row}"] = "รายการ"
+                        ws[f"B{current_row}"] = "วันที่"
+                        ws.merge_cells(f"C{current_row}:K{current_row}")
+                        ws[f"C{current_row}"] = "สาเหตุการเบรกดาวน์ / หมายเหตุ"
+
+                        for c in ["A", "B"]:
+                            ws[f"{c}{current_row}"].font = font_header
+                            ws[f"{c}{current_row}"].alignment = align_center
+                            ws[f"{c}{current_row}"].fill = fill_green
+                            ws[f"{c}{current_row}"].border = thin_border
+
+                        ws[f"C{current_row}"].font = font_header
+                        ws[f"C{current_row}"].alignment = align_center
+                        ws[f"C{current_row}"].fill = fill_green
+                        
+                        for col_i in range(3, 12):
+                            ws[f"{get_column_letter(col_i)}{current_row}"].border = thin_border
+
+                        current_row += 1
+
+                        if breakdown_remarks_list:
+                            for idx, rem in enumerate(breakdown_remarks_list, 1):
+                                ws[f"A{current_row}"] = idx
+                                ws[f"B{current_row}"] = rem["date"]
+                                ws.merge_cells(f"C{current_row}:K{current_row}")
+                                ws[f"C{current_row}"] = f'[{rem["machine"]}] {rem["remark"]} ({rem["break"]} ชม.)'
+
+                                ws[f"A{current_row}"].font = font_body
+                                ws[f"A{current_row}"].alignment = align_center
+                                ws[f"A{current_row}"].border = thin_border
+
+                                ws[f"B{current_row}"].font = font_body
+                                ws[f"B{current_row}"].alignment = align_center
+                                ws[f"B{current_row}"].border = thin_border
+
+                                ws[f"C{current_row}"].font = font_body
+                                ws[f"C{current_row}"].alignment = align_left
+
+                                for col_i in range(3, 12):
+                                    ws[f"{get_column_letter(col_i)}{current_row}"].border = thin_border
+
+                                current_row += 1
+                        else:
+                            ws[f"A{current_row}"] = "-"
+                            ws[f"B{current_row}"] = "-"
+                            ws.merge_cells(f"C{current_row}:K{current_row}")
+                            ws[f"C{current_row}"] = "ไม่มีรายการเครื่องจักรเบรกดาวน์ในช่วงเวลานี้"
+
+                            ws[f"A{current_row}"].alignment = align_center
+                            ws[f"B{current_row}"].alignment = align_center
+                            ws[f"C{current_row}"].alignment = align_center
+
+                            for col_i in range(1, 12):
+                                ws[f"{get_column_letter(col_i)}{current_row}"].border = thin_border
+
+                        # ตั้งค่าความกว้างคอลัมน์ Excel ให้สวยงาม
+                        ws.column_dimensions['A'].width = 8
+                        for c in range(2, 35):
+                            ws.column_dimensions[get_column_letter(c)].width = 11
+
+                        # Save to BytesIO
+                        excel_buffer = io.BytesIO()
+                        wb.save(excel_buffer)
+                        excel_data = excel_buffer.getvalue()
+
+                        # -------------------------------------------------------------------------
+                        # 4. สร้าง HTML สำหรับสั่งปริ้นเปิดในเบราว์เซอร์
+                        # -------------------------------------------------------------------------
+                        header_row1 = "".join([f'<th colspan="3" style="background-color:{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in machines_config])
+                        header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in machines_config])
+
+                        body_rows = ""
+                        for day in range(1, 32):
+                            body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
+                            for m in machines_config:
+                                item = matrix_data[day][m['name']]
+                                if item['has_data']:
+                                    q_val = str(item['qty'])
+                                    w_val = f"{item['work']:,.2f}" if item['work'] > 0 else "-"
+                                    b_val = f"{item['break']:,.2f}" if item['break'] > 0 else "-"
+                                else:
+                                    q_val, w_val, b_val = "", "", ""
+                                
+                                body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{q_val}</td>'
+                                body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{w_val}</td>'
+                                body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{b_val}</td>'
+                            body_rows += '</tr>'
+
+                        total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
+                        for m in machines_config:
+                            m_n = m['name']
+                            tw_s = f"{totals_work[m_n]:,.2f}" if totals_work[m_n] > 0 else '-'
+                            tb_s = f"{totals_break[m_n]:,.2f}" if totals_break[m_n] > 0 else '-'
+                            total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td>'
+                            total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td>'
+                            total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
+                        total_row_html += '</tr>'
+
+                        pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
+                        for m in machines_config:
+                            pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
+                        pct_row_html += '</tr>'
+
+                        if breakdown_remarks_list:
+                            rem_rows = "".join([f'<tr><td style="border:1px solid #000;text-align:center;font-size:9px;">{i+1}</td><td style="border:1px solid #000;text-align:center;font-size:9px;">{r["date"]}</td><td style="border:1px solid #000;font-size:9px;padding-left:4px;">[{r["machine"]}] {r["remark"]} ({r["break"]} ชม.)</td></tr>' for i, r in enumerate(breakdown_remarks_list)])
+                        else:
+                            rem_rows = '<tr><td colspan="3" style="border:1px solid #000;text-align:center;font-size:9px;color:#777;">ไม่มีรายการเครื่องจักรเบรกดาวน์ในช่วงเวลานี้</td></tr>'
+
+                        table_full_html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Print Summary Machine Report</title>
+    <style>
+        @page {{ size: A4 landscape; margin: 4mm; }}
+        body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; }}
+        .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }}
+        .banner {{ background-color: #F8CBAD; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; }}
+    </style>
+</head>
+<body>
+    <div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div>
+    <div class="banner">สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}</div>
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="2" style="background-color:#E2EFDA;border:1px solid #000;padding:3px;font-size:10px;width:35px;">วันที่</th>
+                {header_row1}
+            </tr>
+            <tr>
+                {header_row2}
+            </tr>
+        </thead>
+        <tbody>
+            {body_rows}
+            {total_row_html}
+            {pct_row_html}
+        </tbody>
+    </table>
+    <br>
+    <table style="width:50%;border-collapse:collapse;margin-top:10px;">
+        <thead>
+            <tr style="background-color:#E2EFDA;">
+                <th style="border:1px solid #000;padding:3px;font-size:9px;width:40px;">รายการ</th>
+                <th style="border:1px solid #000;padding:3px;font-size:9px;width:70px;">วันที่</th>
+                <th style="border:1px solid #000;padding:3px;font-size:9px;">สาเหตุการเบรกดาวน์/หมายเหตุ</th>
+            </tr>
+        </thead>
+        <tbody>
+            {rem_rows}
+        </tbody>
+    </table>
+</body>
+</html>"""
+
+                        json_print_html_t1 = json.dumps(table_full_html)
+
+                        # ปุ่ม Export & Print
                         col_btn1, col_btn2 = st.columns(2)
                         with col_btn1:
-                            buffer = io.BytesIO()
-                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                df_t1.to_excel(writer, index=False, sheet_name='Machine Report')
-                            st.download_button("📥 Export เป็น Excel (.xlsx)", data=buffer.getvalue(), file_name=f"Report_Machine_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
+                            st.download_button(
+                                label="📥 Export เป็น Excel (.xlsx)",
+                                data=excel_data,
+                                file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                key="dl_t1"
+                            )
                         with col_btn2:
-                            table_html_t1 = df_t1.to_html(index=False, classes='report-table')
-                            components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="window.parent.openPrintPreview1 ? window.parent.openPrintPreview1() : openPrintPreview1()" style="width:100%; height:38px; background-color:#F0F2F6; border:1px solid #C4C7D0; border-radius:8px; color:#31333F; font-family:sans-serif; font-size:14px; font-weight:500; cursor:pointer; box-sizing:border-box;">🖨️ ปริ้นเอกสารรายงาน (Tab 1)</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); var content = `<html><head><title>Print Preview - Tab 1</title></head><body><h2>รายงานสรุปการทำงานของเครื่องจักร</h2><br>{table_html_t1}</body></html>`; w.document.write(content); w.document.close(); w.print();}}</script>""", height=40)
+                            components.html(f"""
+                            <body style="margin:0;padding:0;overflow:hidden;">
+                                <button onclick="openPrintPreview1()" style="width:100%; height:38px; background-color:#F0F2F6; border:1px solid #C4C7D0; border-radius:8px; color:#31333F; font-family:sans-serif; font-size:14px; font-weight:500; cursor:pointer; box-sizing:border-box;">
+                                    🖨️ ปริ้นเอกสารรายงาน (Tab 1)
+                                </button>
+                            </body>
+                            <script>
+                            function openPrintPreview1(){{
+                                var htmlData = {json_print_html_t1};
+                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                                if (w) {{
+                                    w.document.open();
+                                    w.document.write(htmlData);
+                                    w.document.close();
+                                    w.focus();
+                                    setTimeout(function(){{ w.print(); }}, 500);
+                                }}
+                            }}
+                            </script>
+                            """, height=40)
 
                         if current_role in ['admin', 'manager']:
                             st.write("---")
@@ -162,8 +610,8 @@ def render_all_reports_module(user_branch_name):
                     else:
                         st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
                 except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาดในการดึงรายงาน Tab 1: {e}")
-
+                    st.error(f"เกิดข้อผิดพลาดในการดึงรายงาน Tab 1: {e}")  
+                    
         # =========================================================================
         # 🚚 TAB 2 REPORT: รายงานสรุปการใช้เชื้อเพลิงรถ
         # =========================================================================
