@@ -49,7 +49,7 @@ def render_all_reports_module(user_branch_name):
         current_tab_ctx = created_tabs[index]
 
         # =========================================================================
-        # ⚙️ TAB 1 REPORT: รายงานสรุปเครื่องจักร & เบรกดาวน์
+        # ⚙️ TAB 1 REPORT: รายงานสรุปเครื่องจักร & เบรกดาวน์ (รวมค่า ID ที่ลงซ้ำวันเดียวกัน)
         # =========================================================================
         if key == "1":
             with current_tab_ctx:
@@ -91,7 +91,7 @@ def render_all_reports_module(user_branch_name):
 
                     if raw_data_t1:
                         pk_col_t1 = list(raw_data_t1[0].keys())[0]
-
+                        
                         # 1. แสดง DataFrame บนหน้าจอ Streamlit
                         df_display_t1 = []
                         for r in raw_data_t1:
@@ -108,9 +108,7 @@ def render_all_reports_module(user_branch_name):
                         df_t1 = pd.DataFrame(df_display_t1)
                         st.dataframe(df_t1, use_container_width=True)
 
-
                         # 2. จัดเตรียมข้อมูล Matrix 1-31 วัน
-                        
                         machines_config = [
                             {"name": "โต๊ะเลื่อย (≤ 0.15%)", "hex": "E2EFDA"},
                             {"name": "พัดลมดูดขี้เลื่อย(≤ 0.15%)", "hex": "F2F2F2"},
@@ -125,9 +123,10 @@ def render_all_reports_module(user_branch_name):
                             {"name": "ชิปเปอร์(≤ 0.15%)", "hex": "FFF2CC"}
                         ]
 
-                        matrix_data = {d: {m['name']: {'qty': '', 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, 32)}
+                        matrix_data = {d: {m['name']: {'qty': 0, 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, 32)}
                         breakdown_remarks_list = []
 
+                        # 🎯 วนลูปและบวกค่าเพิ่มกรณีพบเครื่องจักรเดียวกันในวันเดียวกัน
                         for row_m in raw_data_t1:
                             d_num = pd.to_datetime(row_m['record_date']).day
                             m_db_name = str(row_m.get('machine_name') or '')
@@ -140,13 +139,13 @@ def render_all_reports_module(user_branch_name):
                                     qty = int(row_m.get('machine_qty') or 0)
                                     rem = str(row_m.get('remarks') or '').strip()
 
-                                    matrix_data[d_num][m['name']] = {
-                                        'qty': qty,
-                                        'work': w_hr,
-                                        'break': b_hr,
-                                        'has_data': True
-                                    }
+                                    # บวกสะสมค่าตัวเลข (Sum)
+                                    matrix_data[d_num][m['name']]['qty'] += qty
+                                    matrix_data[d_num][m['name']]['work'] += w_hr
+                                    matrix_data[d_num][m['name']]['break'] += b_hr
+                                    matrix_data[d_num][m['name']]['has_data'] = True
 
+                                    # หากมีเบรกดาวน์ บันทึกหมายเหตุแยกรายการตามเดิม
                                     if b_hr > 0 and rem:
                                         d_str = pd.to_datetime(row_m['record_date']).strftime('%d/%m/%y')
                                         breakdown_remarks_list.append({
@@ -157,7 +156,7 @@ def render_all_reports_module(user_branch_name):
                                         })
                                     break
 
-                        # คำนวณผลรวม Sum และ %                        
+                        # คำนวณผลรวม Sum และ %
                         totals_work = {}
                         totals_break = {}
                         percentages = {}
@@ -176,16 +175,12 @@ def render_all_reports_module(user_branch_name):
                         month_str = month_thai[start_dt.month - 1]
                         year_buddhist = start_dt.year + 543
 
-                        # -------------------------------------------------------------------------
-                        # 3. สร้างไฟล์ EXCEL (.xlsx) จัดรูปแบบเต็ม Matrix ด้วย OpenPyXL
-                        # -------------------------------------------------------------------------
                         # Excel export logic
                         wb = Workbook()
                         ws = wb.active
                         ws.title = "Summary Machine Report"
                         ws.views.sheetView[0].showGridLines = True
 
-                        # Styles
                         font_title = Font(name="Sarabun", size=14, bold=True)
                         font_banner = Font(name="Sarabun", size=12, bold=True)
                         font_header = Font(name="Sarabun", size=9, bold=True)
@@ -198,25 +193,20 @@ def render_all_reports_module(user_branch_name):
                         align_left = Alignment(horizontal="left", vertical="center")
 
                         thin_border = Border(
-                            left=Side(style="thin", color="000000"),
-                            right=Side(style="thin", color="000000"),
-                            top=Side(style="thin", color="000000"),
-                            bottom=Side(style="thin", color="000000")
+                            left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"),
+                            top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000")
                         )
 
                         fill_banner = PatternFill(start_color="F8CBAD", end_color="F8CBAD", fill_type="solid")
                         fill_green = PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
 
-                        # Total columns = 1 (วันที่) + 11 * 3 = 34 columns (A to AH)
                         last_col_letter = get_column_letter(1 + len(machines_config) * 3)
 
-                        # Row 1: Title
                         ws.merge_cells(f"A1:{last_col_letter}1")
                         ws["A1"] = f"บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}"
                         ws["A1"].font = font_title
                         ws["A1"].alignment = align_center
 
-                        # Row 2: Banner
                         ws.merge_cells(f"A2:{last_col_letter}2")
                         ws["A2"] = f"สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}"
                         ws["A2"].font = font_banner
@@ -224,7 +214,6 @@ def render_all_reports_module(user_branch_name):
                         ws["A2"].fill = fill_banner
                         ws.row_dimensions[2].height = 25
 
-                        # Row 3 & 4: Headers
                         ws.merge_cells("A3:A4")
                         ws["A3"] = "วันที่"
                         ws["A3"].font = font_header
@@ -237,8 +226,7 @@ def render_all_reports_module(user_branch_name):
                         for m in machines_config:
                             start_c = get_column_letter(col_idx)
                             end_c = get_column_letter(col_idx + 2)
-
-                            # Row 3 Group Name                            
+                            
                             ws.merge_cells(f"{start_c}3:{end_c}3")
                             ws[f"{start_c}3"] = m["name"]
                             ws[f"{start_c}3"].font = font_header
@@ -248,7 +236,6 @@ def render_all_reports_module(user_branch_name):
                             for c in range(col_idx, col_idx + 3):
                                 ws[f"{get_column_letter(c)}3"].border = thin_border
 
-                            # Row 4 Sub-headers
                             sub_headers = ["เครื่องจักร\nใช้งาน\n(เครื่อง)", "ชั่วโมง\nทำงาน\n(ชม.)", "ชั่วโมง\nเบรกดาวน์\n(ชม.)"]
                             for i, sh in enumerate(sub_headers):
                                 cell_ref = f"{get_column_letter(col_idx + i)}4"
@@ -262,7 +249,6 @@ def render_all_reports_module(user_branch_name):
                         ws.row_dimensions[3].height = 20
                         ws.row_dimensions[4].height = 35
 
-                        # Row 5 to 35: Days 1 to 31
                         current_row = 5
                         for day in range(1, 32):
                             ws[f"A{current_row}"] = day
@@ -278,7 +264,7 @@ def render_all_reports_module(user_branch_name):
                                 cell_b = ws[f"{get_column_letter(c_idx+2)}{current_row}"]
 
                                 if item['has_data']:
-                                    cell_q.value = item['qty']
+                                    cell_q.value = item['qty'] if item['qty'] > 0 else "-"
                                     cell_w.value = item['work'] if item['work'] > 0 else "-"
                                     cell_b.value = item['break'] if item['break'] > 0 else "-"
                                 else:
@@ -305,7 +291,6 @@ def render_all_reports_module(user_branch_name):
                                 c_idx += 3
                             current_row += 1
 
-                        # Row 36: แถว "รวม" (Total Row)
                         ws[f"A{current_row}"] = "รวม"
                         ws[f"A{current_row}"].font = font_total
                         ws[f"A{current_row}"].alignment = align_center
@@ -345,7 +330,6 @@ def render_all_reports_module(user_branch_name):
 
                         current_row += 1
 
-                        # Row 37: แถว "คิดเป็น%" (Percentage Row)
                         ws[f"A{current_row}"] = "คิดเป็น%"
                         ws[f"A{current_row}"].font = font_pct
                         ws[f"A{current_row}"].alignment = align_center
@@ -367,9 +351,8 @@ def render_all_reports_module(user_branch_name):
 
                             c_idx += 3
 
-                        current_row += 2  # เว้น 1 แถว
+                        current_row += 2
 
-                        # Section: ตารางหมายเหตุเบรกดาวน์ด้านล่าง
                         ws[f"A{current_row}"] = "รายการ"
                         ws[f"B{current_row}"] = "วันที่"
                         ws.merge_cells(f"C{current_row}:K{current_row}")
@@ -424,19 +407,16 @@ def render_all_reports_module(user_branch_name):
 
                             for col_i in range(1, 12):
                                 ws[f"{get_column_letter(col_i)}{current_row}"].border = thin_border
-                        # ตั้งค่าความกว้างคอลัมน์ Excel ให้สวยงาม
+
                         ws.column_dimensions['A'].width = 8
                         for c in range(2, 35):
                             ws.column_dimensions[get_column_letter(c)].width = 11
 
-                        # Save to BytesIO
                         excel_buffer = io.BytesIO()
                         wb.save(excel_buffer)
                         excel_data = excel_buffer.getvalue()
 
-                        # -------------------------------------------------------------------------
-                        # 4. สร้าง HTML สำหรับสั่งปริ้นเปิดในเบราว์เซอร์
-                        # -------------------------------------------------------------------------
+                        # HTML สำหรับเปิดพิมพ์
                         header_row1 = "".join([f'<th colspan="3" style="background-color:{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in machines_config])
                         header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in machines_config])
 
@@ -446,7 +426,7 @@ def render_all_reports_module(user_branch_name):
                             for m in machines_config:
                                 item = matrix_data[day][m['name']]
                                 if item['has_data']:
-                                    q_val = str(item['qty'])
+                                    q_val = str(item['qty']) if item['qty'] > 0 else "-"
                                     w_val = f"{item['work']:,.2f}" if item['work'] > 0 else "-"
                                     b_val = f"{item['break']:,.2f}" if item['break'] > 0 else "-"
                                 else:
@@ -527,8 +507,6 @@ def render_all_reports_module(user_branch_name):
 </html>"""
 
                         json_print_html_t1 = json.dumps(table_full_html)
-
-                        # 🎯 กำหนดข้อความปุ่มปริ้นท์ตามระดับสิทธิ์ (Admin/Manager vs User)
                         print_btn_label_t1 = "🖨️ ปริ้นเอกสารรายงาน (Tab 1)" if current_role in ["admin", "manager"] else "🖨️ ปริ้นเอกสารรายงาน"
 
                         col_btn1, col_btn2 = st.columns(2)
@@ -571,19 +549,29 @@ def render_all_reports_module(user_branch_name):
                             selected_label_t1 = st.selectbox("เลือกรายการที่ต้องการแก้ไข/ลบ (Tab 1):", options=list(record_map_t1.keys()), key="select_t1")
                             target_pk_t1, target_rec_t1 = record_map_t1[selected_label_t1]
 
+                            # 🎯 ซิงค์ค่าใน session_state อัตโนมัติเมื่อเลือก ID ใหม่
+                            if st.session_state.get('prev_selected_t1') != selected_label_t1:
+                                st.session_state['e_date_t1_in'] = pd.to_datetime(target_rec_t1.get('record_date'))
+                                st.session_state['e_qty_t1_in'] = int(target_rec_t1.get('machine_qty') or 1)
+                                st.session_state['e_work_t1_in'] = float(target_rec_t1.get('working_hours') or 0.0)
+                                st.session_state['e_break_t1_in'] = float(target_rec_t1.get('breakdown_hours') or 0.0)
+                                st.session_state['e_remark_t1_in'] = str(target_rec_t1.get('remarks') or '')
+                                st.session_state['prev_selected_t1'] = selected_label_t1
+
                             with st.expander("📝 ฟอร์มปรับปรุงแก้ไขข้อมูล (Update Tab 1)", expanded=True):
                                 e_col1, e_col2 = st.columns(2)
                                 with e_col1:
-                                    e_date_t1 = st.date_input("แก้ไข วันที่", value=pd.to_datetime(target_rec_t1.get('record_date')), key="e_date_t1_in")
-                                    e_qty_t1 = st.number_input("แก้ไข จำนวนเครื่องจักร", min_value=1, value=int(target_rec_t1.get('machine_qty') or 1), key="e_qty_t1_in")
+                                    e_date_t1 = st.date_input("แก้ไข วันที่", key="e_date_t1_in")
+                                    e_qty_t1 = st.number_input("แก้ไข จำนวนเครื่องจักร", min_value=1, key="e_qty_t1_in")
                                 with e_col2:
-                                    e_work_t1 = st.number_input("แก้ไข ชม.ทำงาน", min_value=0.0, step=0.5, value=float(target_rec_t1.get('working_hours') or 0.0), key="e_work_t1_in")
-                                    e_break_t1 = st.number_input("แก้ไข ชม.เบรกดาวน์", min_value=0.0, step=0.5, value=float(target_rec_t1.get('breakdown_hours') or 0.0), key="e_break_t1_in")
-                                e_remark_t1 = st.text_area("แก้ไข หมายเหตุ", value=str(target_rec_t1.get('remarks') or ''), key="e_remark_t1_in")
+                                    e_work_t1 = st.number_input("แก้ไข ชม.ทำงาน", min_value=0.0, step=0.5, key="e_work_t1_in")
+                                    e_break_t1 = st.number_input("แก้ไข ชม.เบรกดาวน์", min_value=0.0, step=0.5, key="e_break_t1_in")
+                                e_remark_t1 = st.text_area("แก้ไข หมายเหตุ", key="e_remark_t1_in")
 
                                 act_col1, act_col2 = st.columns(2)
                                 with act_col1:
-                                    if st.button("💾 บันทึกการแก้ไข (Update Tab 1)", key="btn_up_t1", use_container_width=True):
+                                    # 🎯 ใส่ ID กำกับหลัง key เพื่อป้องกันชื่อซ้ำ
+                                    if st.button("💾 บันทึกการแก้ไข (Update Tab 1)", key=f"btn_up_t1_{target_pk_t1}", use_container_width=True):
                                         try:
                                             conn = get_db_connection()
                                             with conn.cursor() as cur:
@@ -598,7 +586,8 @@ def render_all_reports_module(user_branch_name):
                                         except Exception as ex:
                                             st.toast(f"❌ เกิดข้อผิดพลาดในการแก้ไข: {ex}", icon="⚠️")
                                 with act_col2:
-                                    if st.button("🗑️ ลบรายการนี้ (Delete Tab 1)", type="primary", use_container_width=True, key="del_btn_t1"):
+                                    # 🎯 ใส่ ID กำกับหลัง key เพื่อแก้ไขข้อผิดพลาด del_btn_t1 ซ้ำ
+                                    if st.button("🗑️ ลบรายการนี้ (Delete Tab 1)", type="primary", use_container_width=True, key=f"del_btn_t1_{target_pk_t1}"):
                                         try:
                                             conn = get_db_connection()
                                             with conn.cursor() as cur:
@@ -617,7 +606,7 @@ def render_all_reports_module(user_branch_name):
                     st.error(f"เกิดข้อผิดพลาดในการดึงรายงาน Tab 1: {e}")
 
         # =========================================================================
-        # 🚚 TAB 2 REPORT: รายงานสรุปการใช้เชื้อเพลิงรถ
+        # 🚚 TAB 2 REPORT: รายงานสรุปการใช้เชื้อเพลิงรถ (แก้ไขปัญหา SQL Column Error 1054)
         # =========================================================================
         elif key == "2":
             with current_tab_ctx:
@@ -631,26 +620,49 @@ def render_all_reports_module(user_branch_name):
                     if current_role in ["admin", "manager"]:
                         b_label_t2 = st.selectbox("เลือกสาขา (Tab 2):", options=report_options, key="b_sel_t2")
                         b_id_t2 = "ทั้งหมด" if b_label_t2 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t2]
+                        selected_branch_display = b_label_t2 if b_label_t2 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
                     else:
                         st.info(f"📍 สังกัด: {user_branch_name}")
                         b_id_t2 = st.session_state.branch_id
+                        selected_branch_display = user_branch_name
 
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
+                        # 1. ดึงเฉพาะคอลัมน์ที่มีอยู่จริงในตาราง engines และ engine_types
                         if b_id_t2 == "ทั้งหมด":
-                            sql = """SELECT r.*, b.branch_name 
-                                     FROM fuel_records r 
-                                     LEFT JOIN branches b ON r.branch_id = b.id
-                                     WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"""
-                            cur.execute(sql, (start_date_t2, end_date_t2))
+                            sql_eng = """SELECT e.id, 
+                                                CONVERT(e.engine_code USING utf8mb4) AS engine_code, 
+                                                CONVERT(et.type_name USING utf8mb4) AS type_name
+                                         FROM engines e 
+                                         LEFT JOIN engine_types et ON e.engine_type_id = et.id 
+                                         WHERE e.is_active = 1 ORDER BY e.id ASC"""
+                            cur.execute(sql_eng)
+                            engines_list = cur.fetchall()
+
+                            sql_trans = """SELECT r.*, b.branch_name 
+                                           FROM fuel_records r 
+                                           LEFT JOIN branches b ON r.branch_id = b.id
+                                           WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"""
+                            cur.execute(sql_trans, (start_date_t2, end_date_t2))
+                            raw_data_t2 = cur.fetchall()
                         else:
-                            sql = """SELECT r.*, b.branch_name 
-                                     FROM fuel_records r 
-                                     LEFT JOIN branches b ON r.branch_id = b.id
-                                     WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"""
-                            cur.execute(sql, (b_id_t2, start_date_t2, end_date_t2))
-                        raw_data_t2 = cur.fetchall()
+                            sql_eng = """SELECT e.id, 
+                                                CONVERT(e.engine_code USING utf8mb4) AS engine_code, 
+                                                CONVERT(et.type_name USING utf8mb4) AS type_name
+                                         FROM engines e 
+                                         LEFT JOIN engine_types et ON e.engine_type_id = et.id 
+                                         WHERE e.branch_id = %s AND e.is_active = 1 ORDER BY e.id ASC"""
+                            cur.execute(sql_eng, (b_id_t2,))
+                            engines_list = cur.fetchall()
+
+                            sql_trans = """SELECT r.*, b.branch_name 
+                                           FROM fuel_records r 
+                                           LEFT JOIN branches b ON r.branch_id = b.id
+                                           WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"""
+                            cur.execute(sql_trans, (b_id_t2, start_date_t2, end_date_t2))
+                            raw_data_t2 = cur.fetchall()
+
                     conn.close()
 
                     if raw_data_t2:
@@ -661,7 +673,7 @@ def render_all_reports_module(user_branch_name):
                             liters = float(r.get('fuel_liters') or 0.0)
                             hours = float(r.get('working_hours') or 0.0)
                             liters_per_hour = round(liters / hours, 2) if hours > 0 else 0.00
-
+                            
                             df_display_t2.append({
                                 'ID รายการ': r[pk_col_t2],
                                 'วันที่': r.get('record_date'),
@@ -676,17 +688,313 @@ def render_all_reports_module(user_branch_name):
                         df_t2 = pd.DataFrame(df_display_t2)
                         st.dataframe(df_t2, use_container_width=True)
 
+                        # 2. จัดโครงสร้าง Engines Configuration
+                        engines_config = []
+                        if engines_list:
+                            for eng in engines_list:
+                                code = str(eng.get('engine_code') or '')
+                                type_nm = str(eng.get('type_name') or 'รถยก')
+                                
+                                # กำหนดสีตามประเภท/รหัสรถ (TOYOTA=แดง, TCK=ส้ม/เหลือง)
+                                hex_color = "FF0000" if "toyota" in type_nm.lower() or "toyota" in code.lower() else ("FFC000" if "tck" in type_nm.lower() or "tck" in code.lower() else "F2F2F2")
+                                
+                                engines_config.append({
+                                    "code": code,
+                                    "title": code,
+                                    "brand": type_nm,
+                                    "hex": hex_color
+                                })
+                        else:
+                            unique_codes = list(set([r.get('engine_code') for r in raw_data_t2 if r.get('engine_code')]))
+                            for c in unique_codes:
+                                engines_config.append({"code": c, "title": c, "brand": "TOYOTA/TCK", "hex": "FFC000"})
+
+                        # 3. จัดเตรียม Matrix ข้อมูล วันที่ 1-31
+                        matrix_data_t2 = {d: {e['code']: {'liters': 0.0, 'hours': 0.0, 'has_data': False} for e in engines_config} for d in range(1, 32)}
+
+                        for r in raw_data_t2:
+                            d_num = pd.to_datetime(r['record_date']).day
+                            e_code = str(r.get('engine_code') or '')
+                            
+                            for e in engines_config:
+                                if e['code'].strip().lower() == e_code.strip().lower():
+                                    matrix_data_t2[d_num][e['code']] = {
+                                        'liters': float(r.get('fuel_liters') or 0.0),
+                                        'hours': float(r.get('working_hours') or 0.0),
+                                        'has_data': True
+                                    }
+                                    break
+
+                        # คำนวณผลรวม
+                        totals_liters_t2 = {}
+                        totals_hours_t2 = {}
+                        avg_l_hr_t2 = {}
+
+                        for e in engines_config:
+                            c_code = e['code']
+                            tot_l = sum([matrix_data_t2[d][c_code]['liters'] for d in range(1, 32)])
+                            tot_h = sum([matrix_data_t2[d][c_code]['hours'] for d in range(1, 32)])
+                            
+                            totals_liters_t2[c_code] = tot_l
+                            totals_hours_t2[c_code] = tot_h
+                            avg_l_hr_t2[c_code] = f"{(tot_l / tot_h):.2f}" if tot_h > 0 else "0.00"
+
+                        month_thai = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+                        start_dt = pd.to_datetime(start_date_t2)
+                        month_str = month_thai[start_dt.month - 1]
+                        year_buddhist = start_dt.year + 543
+
+                        # -------------------------------------------------------------------------
+                        # 4. สร้างไฟล์ EXCEL (.xlsx) Cross-tab Matrix 3 ชั้น
+                        # -------------------------------------------------------------------------
+                        wb2 = Workbook()
+                        ws2 = wb2.active
+                        ws2.title = "Fuel Report Matrix"
+                        ws2.views.sheetView[0].showGridLines = True
+
+                        font_title = Font(name="Sarabun", size=14, bold=True)
+                        font_header = Font(name="Sarabun", size=9, bold=True)
+                        font_header_white = Font(name="Sarabun", size=9, bold=True, color="FFFFFF")
+                        font_body = Font(name="Sarabun", size=9)
+                        font_total = Font(name="Sarabun", size=9, bold=True)
+
+                        align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        align_right = Alignment(horizontal="right", vertical="center")
+
+                        thin_border = Border(
+                            left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"),
+                            top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000")
+                        )
+
+                        last_col_letter_t2 = get_column_letter(1 + len(engines_config) * 3)
+
+                        ws2.merge_cells(f"A1:{last_col_letter_t2}1")
+                        ws2["A1"] = f"บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}"
+                        ws2["A1"].font = font_title
+                        ws2["A1"].alignment = align_center
+
+                        ws2.merge_cells(f"A2:{last_col_letter_t2}2")
+                        ws2["A2"] = f"รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}"
+                        ws2["A2"].font = font_title
+                        ws2["A2"].alignment = align_center
+
+                        ws2.merge_cells("A3:A5")
+                        ws2["A3"] = "วันที่"
+                        ws2["A3"].font = font_header
+                        ws2["A3"].alignment = align_center
+                        ws2["A3"].border = thin_border
+                        ws2["A4"].border = thin_border
+                        ws2["A5"].border = thin_border
+
+                        col_idx = 2
+                        for e in engines_config:
+                            start_c = get_column_letter(col_idx)
+                            end_c = get_column_letter(col_idx + 2)
+                            
+                            ws2.merge_cells(f"{start_c}3:{end_c}3")
+                            ws2[f"{start_c}3"] = e["title"]
+                            ws2[f"{start_c}3"].font = font_header
+                            ws2[f"{start_c}3"].alignment = align_center
+                            
+                            ws2.merge_cells(f"{start_c}4:{end_c}4")
+                            ws2[f"{start_c}4"] = e["brand"]
+                            ws2[f"{start_c}4"].font = font_header_white if e["hex"] == "FF0000" else font_header
+                            ws2[f"{start_c}4"].alignment = align_center
+                            fill_color = PatternFill(start_color=e["hex"], end_color=e["hex"], fill_type="solid")
+                            ws2[f"{start_c}4"].fill = fill_color
+
+                            for c in range(col_idx, col_idx + 3):
+                                ws2[f"{get_column_letter(c)}3"].border = thin_border
+                                ws2[f"{get_column_letter(c)}4"].border = thin_border
+                                ws2[f"{get_column_letter(c)}4"].fill = fill_color
+
+                            sub_h = ["ลิตร", "ชั่วโมง", "ล/ชม"]
+                            for i, sh in enumerate(sub_h):
+                                cell_ref = f"{get_column_letter(col_idx + i)}5"
+                                ws2[cell_ref] = sh
+                                ws2[cell_ref].font = font_header
+                                ws2[cell_ref].alignment = align_center
+                                ws2[cell_ref].border = thin_border
+
+                            col_idx += 3
+
+                        ws2.row_dimensions[3].height = 22
+                        ws2.row_dimensions[4].height = 22
+                        ws2.row_dimensions[5].height = 20
+
+                        current_row = 6
+                        for day in range(1, 32):
+                            ws2[f"A{current_row}"] = day
+                            ws2[f"A{current_row}"].font = font_header
+                            ws2[f"A{current_row}"].alignment = align_center
+                            ws2[f"A{current_row}"].border = thin_border
+
+                            c_idx = 2
+                            for e in engines_config:
+                                item = matrix_data_t2[day][e['code']]
+                                cell_l = ws2[f"{get_column_letter(c_idx)}{current_row}"]
+                                cell_h = ws2[f"{get_column_letter(c_idx+1)}{current_row}"]
+                                cell_r = ws2[f"{get_column_letter(c_idx+2)}{current_row}"]
+
+                                if item['has_data']:
+                                    cell_l.value = item['liters'] if item['liters'] > 0 else "-"
+                                    cell_h.value = item['hours'] if item['hours'] > 0 else "-"
+                                    cell_r.value = round(item['liters'] / item['hours'], 2) if item['hours'] > 0 else "-"
+                                else:
+                                    cell_l.value = ""
+                                    cell_h.value = ""
+                                    cell_r.value = ""
+
+                                for cell in [cell_l, cell_h, cell_r]:
+                                    cell.font = font_body
+                                    cell.alignment = align_right if isinstance(cell.value, (int, float)) else align_center
+                                    cell.border = thin_border
+                                    if isinstance(cell.value, (int, float)):
+                                        cell.number_format = '#,##0.00'
+
+                                c_idx += 3
+                            current_row += 1
+
+                        ws2[f"A{current_row}"] = "รวม"
+                        ws2[f"A{current_row}"].font = font_total
+                        ws2[f"A{current_row}"].alignment = align_center
+                        ws2[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for e in engines_config:
+                            c_code = e['code']
+                            cell_l = ws2[f"{get_column_letter(c_idx)}{current_row}"]
+                            cell_h = ws2[f"{get_column_letter(c_idx+1)}{current_row}"]
+                            cell_r = ws2[f"{get_column_letter(c_idx+2)}{current_row}"]
+
+                            cell_l.value = totals_liters_t2[c_code] if totals_liters_t2[c_code] > 0 else "-"
+                            cell_h.value = totals_hours_t2[c_code] if totals_hours_t2[c_code] > 0 else "-"
+                            cell_r.value = avg_l_hr_t2[c_code]
+
+                            for cell in [cell_l, cell_h, cell_r]:
+                                cell.font = font_total
+                                cell.alignment = align_right if isinstance(cell.value, (int, float)) else align_center
+                                cell.border = thin_border
+                                if isinstance(cell.value, (int, float)):
+                                    cell.number_format = '#,##0.00'
+
+                            c_idx += 3
+
+                        ws2.column_dimensions['A'].width = 8
+                        for c in range(2, col_idx):
+                            ws2.column_dimensions[get_column_letter(c)].width = 11
+
+                        excel_buffer_t2 = io.BytesIO()
+                        wb2.save(excel_buffer_t2)
+                        excel_data_t2 = excel_buffer_t2.getvalue()
+
+                        # -------------------------------------------------------------------------
+                        # 5. สร้าง HTML สำหรับสั่งปริ้นเปิดในเบราว์เซอร์
+                        # -------------------------------------------------------------------------
+                        header_row1_t2 = "".join([f'<th colspan="3" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in engines_config])
+                        header_row2_t2 = "".join([f'<th colspan="3" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in engines_config])
+                        header_row3_t2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชั่วโมง</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม</th>' for _ in engines_config])
+
+                        body_rows_t2 = ""
+                        for day in range(1, 32):
+                            body_rows_t2 += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
+                            for e in engines_config:
+                                item = matrix_data_t2[day][e['code']]
+                                if item['has_data']:
+                                    l_val = f"{item['liters']:,.2f}" if item['liters'] > 0 else "-"
+                                    h_val = f"{item['hours']:,.2f}" if item['hours'] > 0 else "-"
+                                    r_val = f"{(item['liters']/item['hours']):,.2f}" if item['hours'] > 0 else "-"
+                                else:
+                                    l_val, h_val, r_val = "", "", ""
+
+                                body_rows_t2 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td>'
+                                body_rows_t2 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{h_val}</td>'
+                                body_rows_t2 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
+                            body_rows_t2 += '</tr>'
+
+                        total_row_html_t2 = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
+                        for e in engines_config:
+                            c_code = e['code']
+                            tl_s = f"{totals_liters_t2[c_code]:,.2f}" if totals_liters_t2[c_code] > 0 else '-'
+                            th_s = f"{totals_hours_t2[c_code]:,.2f}" if totals_hours_t2[c_code] > 0 else '-'
+                            tr_s = avg_l_hr_t2[c_code]
+                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tl_s}</td>'
+                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{th_s}</td>'
+                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tr_s}</td>'
+                        total_row_html_t2 += '</tr>'
+
+                        table_full_html_t2 = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Print Fuel Report Matrix</title>
+    <style>
+        @page {{ size: A4 landscape; margin: 4mm; }}
+        body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; }}
+        .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }}
+        .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; }}
+    </style>
+</head>
+<body>
+    <div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div>
+    <div class="banner">รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div>
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="3" style="border:1px solid #000;padding:3px;font-size:10px;width:35px;">วันที่</th>
+                {header_row1_t2}
+            </tr>
+            <tr>
+                {header_row2_t2}
+            </tr>
+            <tr>
+                {header_row3_t2}
+            </tr>
+        </thead>
+        <tbody>
+            {body_rows_t2}
+            {total_row_html_t2}
+        </tbody>
+    </table>
+</body>
+</html>"""
+
+                        json_print_html_t2 = json.dumps(table_full_html_t2)
                         print_btn_label_t2 = "🖨️ ปริ้นเอกสารรายงาน (Tab 2)" if current_role in ["admin", "manager"] else "🖨️ ปริ้นเอกสารรายงาน"
 
                         col_btn1, col_btn2 = st.columns(2)
                         with col_btn1:
-                            buffer = io.BytesIO()
-                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                df_t2.to_excel(writer, index=False, sheet_name='Fuel Report')
-                            st.download_button("📥 Export เป็น Excel (.xlsx)", data=buffer.getvalue(), file_name=f"Report_Fuel_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
+                            st.download_button(
+                                label="📥 Export เป็น Excel (.xlsx)",
+                                data=excel_data_t2,
+                                file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                key="dl_t2"
+                            )
                         with col_btn2:
-                            table_html_t2 = df_t2.to_html(index=False, classes='report-table')
-                            components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="window.parent.openPrintPreview2 ? window.parent.openPrintPreview2() : openPrintPreview2()" style="width:100%; height:38px; background-color:#F0F2F6; border:1px solid #C4C7D0; border-radius:8px; color:#31333F; font-family:sans-serif; font-size:14px; font-weight:500; cursor:pointer; box-sizing:border-box;">{print_btn_label_t2}</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); var content = `<html><head><title>Print Preview - Tab 2</title></head><body><h2>รายงานสรุปเชื้อเพลิงรถ</h2><br>{table_html_t2}</body></html>`; w.document.write(content); w.document.close(); w.print();}}</script>""", height=40)
+                            components.html(f"""
+                            <body style="margin:0;padding:0;overflow:hidden;">
+                                <button onclick="openPrintPreview2()" style="width:100%; height:38px; background-color:#F0F2F6; border:1px solid #C4C7D0; border-radius:8px; color:#31333F; font-family:sans-serif; font-size:14px; font-weight:500; cursor:pointer; box-sizing:border-box;">
+                                    {print_btn_label_t2}
+                                </button>
+                            </body>
+                            <script>
+                            function openPrintPreview2(){{
+                                var htmlData = {json_print_html_t2};
+                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                                if (w) {{
+                                    w.document.open();
+                                    w.document.write(htmlData);
+                                    w.document.close();
+                                    w.focus();
+                                    setTimeout(function(){{ w.print(); }}, 500);
+                                }}
+                            }}
+                            </script>
+                            """, height=40)
 
                         if current_role in ['admin', 'manager']:
                             st.write("---")
