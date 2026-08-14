@@ -155,7 +155,7 @@ def render_engineering_system_tabs(current_branch_name):
                                 st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
 
         # =========================================================================
-        # 💨 TAB 3: บันทึกแรงดันไอน้ำ บอยเลอร์
+        # 💨 TAB 3: บันทึกแรงดันไอน้ำ บอยเลอร์ (แก้ไขการรับภาษาไทย)
         # =========================================================================
         elif key == "3":
             with current_tab_ctx:
@@ -180,8 +180,9 @@ def render_engineering_system_tabs(current_branch_name):
                             try:
                                 conn = get_db_connection()
                                 with conn.cursor() as cursor:
+                                    # 🎯 ใส่ CONVERT(%s USING utf8mb4) ในคอลัมน์ remark
                                     sql = """INSERT INTO boiler_pressure_records (branch_id, record_date, total_count, total_drop, pm_drop, non_pm_drop, remark, created_by) 
-                                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)"""
+                                             VALUES (%s, %s, %s, %s, %s, %s, CONVERT(%s USING utf8mb4), %s)"""
                                     cursor.execute(sql, (int(st.session_state.branch_id), p_date, int(total_count), (int(pm_drop) + int(non_pm_drop)), int(pm_drop), int(non_pm_drop), p_remark, int(st.session_state.user_id)))
                                 conn.commit()
                                 conn.close()
