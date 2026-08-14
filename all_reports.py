@@ -1355,7 +1355,7 @@ def render_all_reports_module(user_branch_name):
                     st.error(f"เกิดข้อผิดพลาดในการดึงรายงาน Tab 2: {e}")
 
         # =========================================================================
-        # 💨 TAB 3 REPORT: รายงานสรุปแรงดันไอน้ำ บอยเลอร์
+        # 💨 TAB 3 REPORT: รายงานสรุปแรงดันไอน้ำ บอยเลอร์ (เพิ่มแถวผลรวมท้ายตาราง)
         # =========================================================================
         elif key == "3":
             with current_tab_ctx:
@@ -1369,9 +1369,11 @@ def render_all_reports_module(user_branch_name):
                     if current_role in ["admin", "manager"]:
                         b_label_t3 = st.selectbox("เลือกสาขา (Tab 3):", options=report_options, key="b_sel_t3")
                         b_id_t3 = "ทั้งหมด" if b_label_t3 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t3]
+                        selected_branch_display = b_label_t3 if b_label_t3 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
                     else:
                         st.info(f"📍 สังกัด: {user_branch_name}")
                         b_id_t3 = st.session_state.branch_id
+                        selected_branch_display = user_branch_name
 
                 try:
                     conn = get_db_connection()
@@ -1380,13 +1382,13 @@ def render_all_reports_module(user_branch_name):
                             sql = """SELECT r.*, b.branch_name 
                                      FROM boiler_pressure_records r 
                                      LEFT JOIN branches b ON r.branch_id = b.id
-                                     WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"""
+                                     WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"""
                             cur.execute(sql, (start_date_t3, end_date_t3))
                         else:
                             sql = """SELECT r.*, b.branch_name 
                                      FROM boiler_pressure_records r 
                                      LEFT JOIN branches b ON r.branch_id = b.id
-                                     WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"""
+                                     WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"""
                             cur.execute(sql, (b_id_t3, start_date_t3, end_date_t3))
                         raw_data_t3 = cur.fetchall()
                     conn.close()
@@ -1399,39 +1401,474 @@ def render_all_reports_module(user_branch_name):
                             tot_c = r.get('total_count') or 0
                             tot_d = r.get('total_drop') or 0
                             pm_d = r.get('pm_drop') or 0
+                            non_pm_d = r.get('non_pm_drop') or 0
+                            rem_text = str(r.get('remark') or '')
+                            b_text = str(r.get('branch_name') or '')
+                            
                             df_display_t3.append({
                                 'ID รายการ': r[pk_col_t3],
                                 'วันที่': r.get('record_date'),
-                                'สาขา': r.get('branch_name'),
+                                'สาขา': b_text,
                                 'จำนวนครั้งทั้งหมด': tot_c,
                                 'ตกทั้งหมด (ครั้ง)': tot_d,
                                 'ตกตามเงื่อนไข PM': pm_d,
-                                'ตกนอกเหนือ PM': r.get('non_pm_drop') or 0,
-                                'หมายเหตุ': r.get('remark')
+                                'ตกนอกเหนือ PM': non_pm_d,
+                                'หมายเหตุ': rem_text,
+                                'ตกทั้งหมด (%)': f"{((tot_d / tot_c) * 100):.2f}%" if tot_c > 0 else "0.00%",
+                                'ตกตาม PM (%)': f"{((pm_d / tot_c) * 100):.2f}%" if tot_c > 0 else "0.00%"
                             })
 
                         df_t3 = pd.DataFrame(df_display_t3)
-                        df_t3['ตกทั้งหมด (%)'] = ((df_t3['ตกทั้งหมด (ครั้ง)'] / df_t3['จำนวนครั้งทั้งหมด'].replace(0, 1)) * 100).round(2).astype(str) + '%'
-                        df_t3['ตกตาม PM (%)'] = ((df_t3['ตกตามเงื่อนไข PM'] / df_t3['จำนวนครั้งทั้งหมด'].replace(0, 1)) * 100).round(2).astype(str) + '%'
                         st.dataframe(df_t3, use_container_width=True)
 
+                        # 1. คัดแยกรายการสาขาที่ไม่ซ้ำสำหรับสร้าง Matrix
+                        seen_b_keys = set()
+                        branches_config = []
+                        
+                        for r in raw_data_t3:
+                            b_name = str(r.get('branch_name') or '').strip()
+                            try: b_code = b_name.split("สาขา ")[1].split()[0]
+                            except: b_code = b_name or "WU"
+                            
+                            if b_code.lower() not in seen_b_keys:
+                                seen_b_keys.add(b_code.lower())
+                                branches_config.append({"code": b_code, "full_name": b_name})
+
+                        if not branches_config:
+                            branches_config = [{"code": "WU", "full_name": selected_branch_display}]
+
+                        # 2. จัดโครงสร้างข้อมูล วันที่ 1-31
+                        matrix_data_t3 = {d: {b['code']: {'total': 0.0, 'drop': 0.0, 'pm': 0.0, 'non_pm': 0.0, 'remark': '', 'has_data': False} for b in branches_config} for d in range(1, 32)}
+
+                        for r in raw_data_t3:
+                            d_num = pd.to_datetime(r['record_date']).day
+                            b_name = str(r.get('branch_name') or '').strip()
+                            try: b_code = b_name.split("สาขา ")[1].split()[0]
+                            except: b_code = b_name or "WU"
+
+                            for b in branches_config:
+                                if b['code'].lower() == b_code.lower():
+                                    matrix_data_t3[d_num][b['code']] = {
+                                        'total': float(r.get('total_count') or 0.0),
+                                        'drop': float(r.get('total_drop') or 0.0),
+                                        'pm': float(r.get('pm_drop') or 0.0),
+                                        'non_pm': float(r.get('non_pm_drop') or 0.0),
+                                        'remark': str(r.get('remark') or '').strip(),
+                                        'has_data': True
+                                    }
+                                    break
+
+                        # 🎯 3. คำนวณผลรวม Sum และสถิติ % แต่ละสาขา
+                        branch_totals_t3 = {}
+                        for b in branches_config:
+                            b_code = b['code']
+                            tot_c = sum([matrix_data_t3[d][b_code]['total'] for d in range(1, 32)])
+                            tot_d = sum([matrix_data_t3[d][b_code]['drop'] for d in range(1, 32)])
+                            pm_d = sum([matrix_data_t3[d][b_code]['pm'] for d in range(1, 32)])
+                            npm_d = sum([matrix_data_t3[d][b_code]['non_pm'] for d in range(1, 32)])
+
+                            p_tot = (tot_d / tot_c * 100) if tot_c > 0 else 0.0
+                            p_pm = (pm_d / tot_c * 100) if tot_c > 0 else 0.0
+                            p_npm = (npm_d / tot_c * 100) if tot_c > 0 else 0.0
+
+                            branch_totals_t3[b_code] = {
+                                'total': tot_c,
+                                'drop': tot_d,
+                                'pm': pm_d,
+                                'non_pm': npm_d,
+                                'p_tot': f"{p_tot:.2f}%",
+                                'p_pm': f"{p_pm:.2f}%",
+                                'p_npm': f"{p_npm:.2f}%"
+                            }
+
+                        month_thai = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
+                        start_dt = pd.to_datetime(start_date_t3)
+                        month_str = month_thai[start_dt.month - 1]
+                        year_buddhist = start_dt.year + 543
+
+                        # -------------------------------------------------------------------------
+                        # 4. สร้างไฟล์ EXCEL (.xlsx)
+                        # -------------------------------------------------------------------------
+                        wb3 = Workbook()
+                        ws3 = wb3.active
+                        ws3.title = "Pressure Report Matrix"
+                        ws3.views.sheetView[0].showGridLines = True
+
+                        font_title = Font(name="Sarabun", size=13, bold=True, color="006100")
+                        font_banner = Font(name="Sarabun", size=12, bold=True)
+                        font_header = Font(name="Sarabun", size=9, bold=True)
+                        font_header_purple = Font(name="Sarabun", size=11, bold=True, color="FFFFFF")
+                        font_body = Font(name="Sarabun", size=9)
+                        font_total = Font(name="Sarabun", size=9, bold=True)
+                        font_total_red = Font(name="Sarabun", size=9, bold=True, color="FF0000")
+                        font_total_blue = Font(name="Sarabun", size=9, bold=True, color="0000FF")
+
+                        align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        align_right = Alignment(horizontal="right", vertical="center")
+                        align_left = Alignment(horizontal="left", vertical="center")
+
+                        thin_border = Border(
+                            left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"),
+                            top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000")
+                        )
+
+                        fill_green_banner = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid")
+                        fill_yellow_banner = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+                        fill_purple = PatternFill(start_color="E000E0", end_color="E000E0", fill_type="solid")
+                        fill_yellow_cell = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+
+                        last_col_idx = 1 + (len(branches_config) * 8)
+                        last_col_letter_t3 = get_column_letter(last_col_idx)
+
+                        ws3.merge_cells(f"A1:{last_col_letter_t3}1")
+                        ws3["A1"] = "รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ"
+                        ws3["A1"].font = font_title
+                        ws3["A1"].alignment = align_center
+                        ws3["A1"].fill = fill_green_banner
+
+                        ws3.merge_cells(f"A2:{last_col_letter_t3}2")
+                        ws3["A2"] = f"ประจำเดือน {month_str} {year_buddhist}"
+                        ws3["A2"].font = font_banner
+                        ws3["A2"].alignment = align_center
+                        ws3["A2"].fill = fill_yellow_banner
+
+                        ws3.merge_cells("A3:A5")
+                        ws3["A3"] = "วันที่"
+                        ws3["A3"].font = font_header_purple
+                        ws3["A3"].alignment = align_center
+                        ws3["A3"].fill = fill_purple
+                        ws3["A3"].border = thin_border
+                        ws3["A4"].border = thin_border
+                        ws3["A5"].border = thin_border
+
+                        col_idx = 2
+                        for b in branches_config:
+                            st_c = get_column_letter(col_idx)
+                            en_c = get_column_letter(col_idx + 7)
+
+                            ws3.merge_cells(f"{st_c}3:{en_c}3")
+                            ws3[f"{st_c}3"] = b["code"]
+                            ws3[f"{st_c}3"].font = font_header_purple
+                            ws3[f"{st_c}3"].alignment = align_center
+                            ws3[f"{st_c}3"].fill = fill_purple
+
+                            c_cnt = get_column_letter(col_idx)
+                            c_drp_st = get_column_letter(col_idx + 1)
+                            c_drp_en = get_column_letter(col_idx + 3)
+                            c_pct_st = get_column_letter(col_idx + 4)
+                            c_pct_en = get_column_letter(col_idx + 6)
+                            c_rem = get_column_letter(col_idx + 7)
+
+                            ws3[f"{c_cnt}4"] = "นับทั้งหมด"
+                            ws3.merge_cells(f"{c_drp_st}4:{c_drp_en}4")
+                            ws3[f"{c_drp_st}4"] = "แรงดันตก (ครั้ง)"
+                            ws3.merge_cells(f"{c_pct_st}4:{c_pct_en}4")
+                            ws3[f"{c_pct_st}4"] = "แรงดันตก (%)"
+                            ws3[f"{c_rem}4"] = "หมายเหตุ"
+
+                            for c_i in range(col_idx, col_idx + 8):
+                                cell_h = ws3[f"{get_column_letter(c_i)}4"]
+                                cell_h.font = font_header_purple
+                                cell_h.alignment = align_center
+                                cell_h.fill = fill_purple
+                                cell_h.border = thin_border
+
+                            sub_cols = [
+                                "จำนวน\n(ครั้ง)", "ตกทั้งหมด", "ตกตาม\nเงื่อนไขPM", "เกินนอกเหนือ\nจากการPM",
+                                "ตกทั้งหมด", "ตกตาม\nเงื่อนไขPM", "เกินนอกเหนือ\nจากการPM", ""
+                            ]
+                            for i, sh in enumerate(sub_cols):
+                                cell_ref = f"{get_column_letter(col_idx + i)}5"
+                                ws3[cell_ref] = sh
+                                ws3[cell_ref].font = font_header_purple
+                                ws3[cell_ref].alignment = align_center
+                                ws3[cell_ref].fill = fill_purple
+                                ws3[cell_ref].border = thin_border
+
+                            for c_i in range(col_idx, col_idx + 8):
+                                ws3[f"{get_column_letter(c_i)}3"].border = thin_border
+
+                            col_idx += 8
+
+                        ws3.row_dimensions[1].height = 25
+                        ws3.row_dimensions[2].height = 22
+                        ws3.row_dimensions[3].height = 20
+                        ws3.row_dimensions[4].height = 20
+                        ws3.row_dimensions[5].height = 25
+
+                        current_row = 6
+                        for day in range(1, 32):
+                            ws3[f"A{current_row}"] = day
+                            ws3[f"A{current_row}"].font = font_header
+                            ws3[f"A{current_row}"].alignment = align_center
+                            ws3[f"A{current_row}"].border = thin_border
+
+                            c_idx = 2
+                            for b in branches_config:
+                                item = matrix_data_t3[day][b['code']]
+                                c_tot = ws3[f"{get_column_letter(c_idx)}{current_row}"]
+                                c_drp = ws3[f"{get_column_letter(c_idx+1)}{current_row}"]
+                                c_pm = ws3[f"{get_column_letter(c_idx+2)}{current_row}"]
+                                c_npm = ws3[f"{get_column_letter(c_idx+3)}{current_row}"]
+                                c_pct_drp = ws3[f"{get_column_letter(c_idx+4)}{current_row}"]
+                                c_pct_pm = ws3[f"{get_column_letter(c_idx+5)}{current_row}"]
+                                c_pct_npm = ws3[f"{get_column_letter(c_idx+6)}{current_row}"]
+                                c_rem = ws3[f"{get_column_letter(c_idx+7)}{current_row}"]
+
+                                if item['has_data']:
+                                    tot_v = item['total']
+                                    drp_v = item['drop']
+                                    pm_v = item['pm']
+                                    npm_v = item['non_pm']
+
+                                    c_tot.value = tot_v
+                                    c_drp.value = drp_v
+                                    c_pm.value = pm_v
+                                    c_npm.value = npm_v
+
+                                    c_pct_drp.value = f"{(drp_v / tot_v * 100):.2f}%" if tot_v > 0 else "0.00%"
+                                    c_pct_pm.value = f"{(pm_v / tot_v * 100):.2f}%" if tot_v > 0 else "0.00%"
+                                    c_pct_npm.value = f"{(npm_v / tot_v * 100):.2f}%" if tot_v > 0 else "0.00%"
+                                    c_rem.value = item['remark']
+                                else:
+                                    c_tot.value, c_drp.value, c_pm.value, c_npm.value = "", "", "", ""
+                                    c_pct_drp.value, c_pct_pm.value, c_pct_npm.value, c_rem.value = "", "", "", ""
+
+                                for yellow_c in [c_tot, c_drp, c_pm, c_npm]:
+                                    yellow_c.font = font_total
+                                    yellow_c.alignment = align_center if yellow_c == c_tot else align_right
+                                    yellow_c.fill = fill_yellow_cell
+                                    yellow_c.border = thin_border
+                                    if isinstance(yellow_c.value, (int, float)):
+                                        yellow_c.number_format = '#,##0.00' if yellow_c == c_tot or yellow_c == c_drp else '0'
+
+                                for white_c in [c_pct_drp, c_pct_pm, c_pct_npm]:
+                                    white_c.font = font_total
+                                    white_c.alignment = align_right
+                                    white_c.border = thin_border
+
+                                c_rem.font = font_body
+                                c_rem.alignment = align_left
+                                c_rem.border = thin_border
+
+                                c_idx += 8
+                            current_row += 1
+
+                        # 🎯 แถว รวม (Excel)
+                        ws3[f"A{current_row}"] = "รวม"
+                        ws3[f"A{current_row}"].font = font_total
+                        ws3[f"A{current_row}"].alignment = align_center
+                        ws3[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for b in branches_config:
+                            bt = branch_totals_t3[b['code']]
+                            c_tot = ws3[f"{get_column_letter(c_idx)}{current_row}"]
+                            c_drp = ws3[f"{get_column_letter(c_idx+1)}{current_row}"]
+                            c_pm = ws3[f"{get_column_letter(c_idx+2)}{current_row}"]
+                            c_npm = ws3[f"{get_column_letter(c_idx+3)}{current_row}"]
+                            c_pct_drp = ws3[f"{get_column_letter(c_idx+4)}{current_row}"]
+                            c_pct_pm = ws3[f"{get_column_letter(c_idx+5)}{current_row}"]
+                            c_pct_npm = ws3[f"{get_column_letter(c_idx+6)}{current_row}"]
+                            c_rem = ws3[f"{get_column_letter(c_idx+7)}{current_row}"]
+
+                            c_tot.value = bt['total'] if bt['total'] > 0 else "-"
+                            c_drp.value = bt['drop'] if bt['drop'] > 0 else "-"
+                            c_pm.value = bt['pm'] if bt['pm'] > 0 else "-"
+                            c_npm.value = bt['non_pm'] if bt['non_pm'] > 0 else "-"
+
+                            c_pct_drp.value = bt['p_tot']
+                            c_pct_pm.value = bt['p_pm']
+                            c_pct_npm.value = bt['p_npm']
+                            c_rem.value = ""
+
+                            for yellow_c in [c_tot, c_drp, c_pm, c_npm]:
+                                yellow_c.font = font_total
+                                yellow_c.alignment = align_center if yellow_c == c_tot else align_right
+                                yellow_c.border = thin_border
+                                if isinstance(yellow_c.value, (int, float)):
+                                    yellow_c.number_format = '#,##0'
+
+                            c_pct_drp.font = font_total_red
+                            c_pct_drp.alignment = align_right
+                            c_pct_drp.border = thin_border
+
+                            c_pct_pm.font = font_total
+                            c_pct_pm.alignment = align_right
+                            c_pct_pm.border = thin_border
+
+                            c_pct_npm.font = font_total_blue
+                            c_pct_npm.alignment = align_right
+                            c_pct_npm.border = thin_border
+
+                            c_rem.border = thin_border
+
+                            c_idx += 8
+
+                        ws3.column_dimensions['A'].width = 8
+                        for c in range(2, col_idx):
+                            ws3.column_dimensions[get_column_letter(c)].width = 13
+
+                        excel_buffer_t3 = io.BytesIO()
+                        wb3.save(excel_buffer_t3)
+                        excel_data_t3 = excel_buffer_t3.getvalue()
+
+                        # -------------------------------------------------------------------------
+                        # 5. สร้าง HTML สำหรับสั่งปริ้นท์
+                        # -------------------------------------------------------------------------
+                        header_row1_t3 = "".join([f'<th colspan="8" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:4px;font-size:11px;text-align:center;">{b["code"]}</th>' for b in branches_config])
+                        
+                        header_row2_t3 = ""
+                        for _ in branches_config:
+                            header_row2_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">นับทั้งหมด</th>'
+                            header_row2_t3 += '<th colspan="3" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">แรงดันตก (ครั้ง)</th>'
+                            header_row2_t3 += '<th colspan="3" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">แรงดันตก (%)</th>'
+                            header_row2_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">หมายเหตุ</th>'
+
+                        header_row3_t3 = ""
+                        for _ in branches_config:
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">จำนวน<br>(ครั้ง)</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกทั้งหมด</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกตาม<br>เงื่อนไขPM</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:40px;">เกินนอกเหนือ<br>จากการPM</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกทั้งหมด</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกตาม<br>เงื่อนไขPM</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:40px;">เกินนอกเหนือ<br>จากการPM</th>'
+                            header_row3_t3 += '<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:90px;"></th>'
+
+                        body_rows_t3 = ""
+                        for day in range(1, 32):
+                            body_rows_t3 += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
+                            for b in branches_config:
+                                item = matrix_data_t3[day][b['code']]
+                                if item['has_data']:
+                                    tot_v = item['total']
+                                    drp_v = item['drop']
+                                    pm_v = item['pm']
+                                    npm_v = item['non_pm']
+
+                                    c_tot_s = f"{tot_v:,.2f}"
+                                    c_drp_s = f"{drp_v:,.2f}"
+                                    c_pm_s = f"{int(pm_v)}"
+                                    c_npm_s = f"{int(npm_v)}"
+
+                                    p_drp_s = f"{(drp_v / tot_v * 100):.2f}%" if tot_v > 0 else "0.00%"
+                                    p_pm_s = f"{(pm_v / tot_v * 100):.2f}%" if tot_v > 0 else "0.00%"
+                                    p_npm_s = f"{(npm_v / tot_v * 100):.2f}%" if tot_v > 0 else "0.00%"
+                                    rem_s = item['remark']
+                                else:
+                                    c_tot_s, c_drp_s, c_pm_s, c_npm_s, p_drp_s, p_pm_s, p_npm_s, rem_s = "", "", "", "", "", "", "", ""
+
+                                body_rows_t3 += f'<td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{c_tot_s}</td>'
+                                body_rows_t3 += f'<td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{c_drp_s}</td>'
+                                body_rows_t3 += f'<td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{c_pm_s}</td>'
+                                body_rows_t3 += f'<td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{c_npm_s}</td>'
+
+                                body_rows_t3 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{p_drp_s}</td>'
+                                body_rows_t3 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{p_pm_s}</td>'
+                                body_rows_t3 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{p_npm_s}</td>'
+                                body_rows_t3 += f'<td style="border:1px solid #000;padding:2px;text-align:left;font-size:9px;">{rem_s}</td>'
+
+                            body_rows_t3 += '</tr>'
+
+                        # 🎯 แถว รวม (HTML สั่งปริ้นท์)
+                        total_row_html_t3 = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
+                        for b in branches_config:
+                            bt = branch_totals_t3[b['code']]
+                            t_cnt_s = f"{int(bt['total']):,}" if bt['total'] > 0 else "-"
+                            t_drp_s = f"{int(bt['drop']):,}" if bt['drop'] > 0 else "-"
+                            t_pm_s = f"{int(bt['pm']):,}" if bt['pm'] > 0 else "-"
+                            t_npm_s = f"{int(bt['non_pm']):,}" if bt['non_pm'] > 0 else "-"
+                            
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;">{t_cnt_s}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_drp_s}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_pm_s}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_npm_s}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;color:red;">{bt["p_tot"]}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{bt["p_pm"]}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;color:blue;">{bt["p_npm"]}</td>'
+                            total_row_html_t3 += f'<td style="border:1px solid #000;padding:3px;text-align:left;font-size:9px;"></td>'
+                        total_row_html_t3 += '</tr>'
+
+                        table_full_html_t3 = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Print Pressure Report Matrix</title>
+    <style>
+        @page {{ size: A4 landscape; margin: 4mm; }}
+        body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; }}
+        .header-banner1 {{ background-color: #00FF00; color: #006100; text-align: center; font-size: 16px; font-weight: bold; padding: 6px; border: 1px solid #000; }}
+        .header-banner2 {{ background-color: #FFFF00; color: #000; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }}
+        table {{ width: 100%; border-collapse: collapse; }}
+        th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; }}
+    </style>
+</head>
+<body>
+    <div class="header-banner1">รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div>
+    <div class="header-banner2">ประจำเดือน {month_str} {year_buddhist}</div>
+    <table>
+        <thead>
+            <tr>
+                <th rowspan="3" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;width:35px;">วันที่</th>
+                {header_row1_t3}
+            </tr>
+            <tr>
+                {header_row2_t3}
+            </tr>
+            <tr>
+                {header_row3_t3}
+            </tr>
+        </thead>
+        <tbody>
+            {body_rows_t3}
+            {total_row_html_t3}
+        </tbody>
+    </table>
+</body>
+</html>"""
+
+                        json_print_html_t3 = json.dumps(table_full_html_t3)
                         print_btn_label_t3 = "🖨️ ปริ้นเอกสารรายงาน (Tab 3)" if current_role in ["admin", "manager"] else "🖨️ ปริ้นเอกสารรายงาน"
 
                         col_btn1, col_btn2 = st.columns(2)
                         with col_btn1:
-                            buffer = io.BytesIO()
-                            with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                                df_t3.to_excel(writer, index=False, sheet_name='Pressure Report')
-                            st.download_button("📥 Export เป็น Excel (.xlsx)", data=buffer.getvalue(), file_name=f"Report_Pressure_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
+                            st.download_button(
+                                label="📥 Export เป็น Excel (.xlsx)",
+                                data=excel_data_t3,
+                                file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                use_container_width=True,
+                                key="dl_t3"
+                            )
                         with col_btn2:
-                            table_html_t3 = df_t3.to_html(index=False, classes='report-table')
-                            components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="window.parent.openPrintPreview3 ? window.parent.openPrintPreview3() : openPrintPreview3()" style="width:100%; height:38px; background-color:#F0F2F6; border:1px solid #C4C7D0; border-radius:8px; color:#31333F; font-family:sans-serif; font-size:14px; font-weight:500; cursor:pointer; box-sizing:border-box;">{print_btn_label_t3}</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); var content = `<html><head><title>Print Preview - Tab 3</title></head><body><h2>รายงานสรุปแรงดันไอน้ำ</h2><br>{table_html_t3}</body></html>`; w.document.write(content); w.document.close(); w.print();}}</script>""", height=40)
+                            components.html(f"""
+                            <body style="margin:0;padding:0;overflow:hidden;">
+                                <button onclick="openPrintPreview3()" style="width:100%; height:38px; background-color:#F0F2F6; border:1px solid #C4C7D0; border-radius:8px; color:#31333F; font-family:sans-serif; font-size:14px; font-weight:500; cursor:pointer; box-sizing:border-box;">
+                                    {print_btn_label_t3}
+                                </button>
+                            </body>
+                            <script>
+                            function openPrintPreview3(){{
+                                var htmlData = {json_print_html_t3};
+                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                                if (w) {{
+                                    w.document.open();
+                                    w.document.write(htmlData);
+                                    w.document.close();
+                                    w.focus();
+                                    setTimeout(function(){{ w.print(); }}, 500);
+                                }}
+                            }}
+                            </script>
+                            """, height=40)
 
                         if current_role in ['admin', 'manager']:
                             st.write("---")
                             st.markdown("### 🛠️ เครื่องมือจัดการข้อมูล (Admin/Manager)")
                             
-                            record_map_t3 = {f"ID: {r[pk_col_t3]} | วันที่: {r.get('record_date')} | สาขา: {r.get('branch_name')}": (r[pk_col_t3], r) for r in raw_data_t3}
+                            b_name_select = str(r.get('branch_name') or '')
+                            record_map_t3 = {f"ID: {r[pk_col_t3]} | วันที่: {r.get('record_date')} | สาขา: {b_name_select}": (r[pk_col_t3], r) for r in raw_data_t3}
                             selected_label_t3 = st.selectbox("เลือกรายการที่ต้องการแก้ไข/ลบ (Tab 3):", options=list(record_map_t3.keys()), key="select_t3")
                             target_pk_t3, target_rec_t3 = record_map_t3[selected_label_t3]
 
@@ -1447,7 +1884,7 @@ def render_all_reports_module(user_branch_name):
 
                                 act_col1, act_col2 = st.columns(2)
                                 with act_col1:
-                                    if st.button("💾 บันทึกการแก้ไข (Update Tab 3)", key="btn_up_t3", use_container_width=True):
+                                    if st.button("💾 บันทึกการแก้ไข (Update Tab 3)", key=f"btn_up_t3_{target_pk_t3}", use_container_width=True):
                                         try:
                                             conn = get_db_connection()
                                             with conn.cursor() as cur:
@@ -1462,7 +1899,7 @@ def render_all_reports_module(user_branch_name):
                                         except Exception as ex:
                                             st.toast(f"❌ เกิดข้อผิดพลาดในการแก้ไข: {ex}", icon="⚠️")
                                 with act_col2:
-                                    if st.button("🗑️ ลบรายการนี้ (Delete Tab 3)", type="primary", use_container_width=True, key="del_btn_t3"):
+                                    if st.button("🗑️ ลบรายการนี้ (Delete Tab 3)", type="primary", use_container_width=True, key=f"del_btn_t3_{target_pk_t3}"):
                                         try:
                                             conn = get_db_connection()
                                             with conn.cursor() as cur:
