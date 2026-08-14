@@ -606,7 +606,7 @@ def render_all_reports_module(user_branch_name):
                     st.error(f"เกิดข้อผิดพลาดในการดึงรายงาน Tab 1: {e}")
 
         # =========================================================================
-        # 🚚 TAB 2 REPORT: รายงานสรุปการใช้เชื้อเพลิงรถ (แก้ไขประเภทรถให้ตรงกับ DB)
+        # 🚚 TAB 2 REPORT: รายงานสรุปการใช้เชื้อเพลิงรถ (ปรับสูตร ชม.เป้าหมาย รถหลัก 20 ชม. / รถสำรอง 4 ชม.)
         # =========================================================================
         elif key == "2":
             with current_tab_ctx:
@@ -690,7 +690,7 @@ def render_all_reports_module(user_branch_name):
                         df_t2 = pd.DataFrame(df_display_t2)
                         st.dataframe(df_t2, use_container_width=True)
 
-                        # 🎯 1. สร้าง Mapping ประเภทรถ (type_name) จริงจากรายการบันทึก raw_data_t2
+                        # 1. สร้าง Mapping ประเภทรถ
                         real_type_map = {}
                         for r in raw_data_t2:
                             code = str(r.get('engine_code') or '').strip()
@@ -727,7 +727,6 @@ def render_all_reports_module(user_branch_name):
                                     continue
                                 seen_keys.add(eng_key.lower())
                                 
-                                # 🎯 ดึงประเภทรถจาก real_type_map ก่อน ถ้าไม่มีค่อยดึงจาก engines_list
                                 type_nm = real_type_map.get(eng_key.lower()) or str(eng.get('type_name') or 'TOYOTA')
                                 hex_color = "FFC000" if "tck" in type_nm.lower() else "FF0000"
 
@@ -800,7 +799,11 @@ def render_all_reports_module(user_branch_name):
 
                         engines_config = active_engines_config if active_engines_config else all_engines_config
 
-                        # 🎯 5. แยกกลุ่มประเภทเพื่อคำนวณคอลัมน์สรุปท้ายตาราง (toyo vs TCK)
+                        # 5. คำนวณวันจริงของเดือนที่กำลังแสดงผล (เช่น 31, 30, 28, 29 วัน)
+                        start_dt = pd.to_datetime(start_date_t2)
+                        days_in_current_month = pd.Period(start_dt, freq='M').days_in_month
+
+                        # 6. แยกกลุ่ม toyo vs TCK
                         toyo_keys = [e['key'] for e in engines_config if "tck" not in e['brand'].lower()]
                         tck_keys = [e['key'] for e in engines_config if "tck" in e['brand'].lower()]
 
@@ -808,7 +811,9 @@ def render_all_reports_module(user_branch_name):
                         totals_hours_t2 = {}
                         totals_liters_t2 = {}
                         avg_l_hr_t2 = {}
+                        std_target_hours = {}
 
+                        # 🎯 คำนวณเป้าหมายชั่วโมงตามเงื่อนไข: รถสำรอง 4 ชม./วัน, รถหลัก 20 ชม./วัน × จำนวนวันจริงของเดือน
                         for e in engines_config:
                             c_key = e['key']
                             tot_d = sum([1 for d in range(1, 32) if matrix_data_t2[d][c_key]['has_data']])
@@ -819,6 +824,11 @@ def render_all_reports_module(user_branch_name):
                             totals_hours_t2[c_key] = tot_h
                             totals_liters_t2[c_key] = tot_l
                             avg_l_hr_t2[c_key] = f"{(tot_l / tot_h):.2f}" if tot_h > 0 else "0.00"
+                            
+                            # ตรวจสอบคำว่า "สำรอง" ในชื่อหรือรหัสรถ
+                            is_backup_car = "สำรอง" in e['title'] or "สำรอง" in e['code'] or "สำรอง" in e.get('brand', '')
+                            daily_standard = 4 if is_backup_car else 20
+                            std_target_hours[c_key] = daily_standard * days_in_current_month
 
                         # คำนวณสรุปกลุ่มท้ายตาราง
                         summary_matrix_t2 = {}
@@ -846,13 +856,15 @@ def render_all_reports_module(user_branch_name):
                         tot_tck_liters = sum([summary_matrix_t2[d]['tck']['liters'] for d in range(1, 32)])
                         avg_tck_rate = f"{(tot_tck_liters / tot_tck_hours):.2f}" if tot_tck_hours > 0 else "0.00"
 
+                        tot_target_toyo = sum([std_target_hours[k] for k in toyo_keys])
+                        tot_target_tck = sum([std_target_hours[k] for k in tck_keys])
+
                         month_thai = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"]
-                        start_dt = pd.to_datetime(start_date_t2)
                         month_str = month_thai[start_dt.month - 1]
                         year_buddhist = start_dt.year + 543
 
                         # -------------------------------------------------------------------------
-                        # 6. สร้างไฟล์ EXCEL (.xlsx)
+                        # 7. สร้างไฟล์ EXCEL (.xlsx) Cross-tab Matrix + 5 แถวสรุปท้ายตาราง
                         # -------------------------------------------------------------------------
                         wb2 = Workbook()
                         ws2 = wb2.active
@@ -864,6 +876,7 @@ def render_all_reports_module(user_branch_name):
                         font_header_white = Font(name="Sarabun", size=9, bold=True, color="FFFFFF")
                         font_body = Font(name="Sarabun", size=9)
                         font_total = Font(name="Sarabun", size=9, bold=True)
+                        font_red = Font(name="Sarabun", size=9, bold=True, color="FF0000")
 
                         align_center = Alignment(horizontal="center", vertical="center", wrap_text=True)
                         align_right = Alignment(horizontal="right", vertical="center")
@@ -872,6 +885,11 @@ def render_all_reports_module(user_branch_name):
                             left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"),
                             top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000")
                         )
+
+                        fill_magenta = PatternFill(start_color="D90082", end_color="D90082", fill_type="solid")
+                        fill_green_sum = PatternFill(start_color="A9D08E", end_color="A9D08E", fill_type="solid")
+                        fill_blue_sum = PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid")
+                        fill_pink_sum = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
 
                         last_col_idx = 1 + (len(engines_config) * 4) + 8
                         last_col_letter_t2 = get_column_letter(last_col_idx)
@@ -926,7 +944,7 @@ def render_all_reports_module(user_branch_name):
 
                             col_idx += 4
 
-                        # สรุป toyo ท้ายตาราง (Excel)
+                        # สรุป toyo ท้ายตาราง
                         start_c = get_column_letter(col_idx)
                         end_c = get_column_letter(col_idx + 3)
                         ws2.merge_cells(f"{start_c}3:{end_c}4")
@@ -946,7 +964,7 @@ def render_all_reports_module(user_branch_name):
                             ws2[cell_ref].border = thin_border
                         col_idx += 4
 
-                        # สรุป TCK ท้ายตาราง (Excel)
+                        # สรุป TCK ท้ายตาราง
                         start_c = get_column_letter(col_idx)
                         end_c = get_column_letter(col_idx + 3)
                         ws2.merge_cells(f"{start_c}3:{end_c}4")
@@ -970,6 +988,7 @@ def render_all_reports_module(user_branch_name):
                         ws2.row_dimensions[4].height = 22
                         ws2.row_dimensions[5].height = 20
 
+                        # ข้อมูลวันที่ 1-31
                         current_row = 6
                         for day in range(1, 32):
                             ws2[f"A{current_row}"] = day
@@ -1038,8 +1057,13 @@ def render_all_reports_module(user_branch_name):
 
                             current_row += 1
 
-                        # แถว รวม
-                        ws2[f"A{current_row}"] = "รวม"
+                        # -------------------------------------------------------------------------
+                        # 🎯 ชุด 5 แถวสรุปผลงานตามภาพ (Excel)
+                        # -------------------------------------------------------------------------
+                        label_target_row = f"ชม.รวม1-{days_in_current_month}"
+
+                        # แถวที่ 1: ชม.รวม 1-XX (เป้าหมายแถบสีชมพู)
+                        ws2[f"A{current_row}"] = label_target_row
                         ws2[f"A{current_row}"].font = font_total
                         ws2[f"A{current_row}"].alignment = align_center
                         ws2[f"A{current_row}"].border = thin_border
@@ -1047,56 +1071,163 @@ def render_all_reports_module(user_branch_name):
                         c_idx = 2
                         for e in engines_config:
                             c_key = e['key']
-                            cell_d = ws2[f"{get_column_letter(c_idx)}{current_row}"]
-                            cell_h = ws2[f"{get_column_letter(c_idx+1)}{current_row}"]
-                            cell_l = ws2[f"{get_column_letter(c_idx+2)}{current_row}"]
-                            cell_r = ws2[f"{get_column_letter(c_idx+3)}{current_row}"]
-
-                            cell_d.value = totals_days_t2[c_key] if totals_days_t2[c_key] > 0 else "-"
-                            cell_h.value = totals_hours_t2[c_key] if totals_hours_t2[c_key] > 0 else "-"
-                            cell_l.value = totals_liters_t2[c_key] if totals_liters_t2[c_key] > 0 else "-"
-                            cell_r.value = avg_l_hr_t2[c_key]
-
-                            cell_d.font = font_total
-                            cell_d.alignment = align_center
-                            cell_d.border = thin_border
-
-                            for cell in [cell_h, cell_l, cell_r]:
-                                cell.font = font_total
-                                cell.alignment = align_right if isinstance(cell.value, (int, float)) else align_center
+                            for offset in range(4):
+                                cell = ws2[f"{get_column_letter(c_idx+offset)}{current_row}"]
                                 cell.border = thin_border
-                                if isinstance(cell.value, (int, float)):
-                                    cell.number_format = '#,##0.00'
+                                if offset == 1:
+                                    cell.value = std_target_hours[c_key]
+                                    cell.font = font_header_white
+                                    cell.fill = fill_magenta
+                                    cell.alignment = align_center
+                            c_idx += 4
+                        # toyo & TCK
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = tot_target_toyo
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].font = font_header_white
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].fill = fill_magenta
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].alignment = align_center
+                        for offset in [0, 2, 3]: ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
+                        c_idx += 4
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = tot_target_tck
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].font = font_header_white
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].fill = fill_magenta
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].alignment = align_center
+                        for offset in [0, 2, 3]: ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
+                        current_row += 1
+
+                        # แถวที่ 2: ชม.ใช้จริง 1-XX
+                        ws2[f"A{current_row}"] = f"ชม.ใช้จริง 1-{days_in_current_month}"
+                        ws2[f"A{current_row}"].font = font_total
+                        ws2[f"A{current_row}"].alignment = align_center
+                        ws2[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for e in engines_config:
+                            c_key = e['key']
+                            ws2[f"{get_column_letter(c_idx)}{current_row}"] = totals_days_t2[c_key] if totals_days_t2[c_key]>0 else "-"
+                            ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = round(totals_hours_t2[c_key], 0) if totals_hours_t2[c_key]>0 else "-"
+                            ws2[f"{get_column_letter(c_idx+2)}{current_row}"] = round(totals_liters_t2[c_key], 0) if totals_liters_t2[c_key]>0 else "-"
+                            ws2[f"{get_column_letter(c_idx+3)}{current_row}"] = avg_l_hr_t2[c_key]
+                            for offset in range(4):
+                                cell = ws2[f"{get_column_letter(c_idx+offset)}{current_row}"]
+                                cell.font = font_total
+                                cell.alignment = align_right if offset > 0 else align_center
+                                cell.border = thin_border
+                            c_idx += 4
+                        # toyo & TCK
+                        ws2[f"{get_column_letter(c_idx)}{current_row}"] = tot_toyo_days
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = round(tot_toyo_hours, 0)
+                        ws2[f"{get_column_letter(c_idx+2)}{current_row}"] = round(tot_toyo_liters, 0)
+                        ws2[f"{get_column_letter(c_idx+3)}{current_row}"] = avg_toyo_rate
+                        for offset in range(4): ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].font = font_total; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment = align_right
+                        c_idx += 4
+                        ws2[f"{get_column_letter(c_idx)}{current_row}"] = tot_tck_days
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = round(tot_tck_hours, 0)
+                        ws2[f"{get_column_letter(c_idx+2)}{current_row}"] = round(tot_tck_liters, 0)
+                        ws2[f"{get_column_letter(c_idx+3)}{current_row}"] = avg_tck_rate
+                        for offset in range(4): ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].font = font_total; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment = align_right
+                        current_row += 1
+
+                        # แถวที่ 3: ส่วนต่าง
+                        ws2[f"A{current_row}"] = "ส่วนต่าง"
+                        ws2[f"A{current_row}"].font = font_total
+                        ws2[f"A{current_row}"].alignment = align_center
+                        ws2[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for e in engines_config:
+                            c_key = e['key']
+                            diff_val = std_target_hours[c_key] - round(totals_hours_t2[c_key], 0)
+                            for offset in range(4):
+                                cell = ws2[f"{get_column_letter(c_idx+offset)}{current_row}"]
+                                cell.border = thin_border
+                                if offset == 1:
+                                    cell.value = int(diff_val)
+                                    cell.font = font_red if diff_val < 0 else font_total
+                                    cell.alignment = align_center
+                            c_idx += 4
+                        # toyo & TCK ส่วนต่าง
+                        toyo_diff = tot_target_toyo - round(tot_toyo_hours, 0)
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = int(toyo_diff)
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].font = font_red if toyo_diff < 0 else font_total
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].alignment = align_center
+                        for offset in [0, 2, 3]: ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
+                        c_idx += 4
+                        tck_diff = tot_target_tck - round(tot_tck_hours, 0)
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = int(tck_diff)
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].font = font_red if tck_diff < 0 else font_total
+                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"].alignment = align_center
+                        for offset in [0, 2, 3]: ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
+                        current_row += 1
+
+                        # แถวที่ 4: ชม.รวมทั้งเดือน (แถบสีเขียว + สีฟ้า)
+                        ws2[f"A{current_row}"] = "ชม.รวมทั้งเดือน"
+                        ws2[f"A{current_row}"].font = font_total
+                        ws2[f"A{current_row}"].alignment = align_center
+                        ws2[f"A{current_row}"].fill = fill_green_sum
+                        ws2[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for e in engines_config:
+                            c_key = e['key']
+                            start_c_m = get_column_letter(c_idx)
+                            end_c_m = get_column_letter(c_idx + 3)
+                            ws2.merge_cells(f"{start_c_m}{current_row}:{end_c_m}{current_row}")
+                            cell_m = ws2[f"{start_c_m}{current_row}"]
+                            cell_m.value = std_target_hours[c_key]
+                            cell_m.font = font_total
+                            cell_m.alignment = align_center
+                            cell_m.fill = fill_blue_sum
+                            for offset in range(4): ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].fill = fill_blue_sum
+                            c_idx += 4
+                        # toyo & TCK ชม.รวมทั้งเดือน
+                        for target_sum_val in [tot_target_toyo, tot_target_tck]:
+                            start_c_m = get_column_letter(c_idx)
+                            end_c_m = get_column_letter(c_idx + 3)
+                            ws2.merge_cells(f"{start_c_m}{current_row}:{end_c_m}{current_row}")
+                            cell_m = ws2[f"{start_c_m}{current_row}"]
+                            cell_m.value = target_sum_val
+                            cell_m.font = font_total
+                            cell_m.alignment = align_center
+                            cell_m.fill = fill_blue_sum
+                            for offset in range(4): ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].fill = fill_blue_sum
+                            c_idx += 4
+                        current_row += 1
+
+                        # แถวที่ 5: ชม.คงเหลือทั้งเดือน (แถบสีส้มอ่อน)
+                        ws2[f"A{current_row}"] = "ชม.คงเหลือทั้งเดือน"
+                        ws2[f"A{current_row}"].font = font_total
+                        ws2[f"A{current_row}"].alignment = align_center
+                        ws2[f"A{current_row}"].fill = fill_pink_sum
+                        ws2[f"A{current_row}"].border = thin_border
+
+                        c_idx = 2
+                        for e in engines_config:
+                            c_key = e['key']
+                            diff_val = std_target_hours[c_key] - round(totals_hours_t2[c_key], 0)
+                            start_c_m = get_column_letter(c_idx)
+                            end_c_m = get_column_letter(c_idx + 3)
+                            ws2.merge_cells(f"{start_c_m}{current_row}:{end_c_m}{current_row}")
+                            cell_m = ws2[f"{start_c_m}{current_row}"]
+                            cell_m.value = int(diff_val)
+                            cell_m.font = font_red if diff_val < 0 else font_total
+                            cell_m.alignment = align_center
+                            cell_m.fill = fill_pink_sum
+                            for offset in range(4): ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].fill = fill_pink_sum
+                            c_idx += 4
+                        # toyo & TCK ชม.คงเหลือทั้งเดือน
+                        for diff_sum_val in [toyo_diff, tck_diff]:
+                            start_c_m = get_column_letter(c_idx)
+                            end_c_m = get_column_letter(c_idx + 3)
+                            ws2.merge_cells(f"{start_c_m}{current_row}:{end_c_m}{current_row}")
+                            cell_m = ws2[f"{start_c_m}{current_row}"]
+                            cell_m.value = int(diff_sum_val)
+                            cell_m.font = font_red if diff_sum_val < 0 else font_total
+                            cell_m.alignment = align_center
+                            cell_m.fill = fill_pink_sum
+                            for offset in range(4): ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border; ws2[f"{get_column_letter(c_idx+offset)}{current_row}"].fill = fill_pink_sum
                             c_idx += 4
 
-                        # รวม toyo
-                        ws2[f"{get_column_letter(c_idx)}{current_row}"] = tot_toyo_days if tot_toyo_days > 0 else "-"
-                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = tot_toyo_hours if tot_toyo_hours > 0 else "-"
-                        ws2[f"{get_column_letter(c_idx+2)}{current_row}"] = tot_toyo_liters if tot_toyo_liters > 0 else "-"
-                        ws2[f"{get_column_letter(c_idx+3)}{current_row}"] = avg_toyo_rate
-                        for offset in range(4):
-                            cell = ws2[f"{get_column_letter(c_idx+offset)}{current_row}"]
-                            cell.font = font_total
-                            cell.alignment = align_right if isinstance(cell.value, (int, float)) else align_center
-                            cell.border = thin_border
-                            if isinstance(cell.value, (int, float)):
-                                cell.number_format = '#,##0.00'
-                        c_idx += 4
-
-                        # รวม TCK
-                        ws2[f"{get_column_letter(c_idx)}{current_row}"] = tot_tck_days if tot_tck_days > 0 else "-"
-                        ws2[f"{get_column_letter(c_idx+1)}{current_row}"] = tot_tck_hours if tot_tck_hours > 0 else "-"
-                        ws2[f"{get_column_letter(c_idx+2)}{current_row}"] = tot_tck_liters if tot_tck_liters > 0 else "-"
-                        ws2[f"{get_column_letter(c_idx+3)}{current_row}"] = avg_tck_rate
-                        for offset in range(4):
-                            cell = ws2[f"{get_column_letter(c_idx+offset)}{current_row}"]
-                            cell.font = font_total
-                            cell.alignment = align_right if isinstance(cell.value, (int, float)) else align_center
-                            cell.border = thin_border
-                            if isinstance(cell.value, (int, float)):
-                                cell.number_format = '#,##0.00'
-
-                        ws2.column_dimensions['A'].width = 8
+                        ws2.column_dimensions['A'].width = 16
                         for c in range(2, col_idx):
                             ws2.column_dimensions[get_column_letter(c)].width = 10
 
@@ -1105,7 +1236,7 @@ def render_all_reports_module(user_branch_name):
                         excel_data_t2 = excel_buffer_t2.getvalue()
 
                         # -------------------------------------------------------------------------
-                        # 7. สร้าง HTML สำหรับสั่งปริ้นท์
+                        # 8. สร้าง HTML สำหรับสั่งปริ้นท์
                         # -------------------------------------------------------------------------
                         header_row1_t2 = "".join([f'<th colspan="4" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in engines_config])
                         header_row1_t2 += '<th colspan="4" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th>'
@@ -1134,7 +1265,7 @@ def render_all_reports_module(user_branch_name):
                                 body_rows_t2 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td>'
                                 body_rows_t2 += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
 
-                            # สรุป toyo
+                            # toyo
                             toyo_item = summary_matrix_t2[day]['toyo']
                             td_toyo = "1" if toyo_item['has_data'] else ""
                             th_toyo = f"{toyo_item['hours']:,.2f}" if toyo_item['hours'] > 0 else "-"
@@ -1142,7 +1273,7 @@ def render_all_reports_module(user_branch_name):
                             tr_toyo = f"{(toyo_item['liters']/toyo_item['hours']):,.2f}" if toyo_item['hours'] > 0 else "-"
                             body_rows_t2 += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{td_toyo}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{th_toyo}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tl_toyo}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tr_toyo}</td>'
 
-                            # สรุป TCK
+                            # TCK
                             tck_item = summary_matrix_t2[day]['tck']
                             td_tck = "1" if tck_item['has_data'] else ""
                             th_tck = f"{tck_item['hours']:,.2f}" if tck_item['hours'] > 0 else "-"
@@ -1152,30 +1283,50 @@ def render_all_reports_module(user_branch_name):
 
                             body_rows_t2 += '</tr>'
 
-                        total_row_html_t2 = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
+                            # 🎯 ชุด 5 แถวสรุป HTML (Dynamic Days)
+                        r1_target_html = f'<tr><td style="border:1px solid #000;padding:3px;font-size:9px;font-weight:bold;text-align:center;">ชม.รวม1-{days_in_current_month}</td>'
+                        r2_actual_html = f'<tr><td style="border:1px solid #000;padding:3px;font-size:9px;font-weight:bold;text-align:center;">ชม.ใช้จริง 1-{days_in_current_month}</td>'
+                        r3_diff_html = '<tr><td style="border:1px solid #000;padding:3px;font-size:9px;font-weight:bold;text-align:center;">ส่วนต่าง</td>'
+                        r4_month_html = '<tr><td style="border:1px solid #000;padding:3px;font-size:9px;font-weight:bold;text-align:center;background-color:#A9D08E;">ชม.รวมทั้งเดือน</td>'
+                        r5_remain_html = '<tr><td style="border:1px solid #000;padding:3px;font-size:9px;font-weight:bold;text-align:center;background-color:#FCE4D6;">ชม.คงเหลือทั้งเดือน</td>'
+
                         for e in engines_config:
                             c_key = e['key']
-                            td_s = str(totals_days_t2[c_key]) if totals_days_t2[c_key] > 0 else '-'
-                            th_s = f"{totals_hours_t2[c_key]:,.2f}" if totals_hours_t2[c_key] > 0 else '-'
-                            tl_s = f"{totals_liters_t2[c_key]:,.2f}" if totals_liters_t2[c_key] > 0 else '-'
-                            tr_s = avg_l_hr_t2[c_key]
-                            
-                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{td_s}</td>'
-                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{th_s}</td>'
-                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tl_s}</td>'
-                            total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tr_s}</td>'
+                            t_tgt = std_target_hours[c_key]
+                            t_act_h = round(totals_hours_t2[c_key], 0)
+                            t_act_l = round(totals_liters_t2[c_key], 0)
+                            t_act_d = totals_days_t2[c_key]
+                            diff_h = t_tgt - t_act_h
+                            diff_color = "red" if diff_h < 0 else "black"
 
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tot_toyo_days if tot_toyo_days>0 else "-"}</td>'
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tot_toyo_hours:,.2f}</td>'
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tot_toyo_liters:,.2f}</td>'
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{avg_toyo_rate}</td>'
+                            # Row 1
+                            r1_target_html += f'<td style="border:1px solid #000;"></td><td style="border:1px solid #000;background-color:#D90082;color:#FFF;text-align:center;font-weight:bold;font-size:9px;">{t_tgt}</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td>'
+                            # Row 2
+                            r2_actual_html += f'<td style="border:1px solid #000;text-align:center;font-weight:bold;font-size:9px;">{t_act_d if t_act_d>0 else "-"}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:9px;">{t_act_h:,.0f}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:9px;">{t_act_l:,.0f}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:9px;">{avg_l_hr_t2[c_key]}</td>'
+                            # Row 3
+                            r3_diff_html += f'<td style="border:1px solid #000;"></td><td style="border:1px solid #000;text-align:center;font-weight:bold;font-size:9px;color:{diff_color};">{diff_h:,.0f}</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td>'
+                            # Row 4
+                            r4_month_html += f'<td colspan="4" style="border:1px solid #000;text-align:center;font-weight:bold;font-size:10px;background-color:#BDD7EE;">{t_tgt}</td>'
+                            # Row 5
+                            r5_remain_html += f'<td colspan="4" style="border:1px solid #000;text-align:center;font-weight:bold;font-size:10px;background-color:#FCE4D6;color:{diff_color};">{diff_h:,.0f}</td>'
 
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tot_tck_days if tot_tck_days>0 else "-"}</td>'
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tot_tck_hours:,.2f}</td>'
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tot_tck_liters:,.2f}</td>'
-                        total_row_html_t2 += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{avg_tck_rate}</td>'
+                        # toyo & TCK ท้ายตาราง
+                        for tgt_s, act_h, act_l, act_d, rate_s, diff_s in [
+                            (tot_target_toyo, tot_toyo_hours, tot_toyo_liters, tot_toyo_days, avg_toyo_rate, toyo_diff),
+                            (tot_target_tck, tot_tck_hours, tot_tck_liters, tot_tck_days, avg_tck_rate, tck_diff)
+                        ]:
+                            d_col = "red" if diff_s < 0 else "black"
+                            r1_target_html += f'<td style="border:1px solid #000;"></td><td style="border:1px solid #000;background-color:#D90082;color:#FFF;text-align:center;font-weight:bold;font-size:9px;">{tgt_s}</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td>'
+                            r2_actual_html += f'<td style="border:1px solid #000;text-align:center;font-weight:bold;font-size:9px;">{act_d}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:9px;">{act_h:,.0f}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:9px;">{act_l:,.0f}</td><td style="border:1px solid #000;text-align:right;font-weight:bold;font-size:9px;">{rate_s}</td>'
+                            r3_diff_html += f'<td style="border:1px solid #000;"></td><td style="border:1px solid #000;text-align:center;font-weight:bold;font-size:9px;color:{d_col};">{diff_s:,.0f}</td><td style="border:1px solid #000;"></td><td style="border:1px solid #000;"></td>'
+                            r4_month_html += f'<td colspan="4" style="border:1px solid #000;text-align:center;font-weight:bold;font-size:10px;background-color:#BDD7EE;">{tgt_s}</td>'
+                            r5_remain_html += f'<td colspan="4" style="border:1px solid #000;text-align:center;font-weight:bold;font-size:10px;background-color:#FCE4D6;color:{d_col};">{diff_s:,.0f}</td>'
 
-                        total_row_html_t2 += '</tr>'
+                        r1_target_html += '</tr>'
+                        r2_actual_html += '</tr>'
+                        r3_diff_html += '</tr>'
+                        r4_month_html += '</tr>'
+                        r5_remain_html += '</tr>'
 
                         table_full_html_t2 = f"""<!DOCTYPE html>
 <html>
@@ -1209,7 +1360,11 @@ def render_all_reports_module(user_branch_name):
         </thead>
         <tbody>
             {body_rows_t2}
-            {total_row_html_t2}
+            {r1_target_html}
+            {r2_actual_html}
+            {r3_diff_html}
+            {r4_month_html}
+            {r5_remain_html}
         </tbody>
     </table>
 </body>
