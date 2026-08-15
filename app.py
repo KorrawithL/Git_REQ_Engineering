@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import time
 from database import get_db_connection, hash_password
+from config import branch_dict
 from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
 from all_reports import render_all_reports_module
@@ -64,7 +65,7 @@ apply_responsive_css()
 SESSION_TIMEOUT_SECONDS = 1800  
 
 def perform_logout(message=None):
-    for key in ['logged_in', 'user_id', 'username', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'last_activity']:
+    for key in ['logged_in', 'user_id', 'username', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'last_activity', 'page']:
         if key in st.session_state:
             del st.session_state[key]
     st.query_params.clear()
@@ -139,60 +140,110 @@ restore_session_from_url()
 check_session_timeout()
 
 # -----------------------------------------------------------------------------
-# 🔐 4. หน้าจอ Login
+# 🔐 4. หน้าจอ Authentication (Login & Register)
 # -----------------------------------------------------------------------------
 if not st.session_state.get('logged_in'):
-    st.title("🪵 Woodwork Engineering Records System")
-    st.subheader("🔐 เข้าสู่ระบบ")
+    if st.session_state.get('page') == 'register':
+        # 📝 หน้าลงทะเบียนสมาชิกใหม่
+        st.title("📝 ลงทะเบียนสมาชิกใหม่แยกตามสาขา")
+        st.write("---")
+        
+        with st.form("register_form", clear_on_submit=True):
+            reg_user = st.text_input("กำหนด User ID (Username)")
+            reg_pass = st.text_input("กำหนด Password", type="password")
+            reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ", options=list(branch_dict.keys()))
+            reg_branch_id = branch_dict[reg_branch_label]
+            
+            btn_reg = st.form_submit_button("💥 ลงทะเบียนบัญชี", use_container_width=True)
+            
+            if btn_reg:
+                if reg_user == "" or reg_pass == "":
+                    st.error("กรุณากรอกข้อมูล Username และ Password ให้ครบถ้วน")
+                else:
+                    try:
+                        conn = get_db_connection()
+                        with conn.cursor() as cursor:
+                            cursor.execute("SELECT user_id FROM system_users WHERE username = %s", (reg_user,))
+                            if cursor.fetchone():
+                                st.error("User ID นี้มีผู้ใช้งานในระบบแล้ว")
+                            else:
+                                sql = """INSERT INTO system_users (username, password_hash, branch_id, Role_tab, allowed_tabs, status) 
+                                         VALUES (%s, %s, %s, 'user', '', 'active')"""
+                                cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_branch_id))
+                                conn.commit()
+                                
+                                st.success("🎉 ลงทะเบียนสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...")
+                                st.toast("สมัครสมาชิกสำเร็จ!", icon="🎉")
+                                st.session_state.page = "login"
+                                time.sleep(1.2)
+                                st.rerun()
+                        conn.close()
+                    except Exception as e:
+                        st.error(f"เกิดข้อผิดพลาดในการลงทะเบียน: {e}")
+        
+        if st.button("⬅️ กลับไปหน้าเข้าสู่ระบบ (Login)", use_container_width=True):
+            st.session_state.page = "login"
+            st.rerun()
 
-    with st.form("login_form", clear_on_submit=False):
-        username_input = st.text_input("ชื่อผู้ใช้งาน (Username)")
-        password_input = st.text_input("รหัสผ่าน (Password)", type="password")
-        submit_login = st.form_submit_button("🔑 เข้าสู่ระบบ", use_container_width=True)
+    else:
+        # 🔐 หน้าเข้าสู่ระบบ
+        st.title("🪵 Woodwork Engineering Records System")
+        st.subheader("🔐 เข้าสู่ระบบ")
 
-        if submit_login:
-            if not username_input or not password_input:
-                st.error("⚠️ กรุณากรอก Username และ Password ให้ครบถ้วน")
-            else:
-                try:
-                    conn = get_db_connection()
-                    with conn.cursor() as cur:
-                        sql = """SELECT u.user_id, u.username, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
-                                 FROM system_users u
-                                 LEFT JOIN branches b ON u.branch_id = b.id
-                                 WHERE u.username = %s"""
-                        cur.execute(sql, (username_input,))
-                        user = cur.fetchone()
-                    conn.close()
+        with st.form("login_form", clear_on_submit=False):
+            username_input = st.text_input("ชื่อผู้ใช้งาน (Username)")
+            password_input = st.text_input("รหัสผ่าน (Password)", type="password")
+            submit_login = st.form_submit_button("🔑 เข้าสู่ระบบ", use_container_width=True)
 
-                    if user and user['password_hash'] == hash_password(password_input):
-                        if user['status'] != 'active':
-                            st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+            if submit_login:
+                if not username_input or not password_input:
+                    st.error("⚠️ กรุณากรอก Username และ Password ให้ครบถ้วน")
+                else:
+                    try:
+                        conn = get_db_connection()
+                        with conn.cursor() as cur:
+                            sql = """SELECT u.user_id, u.username, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
+                                     FROM system_users u
+                                     LEFT JOIN branches b ON u.branch_id = b.id
+                                     WHERE u.username = %s"""
+                            cur.execute(sql, (username_input,))
+                            user = cur.fetchone()
+                        conn.close()
+
+                        if user and user['password_hash'] == hash_password(password_input):
+                            if user['status'] != 'active':
+                                st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+                            else:
+                                now_time = time.time()
+                                st.session_state['logged_in'] = True
+                                st.session_state['user_id'] = user['user_id']
+                                st.session_state['username'] = user['username']
+                                st.session_state['branch_id'] = user['branch_id']
+                                st.session_state['branch_name'] = user['branch_name']
+                                st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
+                                
+                                raw_tabs = user.get('allowed_tabs', '') or ''
+                                st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
+                                st.session_state['last_activity'] = now_time
+
+                                st.query_params["auth_user"] = user['username']
+                                st.query_params["auth_time"] = str(now_time)
+                                
+                                st.success("เข้าสู่ระบบสำเร็จ!")
+                                st.rerun()
                         else:
-                            now_time = time.time()
-                            st.session_state['logged_in'] = True
-                            st.session_state['user_id'] = user['user_id']
-                            st.session_state['username'] = user['username']
-                            st.session_state['branch_id'] = user['branch_id']
-                            st.session_state['branch_name'] = user['branch_name']
-                            st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
-                            
-                            raw_tabs = user.get('allowed_tabs', '') or ''
-                            st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
-                            st.session_state['last_activity'] = now_time
+                            st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
+                    except Exception as e:
+                        st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
 
-                            st.query_params["auth_user"] = user['username']
-                            st.query_params["auth_time"] = str(now_time)
-                            
-                            st.success("เข้าสู่ระบบสำเร็จ!")
-                            st.rerun()
-                    else:
-                        st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
+        st.write("---")
+        st.write("ยังไม่มีบัญชีผู้ใช้งานใช่หรือไม่?")
+        if st.button("📝 สมัครสมาชิกใหม่ (Register) ที่นี่", use_container_width=True):
+            st.session_state.page = "register"
+            st.rerun()
 
 # -----------------------------------------------------------------------------
-# 🎯 5. หน้าจอหลักของระบบ
+# 🎯 5. หน้าจอหลักของระบบ (Main Application)
 # -----------------------------------------------------------------------------
 else:
     st.session_state['last_activity'] = time.time()
@@ -230,9 +281,8 @@ else:
         elif admin_menu == "📑 รายงานรวมทุกระบบ (All Report)":
             render_all_reports_module(st.session_state.get('branch_name'))
 
-    # 🎯 หากเป็น MANAGER หรือ USER ทั่วไป (ตั้งชื่อเมนูไดนามิก)
+    # 🎯 หากเป็น MANAGER หรือ USER ทั่วไป
     else:
-        # ตารางจับชื่อรายงานตามสิทธิ์
         report_names_map = {
             "1": "⚙️ รายงานสรุปเครื่องจักร & เบรกดาวน์",
             "2": "🚚 รายงานสรุปการใช้เชื้อเพลิงรถ",
