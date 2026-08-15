@@ -18,49 +18,7 @@ st.set_page_config(
 )
 
 # -----------------------------------------------------------------------------
-# 🎨 2. ฟังก์ชัน Responsive Web Design (RWD CSS)
-# -----------------------------------------------------------------------------
-def apply_responsive_css():
-    st.markdown("""
-        <style>
-        .main .block-container {
-            padding-top: 1.5rem !important;
-            padding-bottom: 2rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            max-width: 100% !important;
-        }
-
-        @media (max-width: 768px) {
-            h1 { font-size: 1.6rem !important; }
-            h2 { font-size: 1.3rem !important; }
-            h3 { font-size: 1.1rem !important; }
-            
-            [data-testid="column"] {
-                width: 100% !important;
-                flex: 1 1 100% !important;
-                min-width: 100% !important;
-                margin-bottom: 0.5rem !important;
-            }
-
-            .stButton > button {
-                width: 100% !important;
-                font-size: 1rem !important;
-                padding: 0.6rem 1rem !important;
-            }
-
-            [data-testid="stDataFrame"] {
-                width: 100% !important;
-                overflow-x: auto !important;
-            }
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-apply_responsive_css()
-
-# -----------------------------------------------------------------------------
-# ⏱️ 3. ตั้งค่า Session Timeout (30 นาที = 1,800 วินาที)
+# ⏱️ 2. ตั้งค่า Session Timeout (30 นาที = 1,800 วินาที)
 # -----------------------------------------------------------------------------
 SESSION_TIMEOUT_SECONDS = 1800  
 
@@ -140,14 +98,13 @@ restore_session_from_url()
 check_session_timeout()
 
 # -----------------------------------------------------------------------------
-# 🔐 4. หน้าจอ Authentication (Login & Register)
+# 🔐 3. หน้าจอ Authentication (Two-Tone Card UI)
 # -----------------------------------------------------------------------------
 if not st.session_state.get('logged_in'):
     if st.session_state.get('page') == 'register':
-        # 📝 หน้าลงทะเบียนสมาชิกใหม่
+        # 📝 หน้าลงทะเบียน (Register Page)
         st.title("📝 ลงทะเบียนสมาชิกใหม่แยกตามสาขา")
         st.write("---")
-        
         with st.form("register_form", clear_on_submit=True):
             reg_user = st.text_input("กำหนด User ID (Username)")
             reg_pass = st.text_input("กำหนด Password", type="password")
@@ -186,66 +143,226 @@ if not st.session_state.get('logged_in'):
             st.rerun()
 
     else:
-        # 🔐 หน้าเข้าสู่ระบบ
-        st.title("🪵 Woodwork Engineering Records System")
-        st.subheader("🔐 เข้าสู่ระบบ")
+        # 🔐 หน้าเข้าสู่ระบบ (Login Page) - CSS สไตล์ Two-Tone กล่องสีน้ำเงิน & ขาว
+        st.markdown("""
+            <style>
+            header {visibility: hidden;}
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
 
-        with st.form("login_form", clear_on_submit=False):
-            username_input = st.text_input("ชื่อผู้ใช้งาน (Username)")
-            password_input = st.text_input("รหัสผ่าน (Password)", type="password")
-            submit_login = st.form_submit_button("🔑 เข้าสู่ระบบ", use_container_width=True)
+            .main .block-container {
+                padding-top: 3.5rem !important;
+                padding-bottom: 2rem !important;
+                max-width: 950px !important;
+                margin: auto;
+            }
 
-            if submit_login:
-                if not username_input or not password_input:
-                    st.error("⚠️ กรุณากรอก Username และ Password ให้ครบถ้วน")
-                else:
-                    try:
-                        conn = get_db_connection()
-                        with conn.cursor() as cur:
-                            sql = """SELECT u.user_id, u.username, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
-                                     FROM system_users u
-                                     LEFT JOIN branches b ON u.branch_id = b.id
-                                     WHERE u.username = %s"""
-                            cur.execute(sql, (username_input,))
-                            user = cur.fetchone()
-                        conn.close()
+            /* กำหนดความโค้งมนและเงาของแผงคู่ */
+            div[data-testid="stHorizontalBlock"] {
+                border-radius: 28px;
+                box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15);
+                overflow: hidden;
+            }
 
-                        if user and user['password_hash'] == hash_password(password_input):
-                            if user['status'] != 'active':
-                                st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+            /* 🔷 ฝั่งซ้าย: กล่องสีน้ำเงิน Welcome Back */
+            div[data-testid="stHorizontalBlock"] > div:first-child {
+                background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important;
+                border-radius: 28px 0 0 28px !important;
+                padding: 45px 35px 35px 35px !important;
+                color: #FFFFFF !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+            }
+
+            /* ⚪ ฝั่งขวา: กล่องสีขาว New Here? */
+            div[data-testid="stHorizontalBlock"] > div:last-child {
+                background: #FFFFFF !important;
+                border-radius: 0 28px 28px 0 !important;
+                padding: 50px 35px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: center !important;
+                align-items: center !important;
+                text-align: center !important;
+            }
+
+            /* ลบกรอบเดิมของ Form ใน Streamlit */
+            div[data-testid="stForm"] {
+                border: none !important;
+                padding: 0 !important;
+                background: transparent !important;
+            }
+
+            /* ตกแต่ง Input Fields ให้เป็นสีขาวโค้งมน */
+            div[data-testid="stForm"] div[data-baseweb="input"] {
+                background-color: #FFFFFF !important;
+                border-radius: 12px !important;
+                border: 1px solid #CBD5E1 !important;
+                margin-bottom: 6px !important;
+            }
+
+            div[data-testid="stForm"] div[data-baseweb="input"] input {
+                color: #0F172A !important;
+            }
+
+            /* 🎯 ปุ่ม Login สีส้ม */
+            div[data-testid="stForm"] .stButton > button {
+                background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 12px !important;
+                padding: 10px !important;
+                font-size: 16px !important;
+                font-weight: 700 !important;
+                box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important;
+                margin-top: 10px !important;
+            }
+
+            /* 🎯 ปุ่ม Sign Up สีน้ำเงิน */
+            div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button {
+                background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important;
+                color: #FFFFFF !important;
+                border: none !important;
+                border-radius: 12px !important;
+                padding: 10px 40px !important;
+                font-size: 16px !important;
+                font-weight: 700 !important;
+                box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important;
+                margin-top: 15px !important;
+            }
+
+            .login-header-title {
+                font-size: 30px;
+                font-weight: 800;
+                color: #FFFFFF;
+                text-align: center;
+                margin-bottom: 4px;
+            }
+
+            .login-header-subtitle {
+                font-size: 13px;
+                color: #BBDEFB;
+                text-align: center;
+                margin-bottom: 25px;
+            }
+
+            .newhere-header-title {
+                font-size: 30px;
+                font-weight: 800;
+                color: #1E293B;
+                margin-bottom: 12px;
+            }
+
+            .newhere-header-desc {
+                font-size: 13.5px;
+                color: #64748B;
+                line-height: 1.6;
+                margin-bottom: 25px;
+                max-width: 280px;
+            }
+
+            .forgot-pass-link {
+                text-align: center;
+                color: #E3F2FD;
+                font-size: 13px;
+                margin-top: 12px;
+                opacity: 0.85;
+            }
+
+            @media (max-width: 768px) {
+                div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; }
+                div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; }
+            }
+            </style>
+        """, unsafe_allow_html=True)
+
+        col_left, col_right = st.columns([1.15, 0.95], gap="small")
+
+        with col_left:
+            st.markdown('<div class="login-header-title">Welcome Back</div>', unsafe_allow_html=True)
+            st.markdown('<div class="login-header-subtitle">Woodwork Engineering Records System</div>', unsafe_allow_html=True)
+
+            with st.form("login_form", clear_on_submit=False):
+                username_input = st.text_input("User Name", placeholder="👤 User Name", label_visibility="collapsed")
+                password_input = st.text_input("Password", type="password", placeholder="🔒 Password", label_visibility="collapsed")
+                submit_login = st.form_submit_button("Login", use_container_width=True)
+
+                if submit_login:
+                    if not username_input or not password_input:
+                        st.error("⚠️ กรุณากรอก Username และ Password ให้ครบถ้วน")
+                    else:
+                        try:
+                            conn = get_db_connection()
+                            with conn.cursor() as cur:
+                                sql = """SELECT u.user_id, u.username, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
+                                         FROM system_users u
+                                         LEFT JOIN branches b ON u.branch_id = b.id
+                                         WHERE u.username = %s"""
+                                cur.execute(sql, (username_input,))
+                                user = cur.fetchone()
+                            conn.close()
+
+                            if user and user['password_hash'] == hash_password(password_input):
+                                if user['status'] != 'active':
+                                    st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+                                else:
+                                    now_time = time.time()
+                                    st.session_state['logged_in'] = True
+                                    st.session_state['user_id'] = user['user_id']
+                                    st.session_state['username'] = user['username']
+                                    st.session_state['branch_id'] = user['branch_id']
+                                    st.session_state['branch_name'] = user['branch_name']
+                                    st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
+                                    
+                                    raw_tabs = user.get('allowed_tabs', '') or ''
+                                    st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
+                                    st.session_state['last_activity'] = now_time
+
+                                    st.query_params["auth_user"] = user['username']
+                                    st.query_params["auth_time"] = str(now_time)
+                                    
+                                    st.success("เข้าสู่ระบบสำเร็จ!")
+                                    st.rerun()
                             else:
-                                now_time = time.time()
-                                st.session_state['logged_in'] = True
-                                st.session_state['user_id'] = user['user_id']
-                                st.session_state['username'] = user['username']
-                                st.session_state['branch_id'] = user['branch_id']
-                                st.session_state['branch_name'] = user['branch_name']
-                                st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
-                                
-                                raw_tabs = user.get('allowed_tabs', '') or ''
-                                st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
-                                st.session_state['last_activity'] = now_time
+                                st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
+                        except Exception as e:
+                            st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
 
-                                st.query_params["auth_user"] = user['username']
-                                st.query_params["auth_time"] = str(now_time)
-                                
-                                st.success("เข้าสู่ระบบสำเร็จ!")
-                                st.rerun()
-                        else:
-                            st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
-                    except Exception as e:
-                        st.error(f"เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล: {e}")
+            
 
-        st.write("---")
-        st.write("ยังไม่มีบัญชีผู้ใช้งานใช่หรือไม่?")
-        if st.button("📝 สมัครสมาชิกใหม่ (Register) ที่นี่", use_container_width=True):
-            st.session_state.page = "register"
-            st.rerun()
+        with col_right:
+            st.markdown('<div class="newhere-header-title">New Here?</div>', unsafe_allow_html=True)
+            st.markdown('<div class="newhere-header-desc">Dear all, the team has completed the development of the machine usage logging system. To ensure the system functions effectively and meets actual requirements, we invite you to test the system and provide your feedback.</div>', unsafe_allow_html=True)
+
+            if st.button("Sign Up", use_container_width=True, key="btn_signup_switch"):
+                st.session_state.page = "register"
+                st.rerun()
 
 # -----------------------------------------------------------------------------
-# 🎯 5. หน้าจอหลักของระบบ (Main Application)
+# 🎯 4. หน้าจอหลักของระบบ (คงรูปแบบเดิมทั้งหมด 100%)
 # -----------------------------------------------------------------------------
 else:
+    st.markdown("""
+        <style>
+        .main .block-container {
+            padding-top: 1.5rem !important;
+            padding-bottom: 2rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            max-width: 100% !important;
+        }
+        @media (max-width: 768px) {
+            h1 { font-size: 1.6rem !important; }
+            h2 { font-size: 1.3rem !important; }
+            h3 { font-size: 1.1rem !important; }
+            [data-testid="column"] { width: 100% !important; flex: 1 1 100% !important; margin-bottom: 0.5rem !important; }
+            .stButton > button { width: 100% !important; font-size: 1rem !important; }
+            [data-testid="stDataFrame"] { width: 100% !important; overflow-x: auto !important; }
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.session_state['last_activity'] = time.time()
     st.query_params["auth_user"] = st.session_state['username']
     st.query_params["auth_time"] = str(st.session_state['last_activity'])
