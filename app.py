@@ -45,10 +45,11 @@ def restore_session_from_url():
 
             conn = get_db_connection()
             with conn.cursor() as cur:
+                # 🎯 แก้ไข Collation โดยใช้ CONVERT
                 sql = """SELECT u.user_id, u.username, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
                          FROM system_users u
                          LEFT JOIN branches b ON u.branch_id = b.id
-                         WHERE u.username = %s AND u.status = 'active'"""
+                         WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4) AND u.status = 'active'"""
                 cur.execute(sql, (saved_user,))
                 user = cur.fetchone()
             conn.close()
@@ -107,25 +108,24 @@ if not st.session_state.get('logged_in'):
             reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ", options=list(branch_dict.keys()))
             reg_branch_id = branch_dict[reg_branch_label]
             
-            # 🎯 เพิ่ม Role Reporter เข้าไปในหน้าสมัครสมาชิก
-            reg_role = st.selectbox("กำหนดระดับสิทธิ์ (Role)", options=["user", "reporter", "manager", "admin"])
-            
             btn_reg = st.form_submit_button("💥 ลงทะเบียนบัญชี", use_container_width=True)
             
             if btn_reg:
-                if reg_user == "" or reg_pass == "":
+                if not reg_user or not reg_pass:
                     st.error("กรุณากรอกข้อมูลให้ครบถ้วน")
                 else:
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cursor:
-                            cursor.execute("SELECT user_id FROM system_users WHERE username = %s", (reg_user,))
+                            # 🎯 ใช้ CONVERT เพื่อป้องกัน Error: Illegal mix of collations
+                            cursor.execute("SELECT user_id FROM system_users WHERE CONVERT(username USING utf8mb4) = CONVERT(%s USING utf8mb4)", (reg_user,))
                             if cursor.fetchone():
                                 st.error("User ID นี้มีผู้ใช้งานในระบบแล้ว")
                             else:
+                                # บังคับ Role_tab เป็น 'user' อัตโนมัติ
                                 sql = """INSERT INTO system_users (username, password_hash, branch_id, Role_tab, allowed_tabs, status) 
-                                         VALUES (%s, %s, %s, %s, '', 'active')"""
-                                cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_branch_id, reg_role))
+                                         VALUES (CONVERT(%s USING utf8mb4), %s, %s, 'user', '', 'active')"""
+                                cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_branch_id))
                                 conn.commit()
                                 
                                 st.success("🎉 ลงทะเบียนสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...")
@@ -175,15 +175,17 @@ if not st.session_state.get('logged_in'):
                         try:
                             conn = get_db_connection()
                             with conn.cursor() as cur:
+                                # 🎯 ใช้ CONVERT เช่นเดียวกันตอน Login
                                 sql = """SELECT u.user_id, u.username, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
-                                         FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id WHERE u.username = %s"""
+                                         FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id 
+                                         WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4)"""
                                 cur.execute(sql, (username_input,))
                                 user = cur.fetchone()
                             conn.close()
 
                             if user and user['password_hash'] == hash_password(password_input):
                                 if user['status'] != 'active':
-                                    st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน และรอการอนุมัติสิทธิ์")
+                                    st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
                                 else:
                                     now_time = time.time()
                                     st.session_state['logged_in'] = True
@@ -239,7 +241,6 @@ else:
         elif admin_menu == "📑 รายงานรวมทุกระบบ (All Report)": render_all_reports_module(st.session_state.get('branch_name'))
     
     elif current_role == 'reporter':
-        # 🎯 Reporter ดูได้อย่างเดียว
         reporter_menu = st.radio("เลือกเมนูหลัก:", ["📑 รายงานรวมทุกระบบ (All Report)"], horizontal=True)
         st.write("---")
         if reporter_menu == "📑 รายงานรวมทุกระบบ (All Report)": render_all_reports_module(st.session_state.get('branch_name'))
@@ -260,4 +261,4 @@ else:
         user_menu = st.radio("เลือกเมนูหลัก:", ["📝 บันทึกข้อมูลประจำวัน (Data Entry)", report_menu_label], horizontal=True)
         st.write("---")
         if user_menu == "📝 บันทึกข้อมูลประจำวัน (Data Entry)": render_engineering_system_tabs(st.session_state.get('branch_name'))
-        elif user_menu == report_menu_label: render_all_reports_module(st.session_state.get('branch_name')) 
+        elif user_menu == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'))
