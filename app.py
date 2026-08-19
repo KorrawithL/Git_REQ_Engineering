@@ -183,7 +183,7 @@ if not st.session_state.get('logged_in'):
 
                             if user and user['password_hash'] == hash_password(password_input):
                                 if user['status'] != 'active':
-                                    st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+                                    st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน และรอการอนุมัติสิทธิ์")
                                 else:
                                     now_time = time.time()
                                     st.session_state['logged_in'] = True

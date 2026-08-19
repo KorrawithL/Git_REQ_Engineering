@@ -63,35 +63,53 @@ def render_admin_user_management():
         
         current_user_row = [r for r in all_users if r['user_id'] == target_id][0]
         
+        # 🎯 เพิ่มตัวเลือกการผสมแท็บ (2 แท็บ, 3 แท็บ)
         tab_assign_options = {
             "🔒 ล็อกสิทธิ์เข้าใช้งานทุกแท็บ (รออนุมัติ)": [],
             "🌐 เข้าถึงได้ทุกแท็บงาน (1, 2, 3, 4)": ["1", "2", "3", "4"],
-            "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์": ["1"],
-            "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)": ["2"],
-            "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์": ["3"],
-            "🔥 4. การใช้เชื้อเพลิง บอยเลอร์": ["4"]
+            
+            # แบบ 1 แท็บ
+            "⚙️ แท็บ 1 (เครื่องจักร/เบรกดาวน์)": ["1"],
+            "🚚 แท็บ 2 (เชื้อเพลิงรถยนต์)": ["2"],
+            "💨 แท็บ 3 (แรงดันไอน้ำ บอยเลอร์)": ["3"],
+            "🔥 แท็บ 4 (เชื้อเพลิง บอยเลอร์)": ["4"],
+            
+            # แบบ 2 แท็บ
+            "🗂️ แท็บ 1 และ 2": ["1", "2"],
+            "🗂️ แท็บ 1 และ 3": ["1", "3"],
+            "🗂️ แท็บ 1 และ 4": ["1", "4"],
+            "🗂️ แท็บ 2 และ 3": ["2", "3"],
+            "🗂️ แท็บ 2 และ 4": ["2", "4"],
+            "🗂️ แท็บ 3 และ 4": ["3", "4"],
+            
+            # แบบ 3 แท็บ
+            "🗂️ แท็บ 1, 2 และ 3": ["1", "2", "3"],
+            "🗂️ แท็บ 1, 2 และ 4": ["1", "2", "4"],
+            "🗂️ แท็บ 1, 3 และ 4": ["1", "3", "4"],
+            "🗂️ แท็บ 2, 3 และ 4": ["2", "3", "4"]
         }
 
         raw_tabs = current_user_row.get('allowed_tabs', '') or ''
         current_user_tabs = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
 
+        # 🎯 ค้นหา index ปัจจุบันแบบไดนามิก เพื่อให้เข้ากับการเรียงลำดับแบบผสมหลายแท็บ
         default_idx = 0
         set_tabs = set(current_user_tabs)
-        if set_tabs == {"1", "2", "3", "4"}: default_idx = 1
-        elif "1" in set_tabs: default_idx = 2
-        elif "2" in set_tabs: default_idx = 3
-        elif "3" in set_tabs: default_idx = 4
-        elif "4" in set_tabs: default_idx = 5
+        tab_keys = list(tab_assign_options.keys())
+        for i, key in enumerate(tab_keys):
+            if set(tab_assign_options[key]) == set_tabs:
+                default_idx = i
+                break
 
         # 🎯 เพิ่ม Reporter สำหรับแก้ไข
         role_list = ["user", "reporter", "manager", "admin"]
         curr_role_idx = role_list.index(current_user_row['Role_tab']) if current_user_row['Role_tab'] in role_list else 0
-        status_list = ["active", "pending", "disabled"]
+        status_list = ["active", "disabled"]
         curr_status_idx = status_list.index(current_user_row['status']) if current_user_row['status'] in status_list else 0
 
         c_edit1, c_edit2, c_edit3 = st.columns(3)
         with c_edit1: edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx)
-        with c_edit2: selected_tab_label = st.selectbox("เลือกจัดสรรแท็บงานประจำบัญชี:", options=list(tab_assign_options.keys()), index=default_idx)
+        with c_edit2: selected_tab_label = st.selectbox("เลือกจัดสรรแท็บงานประจำบัญชี:", options=tab_keys, index=default_idx)
         with c_edit3: edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx)
 
         selected_allowed_tabs = tab_assign_options[selected_tab_label]
@@ -124,3 +142,5 @@ def render_admin_user_management():
                     time.sleep(1)
                     st.rerun()
                 except Exception as e: st.error(f"ไม่สามารถลบข้อมูลได้: {e}")
+    else:
+        st.info("ยังไม่มีข้อมูลบัญชีผู้ใช้ระบบคนอื่นนอกจากตัวคุณ")
