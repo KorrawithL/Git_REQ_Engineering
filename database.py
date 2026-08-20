@@ -1,15 +1,20 @@
 import pymysql
 import hashlib
+import streamlit as st
 
-# 🔌 ฟังก์ชันเชื่อมต่อฐานข้อมูลภายในเครื่อง (Localhost)
+# 🔌 ฟังก์ชันเชื่อมต่อฐานข้อมูลบน TiDB Cloud
 def get_db_connection():
+    db_config = st.secrets["mysql"]
+    
     return pymysql.connect(
-        host='127.0.0.1',      # หรือใช้ 'localhost' เพื่อชี้มาที่เครื่องตัวเอง
-        port=3306,             # Port มาตรฐานของ MySQL/MariaDB บนเครื่อง (ปรับเป็น 3307 ได้หากตั้งค่าไว้)
-        user='root',           # User ปกติของเครื่อง Local มักจะเป็น 'root'
-        password='',           # รหัสผ่าน MySQL บนเครื่องของคุณ (ถ้าไม่มีให้ใส่ '')
-        database='Woodwork_Engineering_Records_System', # ชื่อฐานข้อมูลภายในเครื่อง
+        host=db_config["host"],
+        port=int(db_config["port"]),
+        user=db_config["user"],
+        password=db_config["password"],
+        database=db_config["database"],
         charset='utf8mb4',
+        ssl_verify_cert=True,
+        ssl_verify_identity=True,
         cursorclass=pymysql.cursors.DictCursor
     )
 
@@ -18,10 +23,6 @@ def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()
 
 def log_activity(user_id, username, action_type, module_name, details):
-    """
-    ฟังก์ชันสำหรับบันทึกประวัติการใช้งานลงตาราง activity_logs
-    action_type: 'INSERT', 'UPDATE', 'DELETE'
-    """
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:

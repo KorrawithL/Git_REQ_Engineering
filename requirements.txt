@@ -1,0 +1,5 @@
+streamlit
+pymysql
+cryptography
+pandas
+openpyxl
