@@ -7,7 +7,7 @@ from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
 from all_reports import render_all_reports_module
 # 🎯 Import ไฟล์ใหม่เข้ามาใช้งาน
-from allMachines import render_add_new_equipment
+from addMachines import render_add_new_equipment
 
 # -----------------------------------------------------------------------------
 # 🎯 1. ตั้งค่าหน้าเว็บ Streamlit
