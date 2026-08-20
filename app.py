@@ -6,6 +6,8 @@ from config import branch_dict
 from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
 from all_reports import render_all_reports_module
+# 🎯 Import ไฟล์ใหม่เข้ามาใช้งาน
+from allMachines import render_add_new_equipment
 
 # -----------------------------------------------------------------------------
 # 🎯 1. ตั้งค่าหน้าเว็บ Streamlit
@@ -234,11 +236,22 @@ else:
     current_role = st.session_state.get('role_tab')
     
     if current_role == 'admin':
-        admin_menu = st.radio("เลือกเมนูหลัก (Admin Console):", ["⚙️ ระบบจัดการผู้ใช้และสิทธิ์", "📝 หน้าจอบันทึกข้อมูลประจำวัน (Data Entry)", "📑 รายงานรวมทุกระบบ (All Report)"], horizontal=True)
+        # 🎯 เพิ่มเมนู "🛠️ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ" ต่อจาก All Report
+        admin_menu = st.radio(
+            "เลือกเมนูหลัก (Admin Console):", 
+            [
+                "⚙️ ระบบจัดการผู้ใช้และสิทธิ์", 
+                "📝 หน้าจอบันทึกข้อมูลประจำวัน (Data Entry)", 
+                "📑 รายงานรวมทุกระบบ (All Report)",
+                "🛠️ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ"
+            ], 
+            horizontal=True
+        )
         st.write("---")
         if admin_menu == "⚙️ ระบบจัดการผู้ใช้และสิทธิ์": render_admin_user_management()
         elif admin_menu == "📝 หน้าจอบันทึกข้อมูลประจำวัน (Data Entry)": render_engineering_system_tabs(st.session_state.get('branch_name'))
         elif admin_menu == "📑 รายงานรวมทุกระบบ (All Report)": render_all_reports_module(st.session_state.get('branch_name'))
+        elif admin_menu == "🛠️ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ": render_add_new_equipment()  # 🎯 ดึงหน้าจอ AllMachines มาแสดง
     
     elif current_role == 'reporter':
         reporter_menu = st.radio("เลือกเมนูหลัก:", ["📑 รายงานรวมทุกระบบ (All Report)"], horizontal=True)

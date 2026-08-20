@@ -41,7 +41,6 @@ def render_engineering_system_tabs(current_branch_name):
             with current_tab_ctx:
                 st.header("1. ระบบการทำงานของเครื่องจักร / เบรกดาวน์")
                 
-                # 📝 ดึงข้อมูลเครื่องจักรจากฐานข้อมูล (หรือจาก Dict เดิม)
                 machine_dict = {
                     "โต๊ะเลื่อย (≤ 0.15%)": 7, "พัดลมดูดขี้เลื่อย (≤ 0.15%)": 8, "ตาชั่งใหญ่ (≤ 0.20%)": 9,
                     "ตาชั่งเล็ก (≤ 0.20%)": 10, "รถยก (≤ 0.20%)": 11, "รถคีบ (≤16 ชม.)": 12,
@@ -49,7 +48,6 @@ def render_engineering_system_tabs(current_branch_name):
                     "บอยเลอร์ (≤ 0.15%)": 16, "ชิปเปอร์ (≤ 0.15%)": 17,
                 }
                 
-                # พยายามดึงข้อมูลเครื่องจักรจากฐานข้อมูลตาราง machines แบบ Dynamic
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
@@ -63,11 +61,10 @@ def render_engineering_system_tabs(current_branch_name):
                             machine_dict = {m['machine_name']: m['id'] for m in db_machines}
                     conn.close()
                 except Exception as e:
-                    pass # ถ้าตารางยังไม่มี ให้ใช้ default machine_dict ไปก่อน
+                    pass 
 
                 machine_select_options = ["-- กรุณาเลือกเครื่องจักร --"] + list(machine_dict.keys())
                 
-                # --- ฟอร์มบันทึกข้อมูลเครื่องจักรลงตาราง machine_trans ---
                 with st.form("machine_form", clear_on_submit=True):
                     st.write(f"### 📝 ฟอร์มบันทึกข้อมูลเครื่องจักรลงตาราง (สังกัด: {current_branch_name})")
                     c1, c2 = st.columns(2)
@@ -101,44 +98,6 @@ def render_engineering_system_tabs(current_branch_name):
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
-
-                # =========================================================
-                # ➕ Expander สำหรับเพิ่มเครื่องจักรใหม่เข้าสู่ตาราง "machines"
-                # 🔒 จำกัดสิทธิ์เฉพาะ Admin เท่านั้น
-                # =========================================================
-                if current_role == 'admin':
-                    with st.expander("➕ เพิ่มเครื่องจักรใหม่เข้าสู่ระบบ"):
-                        with st.form("add_new_machine_form", clear_on_submit=True):
-                            st.write("ฟอร์มลงทะเบียนชื่อเครื่องจักรใหม่เข้าสู่ฐานข้อมูลระบบ")
-                            
-                            col_m1, col_m2 = st.columns(2)
-                            with col_m1:
-                                new_machine_name = st.text_input("ชื่อเครื่องจักรใหม่ *", placeholder="เช่น มอเตอร์สายพานลำเลียง")
-                            with col_m2:
-                                new_machine_branch = st.selectbox("สาขาที่ติดตั้ง *", options=list(branch_dict.keys()), key="branch_sel_t1")
-                                
-                            submit_new_machine = st.form_submit_button("💾 บันทึกเครื่องจักรใหม่เข้าฐานข้อมูล", use_container_width=True)
-                            
-                            if submit_new_machine:
-                                if not new_machine_name:
-                                    st.error("⚠️ กรุณาระบุชื่อเครื่องจักรให้ชัดเจน")
-                                else:
-                                    try:
-                                        branch_id_for_machine = branch_dict[new_machine_branch]
-                                        conn = get_db_connection()
-                                        with conn.cursor() as cur:
-                                            # เพิ่มข้อมูลลงในตาราง machines
-                                            sql_add = "INSERT INTO machines (machine_name, branch_id) VALUES (%s, %s)"
-                                            cur.execute(sql_add, (new_machine_name, branch_id_for_machine))
-                                            conn.commit()
-                                        conn.close()
-                                        log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Machine Setup", f"เพิ่มเครื่องจักรใหม่: {new_machine_name}")
-                                        st.success(f"✅ เพิ่มเครื่องจักร '{new_machine_name}' สำหรับสาขา '{new_machine_branch}' เข้าสู่ระบบสำเร็จ!")
-                                        time.sleep(1.2)
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"เกิดข้อผิดพลาดในการบันทึกเครื่องจักรใหม่: {e}")
-
 
         # =========================================================================
         # 🚚 TAB 2: บันทึกการใช้เชื้อเพลิงรถยนต์ / รถยก
@@ -182,7 +141,6 @@ def render_engineering_system_tabs(current_branch_name):
 
                 engine_select_options = ["-- กรุณาเลือก รหัสงาน/ทะเบียนรถ --"] + list(engine_options.keys())
 
-                # --- ฟอร์มบันทึกข้อมูลเชื้อเพลิงลงตาราง fuel_records ---
                 with st.form("fuel_form", clear_on_submit=True):
                     st.write(f"### 📝 ฟอร์มบันทึกข้อมูลการใช้เชื้อเพลิงรถ (สังกัด: {current_branch_name})")
                     c1, c2 = st.columns(2)
@@ -218,63 +176,8 @@ def render_engineering_system_tabs(current_branch_name):
                             except Exception as e:
                                 st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
 
-                # =========================================================
-                # ➕ Expander สำหรับเพิ่มรหัสงาน / ทะเบียนรถใหม่ (Tab 2)
-                # 🔒 จำกัดสิทธิ์เฉพาะ Admin เท่านั้น
-                # =========================================================
-                if current_role == 'admin':
-                    engine_type_dict = {}
-                    try:
-                        conn = get_db_connection()
-                        with conn.cursor() as cur:
-                            cur.execute("SELECT id, CONVERT(type_name USING utf8mb4) AS type_name FROM engine_types ORDER BY id ASC")
-                            for r in cur.fetchall():
-                                engine_type_dict[r['type_name']] = r['id']
-                        conn.close()
-                    except Exception as e:
-                        st.warning("⚠️ ไม่สามารถดึงข้อมูลประเภทรถจากระบบได้ กรุณาตรวจสอบฐานข้อมูลตาราง engine_types")
-
-                    type_options = list(engine_type_dict.keys()) if engine_type_dict else ["-- ไม่มีข้อมูลประเภทรถ --"]
-
-                    with st.expander("➕ เพิ่มรหัสงาน / ทะเบียนรถใหม่เข้าสู่ระบบ"):
-                        with st.form("add_new_engine_form", clear_on_submit=True):
-                            st.write("ฟอร์มลงทะเบียนรหัสงาน/ทะเบียนรถใหม่เข้าสู่ฐานข้อมูลระบบ")
-                            
-                            col_e1, col_e2, col_e3 = st.columns(3)
-                            with col_e1:
-                                new_engine_code = st.text_input("รหัสงาน / ทะเบียนรถใหม่ *", placeholder="เช่น TCK-01")
-                            with col_e2:
-                                new_engine_type = st.selectbox("ชนิดของรถ *", options=type_options)
-                            with col_e3:
-                                new_engine_branch = st.selectbox("สาขาประจำการ *", options=list(branch_dict.keys()), key="branch_sel_t2")
-                                
-                            submit_new_engine = st.form_submit_button("💾 บันทึกทะเบียนรถใหม่", use_container_width=True)
-                            
-                            if submit_new_engine:
-                                if not new_engine_code or new_engine_type == "-- ไม่มีข้อมูลประเภทรถ --":
-                                    st.error("⚠️ กรุณากรอกรหัสงาน/ทะเบียนรถ และเลือกชนิดของรถให้ครบถ้วน")
-                                else:
-                                    try:
-                                        b_id = branch_dict[new_engine_branch]
-                                        t_id = engine_type_dict[new_engine_type]
-                                        
-                                        conn = get_db_connection()
-                                        with conn.cursor() as cur:
-                                            # เพิ่มข้อมูลเข้าตาราง engines
-                                            sql_add_eng = "INSERT INTO engines (engine_code, engine_type_id, branch_id, is_active) VALUES (%s, %s, %s, 1)"
-                                            cur.execute(sql_add_eng, (new_engine_code, t_id, b_id))
-                                            conn.commit()
-                                        conn.close()
-                                        
-                                        log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Fuel System Setup", f"เพิ่มรถใหม่: {new_engine_code}")
-                                        st.success(f"✅ เพิ่มรถ '{new_engine_code}' สาขา '{new_engine_branch}' เข้าสู่ระบบสำเร็จ!")
-                                        time.sleep(1.2)
-                                        st.rerun()
-                                    except Exception as e:
-                                        st.error(f"เกิดข้อผิดพลาดในการบันทึกทะเบียนรถใหม่: {e}")
-
         # =========================================================================
-        # 💨 TAB 3: บันทึกแรงดันไอน้ำ บอยเลอร์ 
+        # 💨 TAB 3: บันทึกแรงดันไอน้ำ บอยเลอร์
         # =========================================================================
         elif key == "3":
             with current_tab_ctx:
