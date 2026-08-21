@@ -17,7 +17,7 @@ def render_admin_user_management():
                 FROM system_users u
                 LEFT JOIN branches b ON u.branch_id = b.id
                 LEFT JOIN user_branches ub ON u.user_id = ub.user_id
-                GROUP BY u.user_id
+                GROUP BY u.user_id, u.username, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status
                 ORDER BY u.user_id ASC
             """)
             all_users = user_cursor.fetchall()
