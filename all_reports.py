@@ -258,7 +258,7 @@ def show_summary_report_dialog(html_content):
 
 
 # ==========================================================
-# 🚀 3. ฟังก์ชัน CACHE ประมวลผลข้อมูล (ไม่ให้เว็บค้าง)
+# 🚀 3. ฟังก์ชัน CACHE ประมวลผลข้อมูล
 # ==========================================================
 @st.cache_data(show_spinner=False)
 def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_branch_display):
@@ -447,7 +447,6 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
     total_row_html += '</tr>'
     
-    # 🎯 แยก pct_row_html ออกมาให้ถูกต้องตามที่แก้ไขใหม่
     pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
     for m in active_machines_config:
         pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
@@ -1031,7 +1030,6 @@ def render_all_reports_module(user_branch_name):
         "3": "💨 รายงานสรุปแรงดันไอน้ำ บอยเลอร์", "4": "🔥 รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)"
     }
 
-    # 🎯 แก้ไขจุดนี้: มีแค่ admin ที่ได้ทุกแท็บอัตโนมัติ นอกนั้นต้องเช็คสิทธิ์ทั้งหมด
     if current_role == "admin":
         visible_tab_keys = ["1", "2", "3", "4"]
     else:
@@ -1043,7 +1041,6 @@ def render_all_reports_module(user_branch_name):
         st.header("📑 รายงานสรุปประจำสาขา")
     st.write("---")
 
-    # 🎯 ถ้าไม่มีสิทธิ์เลย (โดนล็อกเป็น []) จะโชว์หน้ารออนุมัตินี้ทันที
     if not visible_tab_keys:
         st.error("## ⏳ รอการอนุมัติสิทธิ์เลือกแท็บงานจากแอดมิน")
         return
@@ -1177,7 +1174,7 @@ def render_all_reports_module(user_branch_name):
             with current_tab_ctx:
                 st.subheader("📊 รายงานสรุปสถิติแรงดันไอน้ำปลายทางตก")
                 col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
-                with col_f1: start_date_t3 = date_input("ตั้งแต่วันที่", value=pd.to_datetime("today").replace(day=1), key="s_d3")
+                with col_f1: start_date_t3 = st.date_input("ตั้งแต่วันที่", value=pd.to_datetime("today").replace(day=1), key="s_d3")
                 with col_f2: end_date_t3 = st.date_input("ถึงวันที่", value=pd.to_datetime("today"), key="e_d3")
                 with col_f3:
                     if current_role in ["admin", "reporter"]:
