@@ -2,19 +2,15 @@ import pymysql
 import hashlib
 import streamlit as st
 
-# 🔌 ฟังก์ชันเชื่อมต่อฐานข้อมูลบน TiDB Cloud
+# 🔌 ฟังก์ชันเชื่อมต่อฐานข้อมูลภายในเครื่อง (Localhost)
 def get_db_connection():
-    db_config = st.secrets["mysql"]
-    
     return pymysql.connect(
-        host=db_config["host"],
-        port=int(db_config["port"]),
-        user=db_config["user"],
-        password=db_config["password"],
-        database=db_config["database"],
+        host='127.0.0.1',      # หรือใช้ 'localhost' เพื่อชี้มาที่เครื่องตัวเอง
+        port=3306,             # Port มาตรฐานของ MySQL/MariaDB บนเครื่อง (ปรับเป็น 3307 ได้หากตั้งค่าไว้)
+        user='root',           # User ปกติของเครื่อง Local มักจะเป็น 'root'
+        password='',           # รหัสผ่าน MySQL บนเครื่องของคุณ (ถ้าไม่มีให้ใส่ '')
+        database='Woodwork_Engineering_Records_System', # ชื่อฐานข้อมูลภายในเครื่อง
         charset='utf8mb4',
-        ssl_verify_cert=True,
-        ssl_verify_identity=True,
         cursorclass=pymysql.cursors.DictCursor
     )
 

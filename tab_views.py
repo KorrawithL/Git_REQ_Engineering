@@ -10,7 +10,7 @@ def render_engineering_system_tabs(current_branch_name):
     current_role = str(raw_role).strip().lower()
     allowed_tabs_list = st.session_state.get('allowed_tabs', [])
     
-    # 🎯 ดึงสิทธิ์สาขาทั้งหมดของผู้ใช้งาน (เป็น List ของ String ID)
+    # 🎯 ดึงสิทธิ์สาขาทั้งหมดของผู้ใช้งาน
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
 
     all_tabs_config = {
@@ -18,8 +18,11 @@ def render_engineering_system_tabs(current_branch_name):
         "3": "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์", "4": "🔥 4. การใช้เชื้อเพลิง บอยเลอร์"
     }
 
-    if current_role in ["admin", "manager"]: visible_tab_keys = ["1", "2", "3", "4"]
-    else: visible_tab_keys = [k for k in allowed_tabs_list if k in all_tabs_config]
+    # 🎯 แก้ไข: ให้เฉพาะ admin เท่านั้นที่มีสิทธิ์เข้าถึงทุกแท็บโดยไม่ต้องรออนุมัติ
+    if current_role == "admin": 
+        visible_tab_keys = ["1", "2", "3", "4"]
+    else: 
+        visible_tab_keys = [k for k in allowed_tabs_list if k in all_tabs_config]
 
     if not visible_tab_keys:
         st.error("## ⏳ รอการอนุมัติสิทธิ์เลือกแท็บงานจากแอดมิน")
@@ -38,7 +41,6 @@ def render_engineering_system_tabs(current_branch_name):
             with current_tab_ctx:
                 st.header("1. ระบบการทำงานของเครื่องจักร / เบรกดาวน์")
                 
-                # 🎯 กำหนดสาขาที่จะให้ผู้ใช้เลือกบันทึก
                 if current_role == 'admin':
                     available_options = list(branch_dict.keys())
                 else:
@@ -51,7 +53,6 @@ def render_engineering_system_tabs(current_branch_name):
                         if current_role == "admin":
                             cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines")
                         else:
-                            # 🎯 ดึงเครื่องจักรของทุกสาขาที่ User มีสิทธิ์
                             placeholders = ', '.join(['%s'] * len(user_allowed_branches))
                             cur.execute(f"SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines WHERE branch_id IN ({placeholders})", tuple(user_allowed_branches))
                         
@@ -98,6 +99,8 @@ def render_engineering_system_tabs(current_branch_name):
                                     cur.execute(sql, (target_branch_id, m_date, int(m_select_id), int(m_qty), float(m_work_hours), float(m_break_hours), m_remark, int(st.session_state.user_id)))
                                 conn.commit()
                                 conn.close()
+                                
+                                st.cache_data.clear()
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 1 Data Entry", f"บันทึกเครื่องจักร {m_label} วันที่ {m_date}")
                                 st.success("✅ บันทึกข้อมูลเครื่องจักรสำเร็จเรียบร้อยแล้ว!")
                                 time.sleep(1)
@@ -111,10 +114,7 @@ def render_engineering_system_tabs(current_branch_name):
             with current_tab_ctx:
                 st.header("2. ระบบการใช้เชื้อเพลิง (เครื่องยนต์/รถยก)")
                 
-                engine_options = {}
-                engine_type_mapping = {}
-                engine_code_mapping = {}
-                engine_branch_mapping = {} 
+                engine_options, engine_type_mapping, engine_code_mapping, engine_branch_mapping = {}, {}, {}, {} 
                 
                 try:
                     conn = get_db_connection()
@@ -124,7 +124,6 @@ def render_engineering_system_tabs(current_branch_name):
                                         FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.is_active = 1 ORDER BY b.id ASC, e.engine_code ASC"""
                             cur.execute(sql_eng)
                         else:
-                            # 🎯 ดึงรถของสาขาที่ได้รับอนุญาตทั้งหมด
                             placeholders = ', '.join(['%s'] * len(user_allowed_branches))
                             sql_eng = f"""SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id
                                         FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id IN ({placeholders}) AND e.is_active = 1 ORDER BY e.engine_code ASC"""
@@ -171,8 +170,6 @@ def render_engineering_system_tabs(current_branch_name):
                                 selected_pk_id = engine_options[selected_label]
                                 actual_engine_code = engine_code_mapping[selected_pk_id]
                                 actual_type_name = engine_type_mapping[selected_pk_id]
-                                
-                                # 🎯 ใช้ branch_id ตามรถคันนั้นเสมอ
                                 target_branch_id = engine_branch_mapping[selected_pk_id] 
                                 
                                 conn = get_db_connection()
@@ -182,6 +179,8 @@ def render_engineering_system_tabs(current_branch_name):
                                     cur.execute(sql, (target_branch_id, f_date, actual_engine_code, actual_type_name, float(f_liters), float(f_hours), f_remark))
                                 conn.commit()
                                 conn.close()
+                                
+                                st.cache_data.clear()
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 2 Data Entry", f"บันทึกเชื้อเพลิงรถ {actual_engine_code} จำนวน {f_liters} ลิตร")
                                 st.success(f"✅ บันทึกสำเร็จ! (ทะเบียน: {actual_engine_code} | ประเภท: {actual_type_name})")
                                 time.sleep(1)
@@ -232,6 +231,8 @@ def render_engineering_system_tabs(current_branch_name):
                                     cur.execute(sql, (target_branch_id, p_date, int(total_count), (int(pm_drop) + int(non_pm_drop)), int(pm_drop), int(non_pm_drop), p_remark, int(st.session_state.user_id)))
                                 conn.commit()
                                 conn.close()
+                                
+                                st.cache_data.clear()
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 3 Data Entry", f"บันทึกแรงดันไอน้ำตก วันที่ {p_date}")
                                 st.success("✅ บันทึกข้อมูลแรงดันไอน้ำเรียบร้อยแล้ว!")
                                 time.sleep(1)
@@ -293,6 +294,8 @@ def render_engineering_system_tabs(current_branch_name):
                                     cur.execute(sql, (target_branch_id, bf_date, float(saw_w), float(wood_w), float(waste_wood_w), float(saw_p), float(wood_p), float(waste_wood_p), float(prod_val), float(work_hours), int(st.session_state.user_id)))
                                 conn.commit()
                                 conn.close()
+                                
+                                st.cache_data.clear()
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Data Entry", f"บันทึกเชื้อเพลิงบอยเลอร์ วันที่ {bf_date}")
                                 st.success("✅ บันทึกข้อมูลเชื้อเพลิงบอยเลอร์สำเร็จแล้ว!")
                                 time.sleep(1)
