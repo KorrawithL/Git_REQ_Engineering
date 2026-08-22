@@ -21,7 +21,7 @@ st.set_page_config(
 SESSION_TIMEOUT_SECONDS = 1800  
 
 def perform_logout(message=None):
-    for key in ['logged_in', 'user_id', 'username', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'allowed_branches', 'last_activity', 'page']:
+    for key in ['logged_in', 'user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'allowed_branches', 'last_activity', 'page']:
         if key in st.session_state:
             del st.session_state[key]
     st.query_params.clear()
@@ -41,13 +41,12 @@ def restore_session_from_url():
 
             conn = get_db_connection()
             with conn.cursor() as cur:
-                sql = """SELECT u.user_id, u.username, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
+                sql = """SELECT u.user_id, u.username, u.full_name, u.position, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
                          FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id
                          WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4) AND u.status = 'active'"""
                 cur.execute(sql, (saved_user,))
                 user = cur.fetchone()
                 
-                # 🎯 โหลดสิทธิ์สาขาเพิ่มเติมจากตาราง user_branches
                 if user:
                     cur.execute("SELECT branch_id FROM user_branches WHERE user_id = %s", (user['user_id'],))
                     extra_branches = cur.fetchall()
@@ -55,14 +54,13 @@ def restore_session_from_url():
 
             if user:
                 st.session_state['logged_in'] = True
-                for k in ['user_id', 'username', 'branch_id', 'branch_name']:
+                for k in ['user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name']:
                     st.session_state[k] = user[k]
                 st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
                 
                 raw_tabs = user.get('allowed_tabs', '') or ''
                 st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
                 
-                # 🎯 นำสาขาหลัก + สาขาในตาราง user_branches มารวมกัน
                 allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
                 st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
                 
@@ -86,26 +84,55 @@ check_session_timeout()
 # -----------------------------------------------------------------------------
 if not st.session_state.get('logged_in'):
     if st.session_state.get('page') == 'register':
+        
+        # 🎯 โหลดรายการตำแหน่งเตรียมไว้ สำหรับทำ Dropdown
+        position_list = ["-- กรุณาเลือกตำแหน่ง --"]
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY position ASC")
+                for r in cur.fetchall():
+                    if r['pos']: position_list.append(r['pos'].strip())
+            conn.close()
+        except Exception: pass
+
         st.title("📝 ลงทะเบียนสมาชิกใหม่แยกตามสาขา")
         st.write("---")
         with st.form("register_form", clear_on_submit=True):
-            reg_user = st.text_input("กำหนด User ID (Username)")
-            reg_pass = st.text_input("กำหนด Password", type="password")
-            reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ", options=list(branch_dict.keys()))
+            st.markdown("#### 👤 ข้อมูลบัญชีผู้ใช้งาน")
+            col_u1, col_u2 = st.columns(2)
+            with col_u1: reg_user = st.text_input("กำหนด User ID (Username) *")
+            with col_u2: reg_pass = st.text_input("กำหนด Password *", type="password")
+            
+            st.markdown("#### 📋 ข้อมูลส่วนตัว")
+            col_p1, col_p2 = st.columns(2)
+            with col_p1: reg_fullname = st.text_input("ชื่อ-นามสกุล *")
+            # 🎯 เปลี่ยนช่องกรอกตำแหน่งเป็น Selectbox ดึงจากฐานข้อมูล
+            with col_p2: reg_position = st.selectbox("ตำแหน่ง *", options=position_list) 
+            
+            col_c1, col_c2 = st.columns(2)
+            with col_c1: reg_email = st.text_input("E-mail")
+            with col_c2: reg_phone = st.text_input("เบอร์โทรศัพท์")
+            
+            st.markdown("#### 🏢 ข้อมูลสังกัด")
+            reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ *", options=list(branch_dict.keys()))
             reg_branch_id = branch_dict[reg_branch_label]
             
+            st.write("")
             if st.form_submit_button("💥 ลงทะเบียนบัญชี", use_container_width=True):
-                if not reg_user or not reg_pass: st.error("กรุณากรอกข้อมูลให้ครบถ้วน")
+                # 🎯 เช็คว่าไม่ได้เลือก "-- กรุณาเลือกตำแหน่ง --"
+                if not reg_user or not reg_pass or not reg_fullname or reg_position == "-- กรุณาเลือกตำแหน่ง --": 
+                    st.error("⚠️ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน และเลือกตำแหน่ง")
                 else:
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cursor:
                             cursor.execute("SELECT user_id FROM system_users WHERE CONVERT(username USING utf8mb4) = CONVERT(%s USING utf8mb4)", (reg_user,))
-                            if cursor.fetchone(): st.error("User ID นี้มีผู้ใช้งานในระบบแล้ว")
+                            if cursor.fetchone(): st.error("❌ User ID นี้มีผู้ใช้งานในระบบแล้ว")
                             else:
-                                sql = """INSERT INTO system_users (username, password_hash, branch_id, Role_tab, allowed_tabs, status) 
-                                         VALUES (CONVERT(%s USING utf8mb4), %s, %s, 'user', '', 'active')"""
-                                cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_branch_id))
+                                sql = """INSERT INTO system_users (username, password_hash, full_name, position, email, phone_number, branch_id, Role_tab, allowed_tabs, status) 
+                                         VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, 'user', '', 'active')"""
+                                cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_fullname, reg_position, reg_email, reg_phone, reg_branch_id))
                                 conn.commit()
                                 st.success("🎉 ลงทะเบียนสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...")
                                 st.session_state.page = "login"
@@ -113,6 +140,7 @@ if not st.session_state.get('logged_in'):
                                 st.rerun()
                         conn.close()
                     except Exception as e: st.error(f"เกิดข้อผิดพลาดในการลงทะเบียน: {e}")
+                    
         if st.button("⬅️ กลับไปหน้าเข้าสู่ระบบ (Login)", use_container_width=True):
             st.session_state.page = "login"
             st.rerun()
@@ -130,13 +158,12 @@ if not st.session_state.get('logged_in'):
                         try:
                             conn = get_db_connection()
                             with conn.cursor() as cur:
-                                sql = """SELECT u.user_id, u.username, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
+                                sql = """SELECT u.user_id, u.username, u.full_name, u.position, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
                                          FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id 
                                          WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4)"""
                                 cur.execute(sql, (username_input,))
                                 user = cur.fetchone()
                                 
-                                # 🎯 โหลดสิทธิ์สาขาเพิ่มเติมตอน Login
                                 if user:
                                     cur.execute("SELECT branch_id FROM user_branches WHERE user_id = %s", (user['user_id'],))
                                     extra_branches = cur.fetchall()
@@ -147,13 +174,13 @@ if not st.session_state.get('logged_in'):
                                 else:
                                     now_time = time.time()
                                     st.session_state['logged_in'] = True
-                                    for k in ['user_id', 'username', 'branch_id', 'branch_name']: st.session_state[k] = user[k]
+                                    for k in ['user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name']: 
+                                        st.session_state[k] = user[k]
                                     st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
                                     
                                     raw_tabs = user.get('allowed_tabs', '') or ''
                                     st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
                                     
-                                    # 🎯 นำสาขาหลัก + สาขาในตาราง user_branches มารวมกัน
                                     allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
                                     st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
                                     
@@ -180,11 +207,14 @@ else:
     st.query_params["auth_time"] = str(st.session_state['last_activity'])
 
     with st.sidebar:
-        st.success(f"👤 ผู้ใช้งาน: **{st.session_state.get('username')}**")
+        disp_name = st.session_state.get('full_name') or st.session_state.get('username')
+        disp_pos = st.session_state.get('position') or "-"
+        
+        st.success(f"👤 ผู้ใช้งาน: **{disp_name}**")
+        st.info(f"💼 ตำแหน่ง: **{disp_pos}**")
         st.info(f"🏢 สังกัดปัจจุบัน: **{st.session_state.get('branch_name')}**")
         st.warning(f"👑 ระดับสิทธิ์: **{st.session_state.get('role_tab').upper()}**")
         
-        # แสดงสาขาที่มีสิทธิ์เพิ่มเติมให้ User เห็นในแถบด้านข้าง
         user_all_branches = st.session_state.get('allowed_branches', [])
         if len(user_all_branches) > 1:
             extra_b_names = [k for k, v in branch_dict.items() if str(v) in user_all_branches]
