@@ -47,8 +47,6 @@ def render_admin_user_management():
             st.markdown("#### 📋 ข้อมูลส่วนตัว")
             col_p1, col_p2 = st.columns(2)
             with col_p1: new_fullname = st.text_input("ชื่อ-นามสกุล *")
-            
-            # 🎯 2. เปลี่ยนช่อง Text เป็น Selectbox ดึงจากฐานข้อมูล
             with col_p2: new_pos = st.selectbox("ตำแหน่ง *", options=position_list)
             
             col_c1, col_c2 = st.columns(2)
@@ -97,7 +95,7 @@ def render_admin_user_management():
                 'E-mail': u.get('email') or '-',
                 'เบอร์โทร': u.get('phone_number') or '-',
                 'ชื่อสาขา (หลัก)': u['branch_name'], 
-                'ระดับสิทธิ์': u['Role_tab'],
+                'ระดับสิทธิ์ (Role_tab)': u['Role_tab'],
                 'แท็บที่เข้าถึงได้': u['allowed_tabs'],
                 'สาขาที่มีสิทธิ์ (เพิ่มเติม)': get_extra_branches_display(u['additional_branches']),
                 'สถานะบัญชี': u['status']
@@ -113,23 +111,20 @@ def render_admin_user_management():
         
         current_user_row = [r for r in all_users if r['user_id'] == target_id][0]
         
-        tab_assign_options = {
-            "🔒 ล็อกสิทธิ์เข้าใช้งานทุกแท็บ (รออนุมัติ)": [], "🌐 เข้าถึงได้ทุกแท็บงาน (1, 2, 3, 4)": ["1", "2", "3", "4"],
-            "⚙️ แท็บ 1 (เครื่องจักร/เบรกดาวน์)": ["1"], "🚚 แท็บ 2 (เชื้อเพลิงรถยนต์)": ["2"],
-            "💨 แท็บ 3 (แรงดันไอน้ำ บอยเลอร์)": ["3"], "🔥 แท็บ 4 (เชื้อเพลิง บอยเลอร์)": ["4"],
-            "🗂️ แท็บ 1 และ 2": ["1", "2"], "🗂️ แท็บ 1 และ 3": ["1", "3"], "🗂️ แท็บ 1 และ 4": ["1", "4"],
-            "🗂️ แท็บ 2 และ 3": ["2", "3"], "🗂️ แท็บ 2 และ 4": ["2", "4"], "🗂️ แท็บ 3 และ 4": ["3", "4"],
-            "🗂️ แท็บ 1, 2 และ 3": ["1", "2", "3"], "🗂️ แท็บ 1, 2 และ 4": ["1", "2", "4"],
-            "🗂️ แท็บ 1, 3 และ 4": ["1", "3", "4"], "🗂️ แท็บ 2, 3 และ 4": ["2", "3", "4"]
+        # 🎯 ปรับ Tag Pills ให้เหลือแค่รายการแท็บจริงๆ เท่านั้น
+        tab_mapping = {
+            "1": "⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์",
+            "2": "🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ",
+            "3": "💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์",
+            "4": "🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)"
         }
+        tab_pills_options = list(tab_mapping.values())
 
+        # ดึงค่าแท็บที่ผู้ใช้มีสิทธิ์อยู่ในปัจจุบัน
         current_user_tabs = [x.strip() for x in str(current_user_row.get('allowed_tabs', '') or '').split(',') if x.strip()]
-        default_idx = 0
-        set_tabs = set(current_user_tabs)
-        tab_keys = list(tab_assign_options.keys())
-        for i, key in enumerate(tab_keys):
-            if set(tab_assign_options[key]) == set_tabs:
-                default_idx = i; break
+        
+        # ค้นหาชื่อ Label ของแท็บที่ตรงกับฐานข้อมูลเพื่อนำมาตั้งเป็นค่า Default
+        default_pills = [tab_mapping[t] for t in current_user_tabs if t in tab_mapping]
 
         role_list = ["user", "reporter", "manager", "admin"]
         curr_role_idx = role_list.index(current_user_row['Role_tab']) if current_user_row['Role_tab'] in role_list else 0
@@ -146,11 +141,10 @@ def render_admin_user_management():
             c_info1, c_info2 = st.columns(2)
             with c_info1: edit_fullname = st.text_input("ชื่อ-สกุล:", value=current_user_row.get('full_name') or '')
             
-            # 🎯 3. โหลดตำแหน่งเดิมขึ้นมาเป็นค่าเริ่มต้นตอนแก้ข้อมูล
             curr_pos = current_user_row.get('position') or ''
             edit_pos_list = [p for p in position_list if p != "-- กรุณาเลือกตำแหน่ง --"]
             if curr_pos and curr_pos not in edit_pos_list:
-                edit_pos_list.insert(0, curr_pos) # เผื่อกรณีตำแหน่งเดิมโดนลบออกจากตารางไปแล้ว จะได้ไม่ Error
+                edit_pos_list.insert(0, curr_pos) 
             pos_idx = edit_pos_list.index(curr_pos) if curr_pos in edit_pos_list else 0
             
             with c_info2: edit_pos = st.selectbox("ตำแหน่ง:", options=edit_pos_list, index=pos_idx)
@@ -161,10 +155,18 @@ def render_admin_user_management():
             
             st.markdown("---")
             st.markdown("**🔐 ปรับเปลี่ยนสิทธิ์การเข้าถึง**")
-            c_edit1, c_edit2, c_edit3 = st.columns(3)
+            
+            c_edit1, c_edit2 = st.columns(2)
             with c_edit1: edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx)
-            with c_edit2: selected_tab_label = st.selectbox("เลือกจัดสรรแท็บงานประจำบัญชี:", options=tab_keys, index=default_idx)
-            with c_edit3: edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx)
+            with c_edit2: edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx)
+            
+            # 🎯 แสดงผล Selection Tab ที่คลีนขึ้น
+            selected_tabs_pills = st.multiselect(
+                "🏷️ เลือกจัดสรรแท็บงานประจำบัญชี:", 
+                options=tab_pills_options, 
+                default=default_pills,
+                help="หากปล่อยว่างไว้ (ไม่เลือกแท็บใดเลย) ระบบจะ ล็อกสิทธิ์การเข้าใช้งาน ของบัญชีนี้ทันที"
+            )
             
             edit_allowed_branches = st.multiselect(
                 "📍 กำหนดสาขาที่มีสิทธิ์ (รวมสาขาหลักของ User คนนี้แล้ว):", 
@@ -173,11 +175,13 @@ def render_admin_user_management():
                 help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
             )
 
-            selected_allowed_tabs = tab_assign_options[selected_tab_label]
-
             if st.form_submit_button("💾 บันทึกและอนุมัติสิทธิ์การเข้าถึง", use_container_width=True):
+                # 🎯 แปลง Label กลับเป็น "1", "2", "3", "4" เพื่อบันทึกลงฐานข้อมูล
+                reverse_tab_mapping = {v: k for k, v in tab_mapping.items()}
+                allowed_tabs_list = [reverse_tab_mapping[lbl] for lbl in selected_tabs_pills]
+                allowed_tabs_str = ",".join(sorted(allowed_tabs_list)) # หากเลือกว่างเปล่า จะได้ "" ทันที
+
                 try:
-                    allowed_tabs_str = ",".join(selected_allowed_tabs)
                     conn = get_db_connection()
                     with conn.cursor() as cur:
                         cur.execute("""UPDATE system_users SET full_name=CONVERT(%s USING utf8mb4), position=CONVERT(%s USING utf8mb4), email=CONVERT(%s USING utf8mb4), phone_number=CONVERT(%s USING utf8mb4), Role_tab=%s, allowed_tabs=%s, status=%s WHERE user_id=%s""", 
