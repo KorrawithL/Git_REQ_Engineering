@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import time
+from datetime import datetime
 from database import get_db_connection, log_activity
 from config import branch_dict
 
@@ -21,8 +22,12 @@ def render_add_new_equipment():
             col_m1, col_m2 = st.columns(2)
             with col_m1:
                 new_machine_name = st.text_input("ชื่อเครื่องจักรใหม่ *", placeholder="เช่น มอเตอร์สายพานลำเลียง")
+                new_m_reg_date = st.date_input("วันที่ลงทะเบียนอุปกรณ์ *", value=datetime.today())
             with col_m2:
                 new_machine_branch = st.selectbox("สาขาที่ติดตั้ง *", options=list(branch_dict.keys()), key="add_m_branch")
+                new_m_exp_date = st.date_input("วันหมดอายุการใช้งาน", value=None)
+                
+            new_m_remark = st.text_area("หมายเหตุ", placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)")
                 
             submit_new_machine = st.form_submit_button("➕ บันทึกเครื่องจักรใหม่", use_container_width=True)
             
@@ -34,8 +39,9 @@ def render_add_new_equipment():
                         branch_id_for_machine = branch_dict[new_machine_branch]
                         conn = get_db_connection()
                         with conn.cursor() as cur:
-                            sql_add = "INSERT INTO machines (machine_name, branch_id) VALUES (%s, %s)"
-                            cur.execute(sql_add, (new_machine_name, branch_id_for_machine))
+                            # 🎯 ใช้ created_at เป็นวันที่ลงทะเบียนอุปกรณ์
+                            sql_add = "INSERT INTO machines (machine_name, branch_id, created_at, expiration_date, remark) VALUES (%s, %s, %s, %s, %s)"
+                            cur.execute(sql_add, (new_machine_name, branch_id_for_machine, new_m_reg_date, new_m_exp_date, new_m_remark))
                             conn.commit()
                         conn.close()
                         log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Machine Setup", f"เพิ่มเครื่องจักรใหม่: {new_machine_name}")
@@ -54,7 +60,8 @@ def render_add_new_equipment():
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT m.id, CONVERT(m.machine_name USING utf8mb4) AS machine_name, 
-                           m.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name 
+                           m.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
+                           m.created_at, m.expiration_date, CONVERT(m.remark USING utf8mb4) AS remark
                     FROM machines m 
                     LEFT JOIN branches b ON m.branch_id = b.id 
                     ORDER BY m.id DESC
@@ -68,8 +75,11 @@ def render_add_new_equipment():
         if machines_data:
             # 1. แสดงเป็นตาราง
             df_m = pd.DataFrame(machines_data)
-            df_m.rename(columns={'id': 'ID', 'machine_name': 'ชื่อเครื่องจักร', 'branch_name': 'สาขา'}, inplace=True)
-            st.dataframe(df_m[['ID', 'ชื่อเครื่องจักร', 'สาขา']], use_container_width=True, height=250)
+            df_m.rename(columns={
+                'id': 'ID', 'machine_name': 'ชื่อเครื่องจักร', 'branch_name': 'สาขา',
+                'created_at': 'วันที่ลงทะเบียน', 'expiration_date': 'วันหมดอายุ', 'remark': 'หมายเหตุ'
+            }, inplace=True)
+            st.dataframe(df_m[['ID', 'ชื่อเครื่องจักร', 'สาขา', 'วันที่ลงทะเบียน', 'วันหมดอายุ', 'หมายเหตุ']], use_container_width=True, height=250)
 
             # 2. ฟอร์มสำหรับแก้ไขและลบ
             with st.expander("✏️ / 🗑️ แก้ไข หรือ ลบ ข้อมูลเครื่องจักร", expanded=False):
@@ -81,15 +91,20 @@ def render_add_new_equipment():
                     e_col1, e_col2 = st.columns(2)
                     with e_col1:
                         edit_m_name = st.text_input("แก้ไข ชื่อเครื่องจักร", value=selected_m_data['machine_name'])
+                        m_reg_val = pd.to_datetime(selected_m_data['created_at']) if selected_m_data.get('created_at') else datetime.today()
+                        edit_m_reg_date = st.date_input("แก้ไข วันที่ลงทะเบียน", value=m_reg_val)
                     with e_col2:
                         branch_names = list(branch_dict.keys())
-                        # หาค่า Index เริ่มต้นของสาขา
                         b_idx = 0
                         for i, b_name in enumerate(branch_names):
                             if branch_dict[b_name] == selected_m_data['branch_id']:
                                 b_idx = i
                                 break
                         edit_m_branch = st.selectbox("แก้ไข สาขา", options=branch_names, index=b_idx)
+                        m_exp_val = pd.to_datetime(selected_m_data['expiration_date']) if selected_m_data.get('expiration_date') else None
+                        edit_m_exp_date = st.date_input("แก้ไข วันหมดอายุการใช้งาน", value=m_exp_val)
+                        
+                    edit_m_remark = st.text_area("แก้ไข หมายเหตุ", value=selected_m_data.get('remark') or "")
 
                     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
                     confirm_del_m = st.checkbox("⚠️ ยืนยันการลบข้อมูล (ติ๊กถูกก่อนกดปุ่มลบ)", key="chk_del_m")
@@ -100,8 +115,8 @@ def render_add_new_equipment():
                             try:
                                 conn = get_db_connection()
                                 with conn.cursor() as cur:
-                                    cur.execute("UPDATE machines SET machine_name=%s, branch_id=%s WHERE id=%s", 
-                                                (edit_m_name, branch_dict[edit_m_branch], selected_m_data['id']))
+                                    cur.execute("UPDATE machines SET machine_name=%s, branch_id=%s, created_at=%s, expiration_date=%s, remark=%s WHERE id=%s", 
+                                                (edit_m_name, branch_dict[edit_m_branch], edit_m_reg_date, edit_m_exp_date, edit_m_remark, selected_m_data['id']))
                                     conn.commit()
                                 conn.close()
                                 log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "Machine Setup", f"แก้ไขเครื่องจักร ID: {selected_m_data['id']}")
@@ -156,10 +171,14 @@ def render_add_new_equipment():
             col_e1, col_e2, col_e3 = st.columns(3)
             with col_e1:
                 new_engine_code = st.text_input("รหัสงาน / ทะเบียนรถใหม่ *", placeholder="เช่น TCK-01")
+                new_e_reg_date = st.date_input("วันที่ลงทะเบียนอุปกรณ์ *", value=datetime.today(), key="add_e_reg")
             with col_e2:
                 new_engine_type = st.selectbox("ชนิดของรถ *", options=type_options)
+                new_e_exp_date = st.date_input("วันหมดอายุการใช้งาน", value=None, key="add_e_exp")
             with col_e3:
                 new_engine_branch = st.selectbox("สาขาประจำการ *", options=list(branch_dict.keys()), key="add_e_branch")
+                
+            new_e_remark = st.text_area("หมายเหตุ", placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)", key="add_e_rem")
                 
             submit_new_engine = st.form_submit_button("➕ บันทึกทะเบียนรถใหม่", use_container_width=True)
             
@@ -172,8 +191,9 @@ def render_add_new_equipment():
                         t_id = engine_type_dict[new_engine_type]
                         conn = get_db_connection()
                         with conn.cursor() as cur:
-                            sql_add_eng = "INSERT INTO engines (engine_code, engine_type_id, branch_id, is_active) VALUES (%s, %s, %s, 1)"
-                            cur.execute(sql_add_eng, (new_engine_code, t_id, b_id))
+                            # 🎯 ใช้ created_at เป็นวันที่ลงทะเบียนอุปกรณ์
+                            sql_add_eng = "INSERT INTO engines (engine_code, engine_type_id, branch_id, is_active, created_at, expiration_date, remark) VALUES (%s, %s, %s, 1, %s, %s, %s)"
+                            cur.execute(sql_add_eng, (new_engine_code, t_id, b_id, new_e_reg_date, new_e_exp_date, new_e_remark))
                             conn.commit()
                         conn.close()
                         log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Fuel System Setup", f"เพิ่มรถใหม่: {new_engine_code}")
@@ -193,7 +213,8 @@ def render_add_new_equipment():
                 cur.execute("""
                     SELECT e.id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, 
                            e.engine_type_id, CONVERT(et.type_name USING utf8mb4) AS type_name, 
-                           e.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name 
+                           e.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
+                           e.created_at, e.expiration_date, CONVERT(e.remark USING utf8mb4) AS remark
                     FROM engines e 
                     LEFT JOIN engine_types et ON e.engine_type_id = et.id 
                     LEFT JOIN branches b ON e.branch_id = b.id 
@@ -208,8 +229,11 @@ def render_add_new_equipment():
         if engines_data:
             # 1. แสดงผล DataFrame
             df_e = pd.DataFrame(engines_data)
-            df_e.rename(columns={'id': 'ID', 'engine_code': 'รหัส/ทะเบียน', 'type_name': 'ชนิดของรถ', 'branch_name': 'สาขา'}, inplace=True)
-            st.dataframe(df_e[['ID', 'รหัส/ทะเบียน', 'ชนิดของรถ', 'สาขา']], use_container_width=True, height=250)
+            df_e.rename(columns={
+                'id': 'ID', 'engine_code': 'รหัส/ทะเบียน', 'type_name': 'ชนิดของรถ', 'branch_name': 'สาขา',
+                'created_at': 'วันที่ลงทะเบียน', 'expiration_date': 'วันหมดอายุ', 'remark': 'หมายเหตุ'
+            }, inplace=True)
+            st.dataframe(df_e[['ID', 'รหัส/ทะเบียน', 'ชนิดของรถ', 'สาขา', 'วันที่ลงทะเบียน', 'วันหมดอายุ', 'หมายเหตุ']], use_container_width=True, height=250)
 
             # 2. ฟอร์มแก้ไข / ลบ
             with st.expander("✏️ / 🗑️ แก้ไข หรือ ลบ ข้อมูลรถ/เครื่องยนต์", expanded=False):
@@ -221,23 +245,27 @@ def render_add_new_equipment():
                     ee_col1, ee_col2, ee_col3 = st.columns(3)
                     with ee_col1:
                         edit_e_code = st.text_input("แก้ไข ทะเบียนรถ", value=selected_e_data['engine_code'])
+                        e_reg_val = pd.to_datetime(selected_e_data['created_at']) if selected_e_data.get('created_at') else datetime.today()
+                        edit_e_reg_date = st.date_input("แก้ไข วันที่ลงทะเบียน", value=e_reg_val, key="edit_e_reg")
                     with ee_col2:
-                        # หา Index ของชนิดรถ
                         t_idx = 0
                         for i, (k, v) in enumerate(engine_type_dict.items()):
                             if v == selected_e_data['engine_type_id']:
                                 t_idx = i
                                 break
                         edit_e_type = st.selectbox("แก้ไข ชนิดของรถ", options=type_options, index=t_idx)
+                        e_exp_val = pd.to_datetime(selected_e_data['expiration_date']) if selected_e_data.get('expiration_date') else None
+                        edit_e_exp_date = st.date_input("แก้ไข วันหมดอายุการใช้งาน", value=e_exp_val, key="edit_e_exp")
                     with ee_col3:
                         branch_names = list(branch_dict.keys())
-                        # หา Index ของสาขา
                         b_idx = 0
                         for i, b_name in enumerate(branch_names):
                             if branch_dict[b_name] == selected_e_data['branch_id']:
                                 b_idx = i
                                 break
                         edit_e_branch = st.selectbox("แก้ไข สาขา", options=branch_names, index=b_idx)
+                    
+                    edit_e_remark = st.text_area("แก้ไข หมายเหตุ", value=selected_e_data.get('remark') or "", key="edit_e_rem")
 
                     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
                     confirm_del_e = st.checkbox("⚠️ ยืนยันการลบข้อมูล (ติ๊กถูกก่อนกดปุ่มลบ)", key="chk_del_e")
@@ -248,8 +276,8 @@ def render_add_new_equipment():
                             try:
                                 conn = get_db_connection()
                                 with conn.cursor() as cur:
-                                    cur.execute("UPDATE engines SET engine_code=%s, engine_type_id=%s, branch_id=%s WHERE id=%s", 
-                                                (edit_e_code, engine_type_dict[edit_e_type], branch_dict[edit_e_branch], selected_e_data['id']))
+                                    cur.execute("UPDATE engines SET engine_code=%s, engine_type_id=%s, branch_id=%s, created_at=%s, expiration_date=%s, remark=%s WHERE id=%s", 
+                                                (edit_e_code, engine_type_dict[edit_e_type], branch_dict[edit_e_branch], edit_e_reg_date, edit_e_exp_date, edit_e_remark, selected_e_data['id']))
                                     conn.commit()
                                 conn.close()
                                 log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "Fuel System Setup", f"แก้ไขรถ ID: {selected_e_data['id']}")
