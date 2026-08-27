@@ -76,6 +76,38 @@ def check_session_timeout():
         else:
             components.html(f"<script>if(window.parent.idleTimer) clearTimeout(window.parent.idleTimer); window.parent.idleTimer = setTimeout(function(){{ window.parent.location.reload(); }}, {int((SESSION_TIMEOUT_SECONDS - elapsed + 1) * 1000)});</script>", height=0, width=0)
 
+@st.dialog("🔑 เปลี่ยนรหัสผ่าน")
+def change_password_dialog():
+    st.write("กรุณากรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่ของคุณ")
+    with st.form("change_pwd_form"):
+        old_pwd = st.text_input("รหัสผ่านปัจจุบัน *", type="password")
+        new_pwd = st.text_input("รหัสผ่านใหม่ *", type="password")
+        confirm_pwd = st.text_input("ยืนยันรหัสผ่านใหม่ *", type="password")
+        
+        if st.form_submit_button("💾 บันทึกรหัสผ่านใหม่", use_container_width=True):
+            if not old_pwd or not new_pwd or not confirm_pwd:
+                st.error("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง")
+            elif new_pwd != confirm_pwd:
+                st.error("⚠️ รหัสผ่านใหม่และการยืนยันไม่ตรงกัน")
+            else:
+                try:
+                    conn = get_db_connection()
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT password_hash FROM system_users WHERE user_id = %s", (st.session_state.user_id,))
+                        user_record = cur.fetchone()
+                        if not user_record or user_record['password_hash'] != hash_password(old_pwd):
+                            st.error("❌ รหัสผ่านปัจจุบันไม่ถูกต้อง")
+                        else:
+                            cur.execute("UPDATE system_users SET password_hash = %s WHERE user_id = %s", (hash_password(new_pwd), st.session_state.user_id))
+                            conn.commit()
+                            st.success("✅ เปลี่ยนรหัสผ่านสำเร็จ! ระบบกำลังนำคุณออกเพื่อเข้าสู่ระบบใหม่...")
+                            time.sleep(1.5)
+                            perform_logout()
+                            st.rerun()
+                    conn.close()
+                except Exception as e:
+                    st.error(f"เกิดข้อผิดพลาด: {e}")
+
 restore_session_from_url()
 check_session_timeout()
 
@@ -85,7 +117,6 @@ check_session_timeout()
 if not st.session_state.get('logged_in'):
     if st.session_state.get('page') == 'register':
         
-        # 🎯 โหลดรายการตำแหน่งเตรียมไว้ สำหรับทำ Dropdown
         position_list = ["-- กรุณาเลือกตำแหน่ง --"]
         try:
             conn = get_db_connection()
@@ -107,7 +138,6 @@ if not st.session_state.get('logged_in'):
             st.markdown("#### 📋 ข้อมูลส่วนตัว")
             col_p1, col_p2 = st.columns(2)
             with col_p1: reg_fullname = st.text_input("ชื่อ-นามสกุล *")
-            # 🎯 เปลี่ยนช่องกรอกตำแหน่งเป็น Selectbox ดึงจากฐานข้อมูล
             with col_p2: reg_position = st.selectbox("ตำแหน่ง *", options=position_list) 
             
             col_c1, col_c2 = st.columns(2)
@@ -120,7 +150,6 @@ if not st.session_state.get('logged_in'):
             
             st.write("")
             if st.form_submit_button("💥 ลงทะเบียนบัญชี", use_container_width=True):
-                # 🎯 เช็คว่าไม่ได้เลือก "-- กรุณาเลือกตำแหน่ง --"
                 if not reg_user or not reg_pass or not reg_fullname or reg_position == "-- กรุณาเลือกตำแหน่ง --": 
                     st.error("⚠️ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน และเลือกตำแหน่ง")
                 else:
@@ -221,6 +250,9 @@ else:
             st.markdown(f"<div style='font-size:12px; color:#64748B;'>สาขาที่สามารถเข้าถึงได้:<br>• " + "<br>• ".join(extra_b_names) + "</div>", unsafe_allow_html=True)
 
         st.write("---")
+        if st.button("🔑 เปลี่ยนรหัสผ่าน", use_container_width=True):
+            change_password_dialog()
+            
         if st.button("🚪 ออกจากระบบ (Logout)", use_container_width=True):
             perform_logout()
             st.rerun()
@@ -228,12 +260,12 @@ else:
     current_role = st.session_state.get('role_tab')
     
     if current_role == 'admin':
-        admin_menu = st.radio("เลือกเมนูหลัก (Admin Console):", ["⚙️ ระบบจัดการผู้ใช้และสิทธิ์", "📝 หน้าจอบันทึกข้อมูลประจำวัน (Data Entry)", "📑 รายงานรวมทุกระบบ (All Report)", "🛠️ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ"], horizontal=True)
+        admin_menu = st.radio("เลือกเมนูหลัก (Admin Console):", ["⚙️ ระบบจัดการผู้ใช้และสิทธิ์", "📝 หน้าจอบันทึกข้อมูลประจำวัน (Data Entry)", "📑 รายงานรวมทุกระบบ (All Report)", "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ"], horizontal=True)
         st.write("---")
         if admin_menu == "⚙️ ระบบจัดการผู้ใช้และสิทธิ์": render_admin_user_management()
         elif admin_menu == "📝 หน้าจอบันทึกข้อมูลประจำวัน (Data Entry)": render_engineering_system_tabs(st.session_state.get('branch_name'))
         elif admin_menu == "📑 รายงานรวมทุกระบบ (All Report)": render_all_reports_module(st.session_state.get('branch_name'))
-        elif admin_menu == "🛠️ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ": render_add_new_equipment()
+        elif admin_menu == "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ": render_add_new_equipment()
     
     elif current_role == 'reporter':
         reporter_menu = st.radio("เลือกเมนูหลัก:", ["📑 รายงานรวมทุกระบบ (All Report)"], horizontal=True)
@@ -245,11 +277,16 @@ else:
         allowed_tabs_list = st.session_state.get('allowed_tabs', [])
         user_tab_keys = [k for k in allowed_tabs_list if k in report_names_map]
 
-        if current_role == 'manager': report_menu_label = "📑 รายงานสรุปประจำสาขา"
-        elif len(user_tab_keys) == 1: report_menu_label = report_names_map[user_tab_keys[0]]
-        else: report_menu_label = "📑 รายงานสรุปประจำบัญชี"
+        if current_role == 'manager': 
+            report_menu_label = "📑 รายงานสรุปประจำสาขา"
+            menu_choices = ["📝 บันทึกข้อมูลประจำวัน (Data Entry)", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ"]
+        else: 
+            if len(user_tab_keys) == 1: report_menu_label = report_names_map[user_tab_keys[0]]
+            else: report_menu_label = "📑 รายงานสรุปประจำบัญชี"
+            menu_choices = ["📝 บันทึกข้อมูลประจำวัน (Data Entry)", report_menu_label]
 
-        user_menu = st.radio("เลือกเมนูหลัก:", ["📝 บันทึกข้อมูลประจำวัน (Data Entry)", report_menu_label], horizontal=True)
+        user_menu = st.radio("เลือกเมนูหลัก:", menu_choices, horizontal=True)
         st.write("---")
         if user_menu == "📝 บันทึกข้อมูลประจำวัน (Data Entry)": render_engineering_system_tabs(st.session_state.get('branch_name'))
         elif user_menu == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'))
+        elif user_menu == "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ": render_add_new_equipment()

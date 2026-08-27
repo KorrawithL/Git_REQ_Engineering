@@ -18,7 +18,7 @@ def render_engineering_system_tabs(current_branch_name):
         "3": "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์", "4": "🔥 4. การใช้เชื้อเพลิง บอยเลอร์"
     }
 
-    # 🎯 แก้ไข: ให้เฉพาะ admin เท่านั้นที่มีสิทธิ์เข้าถึงทุกแท็บโดยไม่ต้องรออนุมัติ
+    # ให้เฉพาะ admin เท่านั้นที่มีสิทธิ์เข้าถึงทุกแท็บโดยไม่ต้องรออนุมัติ
     if current_role == "admin": 
         visible_tab_keys = ["1", "2", "3", "4"]
     else: 
@@ -50,11 +50,12 @@ def render_engineering_system_tabs(current_branch_name):
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
+                        # 🎯 เพิ่มเงื่อนไข WHERE is_active = 1 เพื่อไม่ให้เครื่องจักรที่โดนระงับโผล่มา
                         if current_role == "admin":
-                            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines")
+                            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines WHERE is_active = 1")
                         else:
                             placeholders = ', '.join(['%s'] * len(user_allowed_branches))
-                            cur.execute(f"SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines WHERE branch_id IN ({placeholders})", tuple(user_allowed_branches))
+                            cur.execute(f"SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines WHERE branch_id IN ({placeholders}) AND is_active = 1", tuple(user_allowed_branches))
                         
                         db_machines = cur.fetchall()
                         if db_machines: machine_dict = {m['machine_name']: m['id'] for m in db_machines}
@@ -119,6 +120,7 @@ def render_engineering_system_tabs(current_branch_name):
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
+                        # 🎯 โค้ดส่วนนี้มีการกำหนด e.is_active = 1 เพื่อไม่ให้รถที่โดนระงับโผล่มาอยู่แล้วครับ
                         if current_role == "admin":
                             sql_eng = """SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id
                                         FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.is_active = 1 ORDER BY b.id ASC, e.engine_code ASC"""
