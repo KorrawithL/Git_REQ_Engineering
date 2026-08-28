@@ -266,14 +266,14 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         conn = get_db_connection()
         with conn.cursor() as cur:
             if b_id_t1 == "ทั้งหมด":
-                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines m ON t.machine_id = m.id WHERE t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
+                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
             elif b_id_t1 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
-                sql = f"SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines m ON t.machine_id = m.id WHERE t.branch_id IN ({placeholders}) AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
+                sql = f"SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.branch_id IN ({placeholders}) AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
             else:
-                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines m ON t.machine_id = m.id WHERE t.branch_id = %s AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
+                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.branch_id = %s AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
                 cur.execute(sql, (b_id_t1, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
@@ -462,7 +462,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
         conn = get_db_connection()
         with conn.cursor() as cur:
             if b_id_t2 == "ทั้งหมด":
-                sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.is_active = 1 ORDER BY b.id ASC, e.engine_code ASC"
+                sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.machine_type = 'engine' AND e.is_active = 1 ORDER BY b.id ASC, e.machine_name ASC"
                 cur.execute(sql_eng)
                 engines_list = cur.fetchall()
 
@@ -471,7 +471,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 raw_data = cur.fetchall()
             elif b_id_t2 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
-                sql_eng = f"SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id IN ({placeholders}) AND e.is_active = 1 ORDER BY e.engine_code ASC"
+                sql_eng = f"SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id IN ({placeholders}) AND e.machine_type = 'engine' AND e.is_active = 1 ORDER BY e.machine_name ASC"
                 cur.execute(sql_eng, allowed_tuple)
                 engines_list = cur.fetchall()
 
@@ -479,7 +479,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql_trans, allowed_tuple + (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
             else:
-                sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id = %s AND e.is_active = 1 ORDER BY e.id ASC"
+                sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id = %s AND e.machine_type = 'engine' AND e.is_active = 1 ORDER BY e.id ASC"
                 cur.execute(sql_eng, (b_id_t2,))
                 engines_list = cur.fetchall()
 
@@ -1080,7 +1080,17 @@ def render_all_reports_module(user_branch_name):
 
                 if raw_data_t1:
                     pk_col_t1 = list(raw_data_t1[0].keys())[0]
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    
+                    # 🚀 ระบบแบ่งหน้า (Pagination) ช่วยลดภาระการ Render ทำให้เว็บโหลดเร็วขึ้น
+                    ROWS_PER_PAGE = 15
+                    total_pages_t1 = max(1, (len(raw_data_t1) - 1) // ROWS_PER_PAGE + 1)
+                    
+                    pc1, pc2 = st.columns([7, 3])
+                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t1)}</b> รายการ</div>", unsafe_allow_html=True)
+                    with pc2: page_t1 = st.selectbox("เลือกหน้า", range(1, total_pages_t1 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", key="pg_t1", label_visibility="collapsed")
+                    
+                    paginated_t1 = raw_data_t1[(page_t1 - 1) * ROWS_PER_PAGE : page_t1 * ROWS_PER_PAGE]
+
                     st.markdown("<br>", unsafe_allow_html=True)
                     header_cols = st.columns([0.6, 1.2, 1, 1.6, 0.8, 1, 1.2, 1.5, 0.6])
                     headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "ตัวเลือก"]
@@ -1088,7 +1098,7 @@ def render_all_reports_module(user_branch_name):
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in raw_data_t1:
+                        for r in paginated_t1:
                             rec_id = r[pk_col_t1]
                             cols = st.columns([0.6, 1.2, 1, 1.6, 0.8, 1, 1.2, 1.5, 0.6])
                             cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
@@ -1103,6 +1113,7 @@ def render_all_reports_module(user_branch_name):
                             else: cols[8].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
+                    col_btn1, col_btn2, col_btn3 = st.columns(3)
                     with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
@@ -1137,7 +1148,17 @@ def render_all_reports_module(user_branch_name):
 
                 if raw_data_t2:
                     pk_col_t2 = list(raw_data_t2[0].keys())[0]
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    
+                    # 🚀 ระบบแบ่งหน้า (Pagination)
+                    ROWS_PER_PAGE = 15
+                    total_pages_t2 = max(1, (len(raw_data_t2) - 1) // ROWS_PER_PAGE + 1)
+                    
+                    pc1, pc2 = st.columns([7, 3])
+                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t2)}</b> รายการ</div>", unsafe_allow_html=True)
+                    with pc2: page_t2 = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key="pg_t2", label_visibility="collapsed")
+                    
+                    paginated_t2 = raw_data_t2[(page_t2 - 1) * ROWS_PER_PAGE : page_t2 * ROWS_PER_PAGE]
+
                     st.markdown("<br>", unsafe_allow_html=True)
                     header_cols = st.columns([0.6, 1.2, 1.4, 1.4, 1, 1, 1, 1.5, 0.6])
                     headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "ตัวเลือก"]
@@ -1145,7 +1166,7 @@ def render_all_reports_module(user_branch_name):
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in raw_data_t2:
+                        for r in paginated_t2:
                             rec_id = r[pk_col_t2]
                             lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
                             cols = st.columns([0.6, 1.2, 1.4, 1.4, 1, 1, 1, 1.5, 0.6])
@@ -1161,6 +1182,7 @@ def render_all_reports_module(user_branch_name):
                             else: cols[8].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
+                    col_btn1, col_btn2, col_btn3 = st.columns(3)
                     with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
@@ -1195,7 +1217,17 @@ def render_all_reports_module(user_branch_name):
 
                 if raw_data_t3:
                     pk_col_t3 = list(raw_data_t3[0].keys())[0]
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    
+                    # 🚀 ระบบแบ่งหน้า (Pagination)
+                    ROWS_PER_PAGE = 15
+                    total_pages_t3 = max(1, (len(raw_data_t3) - 1) // ROWS_PER_PAGE + 1)
+                    
+                    pc1, pc2 = st.columns([7, 3])
+                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t3)}</b> รายการ</div>", unsafe_allow_html=True)
+                    with pc2: page_t3 = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key="pg_t3", label_visibility="collapsed")
+                    
+                    paginated_t3 = raw_data_t3[(page_t3 - 1) * ROWS_PER_PAGE : page_t3 * ROWS_PER_PAGE]
+
                     st.markdown("<br>", unsafe_allow_html=True)
                     header_cols = st.columns([0.6, 1.2, 1, 1.2, 1.2, 1.2, 1.2, 1.6, 0.6])
                     headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "ตัวเลือก"]
@@ -1203,7 +1235,7 @@ def render_all_reports_module(user_branch_name):
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in raw_data_t3:
+                        for r in paginated_t3:
                             rec_id = r[pk_col_t3]
                             cols = st.columns([0.6, 1.2, 1, 1.2, 1.2, 1.2, 1.2, 1.6, 0.6])
                             cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
@@ -1218,6 +1250,7 @@ def render_all_reports_module(user_branch_name):
                             else: cols[8].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
+                    col_btn1, col_btn2, col_btn3 = st.columns(3)
                     with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
@@ -1249,7 +1282,17 @@ def render_all_reports_module(user_branch_name):
 
                 if raw_data_t4:
                     pk_col_t4 = list(raw_data_t4[0].keys())[0]
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    
+                    # 🚀 ระบบแบ่งหน้า (Pagination)
+                    ROWS_PER_PAGE = 15
+                    total_pages_t4 = max(1, (len(raw_data_t4) - 1) // ROWS_PER_PAGE + 1)
+                    
+                    pc1, pc2 = st.columns([7, 3])
+                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t4)}</b> รายการ</div>", unsafe_allow_html=True)
+                    with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages_t4 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t4}", key="pg_t4", label_visibility="collapsed")
+                    
+                    paginated_t4 = raw_data_t4[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
+
                     st.markdown("<br>", unsafe_allow_html=True)
                     header_cols = st.columns([0.6, 1.2, 1, 1.4, 1.4, 1.2, 1.6, 0.6])
                     headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "ตัวเลือก"]
@@ -1257,7 +1300,7 @@ def render_all_reports_module(user_branch_name):
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in raw_data_t4:
+                        for r in paginated_t4:
                             rec_id = r[pk_col_t4]
                             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
                             tot_w = s_w + w_w + ww_w
@@ -1275,6 +1318,7 @@ def render_all_reports_module(user_branch_name):
                             else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
+                    col_btn1, col_btn2, col_btn3 = st.columns(3)
                     with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): show_summary_report_dialog(json.loads(json_html_t4))

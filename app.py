@@ -399,12 +399,52 @@ else:
 
     current_role = st.session_state.get('role_tab')
 
-    # 🎯 สร้างพื้นที่ว่างด้านบนสุดจองไว้ (Placeholder) สำหรับนำแถบโปรไฟล์(สีน้ำเงิน)มาโชว์ในภายหลัง
-    top_bar_placeholder = st.empty()
+    # =========================================================================
+    # 🎯 แถบ Top Bar แนวนอนด้านบนสุด (ถูกเลื่อนขึ้นมาแสดงก่อนเสมอ)
+    # =========================================================================
+    disp_name = st.session_state.get('full_name') or st.session_state.get('username')
+    disp_pos = st.session_state.get('position') or "-"
+    
+    with st.container(border=True):
+        tc_logo, tc1, tc2, tc3, tc4, tc5, tc6 = st.columns([1.2, 1.5, 1.5, 1.2, 2.2, 1.2, 1.2], vertical_alignment="center")
+        
+        with tc_logo:
+            if os.path.exists("Logo.png"):
+                st.image("Logo.png", use_container_width=True)
+            elif os.path.exists("logo.png"):
+                st.image("logo.png", use_container_width=True)
+            else:
+                st.markdown("<div style='color:#E4222C; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
+            
+        with tc1: 
+            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👤 ผู้ใช้งาน</div><div class='tb-val'>{disp_name}</div></div>", unsafe_allow_html=True)
+        with tc2: 
+            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>💼 ตำแหน่ง</div><div class='tb-val'>{disp_pos}</div></div>", unsafe_allow_html=True)
+        with tc3: 
+            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>🏢 สังกัดปัจจุบัน</div><div class='tb-val'>{st.session_state.get('branch_name')}</div></div>", unsafe_allow_html=True)
+        with tc4:
+            if current_role == 'admin':
+                st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์: {current_role.upper()}</div><div class='tb-sub text-green'>🌟 เข้าถึงได้ทุกสาขา (Full Access)</div></div>", unsafe_allow_html=True)
+            else:
+                user_all_branches = st.session_state.get('allowed_branches', [])
+                if len(user_all_branches) > 1:
+                    extra_b_names = [k.split(" ")[1] for k, v in branch_dict.items() if str(v) in user_all_branches]
+                    b_str = ", ".join(extra_b_names)
+                    st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์: {current_role.upper()}</div><div class='tb-sub text-blue'>📍 เข้าถึงได้: {b_str}</div></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์</div><div class='tb-val'>{current_role.upper()}</div></div>", unsafe_allow_html=True)
+        
+        with tc5:
+            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+            if st.button("🔑 เปลี่ยนรหัสผ่าน Password", use_container_width=True): change_password_dialog()
+        with tc6:
+            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+            if st.button("🚪 ออกจากระบบ", use_container_width=True): perform_logout(); st.rerun()
+
     st.write("") 
 
     # =========================================================================
-    # 🎯 แยกระบบจัดหน้า Layout ใหม่ออกเป็น 2 คอลัมน์ (เมนูซ้าย - เนื้อหาขวา) (ประมวลผลก่อน)
+    # 🎯 แยกระบบจัดหน้า Layout ใหม่ออกเป็น 2 คอลัมน์ (เมนูซ้าย - เนื้อหาขวา)
     # =========================================================================
     if current_role == 'admin':
         col_menu, col_content = st.columns([2.5, 9.5], gap="large")
@@ -446,47 +486,3 @@ else:
             if user_menu == "📝 หน้าจอบันทึกข้อมูลประจำวัน": render_engineering_system_tabs(st.session_state.get('branch_name'))
             elif user_menu == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'))
             elif user_menu == "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ": render_add_new_equipment()
-
-    # =========================================================================
-    # 🎯 แถบ Top Bar แนวนอนด้านบนสุด (ถูกนำไปแสดงใน Placeholder ด้านบนที่จองไว้)
-    # =========================================================================
-    disp_name = st.session_state.get('full_name') or st.session_state.get('username')
-    disp_pos = st.session_state.get('position') or "-"
-    
-    with top_bar_placeholder.container(border=True):
-        # 🎯 ปรับอัตราส่วนคอลัมน์ใหม่ เพื่อเพิ่มที่ว่างให้รูปโลโก้ซ้ายสุด
-        tc_logo, tc1, tc2, tc3, tc4, tc5, tc6 = st.columns([1.2, 1.5, 1.5, 1.2, 2.2, 1.2, 1.2], vertical_alignment="center")
-        
-        with tc_logo:
-            # 🎯 แสดงรูปภาพโลโก้ "Logo.png" ด้านซ้ายบน
-            if os.path.exists("Logo.png"):
-                st.image("Logo.png", use_container_width=True)
-            elif os.path.exists("logo.png"):
-                st.image("logo.png", use_container_width=True)
-            else:
-                st.markdown("<div style='color:#E4222C; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
-            
-        with tc1: 
-            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👤 ผู้ใช้งาน</div><div class='tb-val'>{disp_name}</div></div>", unsafe_allow_html=True)
-        with tc2: 
-            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>💼 ตำแหน่ง</div><div class='tb-val'>{disp_pos}</div></div>", unsafe_allow_html=True)
-        with tc3: 
-            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>🏢 สังกัดปัจจุบัน</div><div class='tb-val'>{st.session_state.get('branch_name')}</div></div>", unsafe_allow_html=True)
-        with tc4:
-            if current_role == 'admin':
-                st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์: {current_role.upper()}</div><div class='tb-sub text-green'>🌟 เข้าถึงได้ทุกสาขา (Full Access)</div></div>", unsafe_allow_html=True)
-            else:
-                user_all_branches = st.session_state.get('allowed_branches', [])
-                if len(user_all_branches) > 1:
-                    extra_b_names = [k.split(" ")[1] for k, v in branch_dict.items() if str(v) in user_all_branches]
-                    b_str = ", ".join(extra_b_names)
-                    st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์: {current_role.upper()}</div><div class='tb-sub text-blue'>📍 เข้าถึงได้: {b_str}</div></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์</div><div class='tb-val'>{current_role.upper()}</div></div>", unsafe_allow_html=True)
-        
-        with tc5:
-            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-            if st.button("🔑 เปลี่ยนรหัสผ่าน Password", use_container_width=True): change_password_dialog()
-        with tc6:
-            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-            if st.button("🚪 ออกจากระบบ", use_container_width=True): perform_logout(); st.rerun()
