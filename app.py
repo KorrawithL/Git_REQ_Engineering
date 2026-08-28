@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 import time
+import os
 from database import get_db_connection, hash_password
 from config import branch_dict
 from tab_views import render_engineering_system_tabs
@@ -76,7 +77,7 @@ def check_session_timeout():
         else:
             components.html(f"<script>if(window.parent.idleTimer) clearTimeout(window.parent.idleTimer); window.parent.idleTimer = setTimeout(function(){{ window.parent.location.reload(); }}, {int((SESSION_TIMEOUT_SECONDS - elapsed + 1) * 1000)});</script>", height=0, width=0)
 
-@st.dialog("🔑 เปลี่ยนรหัสผ่าน")
+@st.dialog("🔑 เปลี่ยนรหัสผ่าน Password")
 def change_password_dialog():
     st.write("กรุณากรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่ของคุณ")
     with st.form("change_pwd_form"):
@@ -453,8 +454,18 @@ else:
     disp_pos = st.session_state.get('position') or "-"
     
     with top_bar_placeholder.container(border=True):
-        tc1, tc2, tc3, tc4, tc5, tc6 = st.columns([1.5, 1.5, 1.2, 2.5, 1.2, 1.2])
+        # 🎯 ปรับอัตราส่วนคอลัมน์ใหม่ เพื่อเพิ่มที่ว่างให้รูปโลโก้ซ้ายสุด
+        tc_logo, tc1, tc2, tc3, tc4, tc5, tc6 = st.columns([1.2, 1.5, 1.5, 1.2, 2.2, 1.2, 1.2], vertical_alignment="center")
         
+        with tc_logo:
+            # 🎯 แสดงรูปภาพโลโก้ "Logo.png" ด้านซ้ายบน
+            if os.path.exists("Logo.png"):
+                st.image("Logo.png", use_container_width=True)
+            elif os.path.exists("logo.png"):
+                st.image("logo.png", use_container_width=True)
+            else:
+                st.markdown("<div style='color:#E4222C; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
+            
         with tc1: 
             st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👤 ผู้ใช้งาน</div><div class='tb-val'>{disp_name}</div></div>", unsafe_allow_html=True)
         with tc2: 
@@ -475,7 +486,7 @@ else:
         
         with tc5:
             st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-            if st.button("🔑 เปลี่ยนรหัสผ่าน", use_container_width=True): change_password_dialog()
+            if st.button("🔑 เปลี่ยนรหัสผ่าน Password", use_container_width=True): change_password_dialog()
         with tc6:
             st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
             if st.button("🚪 ออกจากระบบ", use_container_width=True): perform_logout(); st.rerun()
