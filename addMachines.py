@@ -27,19 +27,23 @@ def render_add_new_equipment():
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # ตรวจสอบว่าถ้าเลยวันหมดอายุ ให้ปรับ is_active = 0 อัตโนมัติ
-            cur.execute("UPDATE machines SET is_active = 0 WHERE expiration_date IS NOT NULL AND expiration_date < CURDATE() AND is_active = 1")
-            cur.execute("UPDATE engines SET is_active = 0 WHERE expiration_date IS NOT NULL AND expiration_date < CURDATE() AND is_active = 1")
+            # 🎯 อัปเดตตารางเดียว machines_set
+            cur.execute("UPDATE machines_set SET is_active = 0 WHERE expiration_date IS NOT NULL AND expiration_date < CURDATE() AND is_active = 1")
             conn.commit()
         conn.close()
     except Exception as e:
-        pass # ปล่อยผ่านหากเกิด error ตอน query เพื่อไม่ให้กระทบ UI
+        pass
 
     # ==========================================
     # 1. ฟอร์มเพิ่มข้อมูลรวม (Unified Create Form)
     # ==========================================
     st.subheader("➕ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ")
-    equip_type_add = st.radio("เลือกประเภทอุปกรณ์ที่ต้องการเพิ่ม:", ["⚙️ เครื่องจักร (Machine)", "🚚 รถยนต์ / รถยก (Vehicle)"], horizontal=True)
+    
+    equip_options = ["-- กรุณาเลือกประเภทอุปกรณ์ --", "⚙️ เครื่องจักร (Machine)", "🚚 รถยนต์ / รถยก (Vehicle)"]
+    equip_type_add = st.selectbox("เลือกประเภทอุปกรณ์ที่ต้องการเพิ่ม:", options=equip_options)
+    
+    is_not_selected = (equip_type_add == "-- กรุณาเลือกประเภทอุปกรณ์ --")
+    is_machine_add = (equip_type_add == "⚙️ เครื่องจักร (Machine)")
     
     engine_type_dict = {}
     try:
@@ -54,24 +58,29 @@ def render_add_new_equipment():
 
     with st.form("add_equipment_form", clear_on_submit=True):
         col1, col2, col3 = st.columns(3)
-        is_machine_add = (equip_type_add == "⚙️ เครื่องจักร (Machine)")
         
         with col1:
-            new_name_code = st.text_input("ชื่อเครื่องจักร / รหัสทะเบียนรถ *" if is_machine_add else "รหัสงาน / ทะเบียนรถใหม่ *", placeholder="ระบุชื่อหรือรหัสอุปกรณ์...")
-            new_reg_date = st.date_input("วันที่ลงทะเบียนอุปกรณ์ *", value=datetime.today())
+            lbl_name = "รหัสงาน / ทะเบียนรถใหม่ *"
+            if is_not_selected: lbl_name = "ชื่อ/รหัสอุปกรณ์ *"
+            elif is_machine_add: lbl_name = "ชื่อเครื่องจักร / รหัสทะเบียนรถ *"
+            
+            new_name_code = st.text_input(lbl_name, placeholder="ระบุชื่อหรือรหัสอุปกรณ์...", disabled=is_not_selected)
+            new_reg_date = st.date_input("วันที่ลงทะเบียนอุปกรณ์ *", value=datetime.today(), disabled=is_not_selected)
         
         with col2:
-            new_engine_type = st.selectbox("ชนิดของรถ (เฉพาะรถยนต์) *", options=type_options, disabled=is_machine_add)
-            new_exp_date = st.date_input("วันหมดอายุการใช้งาน", value=None)
+            new_engine_type = st.selectbox("ชนิดของรถ (เฉพาะรถยนต์) *", options=type_options, disabled=(is_not_selected or is_machine_add))
+            new_exp_date = st.date_input("วันหมดอายุการใช้งาน", value=None, disabled=is_not_selected)
             
         with col3:
-            new_branch = st.selectbox("สาขาประจำการ *", options=branch_options)
-            new_remark = st.text_input("หมายเหตุ", placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)")
+            new_branch = st.selectbox("สาขาประจำการ *", options=branch_options, disabled=is_not_selected)
+            new_remark = st.text_input("หมายเหตุ", placeholder="ระบุหมายเหตุเพิ่มเติม (ถ้ามี)", disabled=is_not_selected)
             
-        submit_add = st.form_submit_button("➕ บันทึกข้อมูลเข้าสู่ระบบ (สถานะ Active)", use_container_width=True)
+        submit_add = st.form_submit_button("➕ บันทึกข้อมูลเข้าสู่ระบบ (สถานะ Active)", disabled=is_not_selected, use_container_width=True)
         
         if submit_add:
-            if not new_name_code:
+            if is_not_selected:
+                st.error("⚠️ กรุณาเลือกประเภทอุปกรณ์ก่อนทำการบันทึก")
+            elif not new_name_code:
                 st.error("⚠️ กรุณาระบุชื่อ/รหัสอุปกรณ์ให้ชัดเจน")
             elif not is_machine_add and new_engine_type == "-- ไม่มีข้อมูลประเภทรถ --":
                 st.error("⚠️ กรุณาเลือกชนิดของรถให้ครบถ้วน")
@@ -81,14 +90,14 @@ def render_add_new_equipment():
                     conn = get_db_connection()
                     with conn.cursor() as cur:
                         if is_machine_add:
-                            # 🎯 เพิ่ม is_active = 1
-                            sql_add = "INSERT INTO machines (machine_name, branch_id, created_at, expiration_date, remark, is_active) VALUES (%s, %s, %s, %s, %s, 1)"
+                            # 🎯 บันทึกลงตารางเดียว โดยระบุ machine_type = 'machine'
+                            sql_add = "INSERT INTO machines_set (machine_name, branch_id, machine_type, created_at, expiration_date, remark, is_active) VALUES (%s, %s, 'machine', %s, %s, %s, 1)"
                             cur.execute(sql_add, (new_name_code, b_id, new_reg_date, new_exp_date, new_remark))
                             log_msg = f"เพิ่มเครื่องจักรใหม่: {new_name_code}"
                         else:
+                            # 🎯 บันทึกลงตารางเดียว โดยระบุ machine_type = 'engine'
                             t_id = engine_type_dict[new_engine_type]
-                            # 🎯 เพิ่ม is_active = 1
-                            sql_add = "INSERT INTO engines (engine_code, engine_type_id, branch_id, is_active, created_at, expiration_date, remark) VALUES (%s, %s, %s, 1, %s, %s, %s)"
+                            sql_add = "INSERT INTO machines_set (machine_name, engine_type_id, branch_id, machine_type, created_at, expiration_date, remark, is_active) VALUES (%s, %s, %s, 'engine', %s, %s, %s, 1)"
                             cur.execute(sql_add, (new_name_code, t_id, b_id, new_reg_date, new_exp_date, new_remark))
                             log_msg = f"เพิ่มรถใหม่: {new_name_code}"
                         conn.commit()
@@ -110,54 +119,44 @@ def render_add_new_equipment():
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 🎯 2.1 ดึงข้อมูลเครื่องจักร พร้อม is_active
+            # 🎯 ดึงข้อมูลจากตารางเดียว (machines_set) 
+            base_query = """
+                SELECT m.id, CONVERT(m.machine_name USING utf8mb4) AS name_code, 
+                       m.engine_type_id, CONVERT(et.type_name USING utf8mb4) AS type_name, 
+                       m.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
+                       m.created_at, m.expiration_date, CONVERT(m.remark USING utf8mb4) AS remark, 
+                       m.is_active, m.machine_type
+                FROM machines_set m 
+                LEFT JOIN engine_types et ON m.engine_type_id = et.id 
+                LEFT JOIN branches b ON m.branch_id = b.id 
+            """
+            
             if current_role == 'admin':
-                cur.execute("""SELECT m.id, CONVERT(m.machine_name USING utf8mb4) AS name_code, 
-                               m.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
-                               m.created_at, m.expiration_date, CONVERT(m.remark USING utf8mb4) AS remark, m.is_active
-                               FROM machines m LEFT JOIN branches b ON m.branch_id = b.id ORDER BY m.id DESC""")
+                cur.execute(base_query + "ORDER BY m.id DESC")
             else:
                 placeholders = ', '.join(['%s'] * len(user_allowed_branches))
-                cur.execute(f"""SELECT m.id, CONVERT(m.machine_name USING utf8mb4) AS name_code, 
-                               m.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
-                               m.created_at, m.expiration_date, CONVERT(m.remark USING utf8mb4) AS remark, m.is_active
-                               FROM machines m LEFT JOIN branches b ON m.branch_id = b.id
-                               WHERE m.branch_id IN ({placeholders}) ORDER BY m.id DESC""", tuple(user_allowed_branches))
+                cur.execute(base_query + f"WHERE m.branch_id IN ({placeholders}) ORDER BY m.id DESC", tuple(user_allowed_branches))
             
             for r in cur.fetchall():
                 status_label = "🟢 ใช้งาน" if r.get('is_active') == 1 else "🔴 ระงับ"
-                combined_data.append({
-                    "หมวดหมู่": "⚙️ เครื่องจักร", "ID": r['id'], "ชื่อ/รหัส": r['name_code'], "ชนิดรถ": "-",
-                    "branch_id": r['branch_id'], "สาขา": r['branch_name'], 
-                    "วันที่ลงทะเบียน": r['created_at'], "วันหมดอายุ": r['expiration_date'], "หมายเหตุ": r['remark'],
-                    "สถานะ": status_label, "is_active": r.get('is_active', 1), "type_id": None
-                })
+                is_mach = (r.get('machine_type') == 'machine')
                 
-            # 🎯 2.2 ดึงข้อมูลรถยนต์/รถยก พร้อม is_active
-            if current_role == 'admin':
-                cur.execute("""SELECT e.id, CONVERT(e.engine_code USING utf8mb4) AS name_code, 
-                               e.engine_type_id, CONVERT(et.type_name USING utf8mb4) AS type_name, 
-                               e.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
-                               e.created_at, e.expiration_date, CONVERT(e.remark USING utf8mb4) AS remark, e.is_active
-                               FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id 
-                               LEFT JOIN branches b ON e.branch_id = b.id ORDER BY e.id DESC""")
-            else:
-                placeholders = ', '.join(['%s'] * len(user_allowed_branches))
-                cur.execute(f"""SELECT e.id, CONVERT(e.engine_code USING utf8mb4) AS name_code, 
-                               e.engine_type_id, CONVERT(et.type_name USING utf8mb4) AS type_name, 
-                               e.branch_id, CONVERT(b.branch_name USING utf8mb4) AS branch_name,
-                               e.created_at, e.expiration_date, CONVERT(e.remark USING utf8mb4) AS remark, e.is_active
-                               FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id 
-                               LEFT JOIN branches b ON e.branch_id = b.id
-                               WHERE e.branch_id IN ({placeholders}) ORDER BY e.id DESC""", tuple(user_allowed_branches))
-                               
-            for r in cur.fetchall():
-                status_label = "🟢 ใช้งาน" if r.get('is_active') == 1 else "🔴 ระงับ"
+                cat_label = "⚙️ เครื่องจักร" if is_mach else "🚚 รถยนต์/รถยก"
+                t_name = "-" if is_mach else (r.get('type_name') or "ไม่ระบุ")
+                
                 combined_data.append({
-                    "หมวดหมู่": "🚚 รถยนต์/รถยก", "ID": r['id'], "ชื่อ/รหัส": r['name_code'], "ชนิดรถ": r['type_name'],
-                    "branch_id": r['branch_id'], "สาขา": r['branch_name'], 
-                    "วันที่ลงทะเบียน": r['created_at'], "วันหมดอายุ": r['expiration_date'], "หมายเหตุ": r['remark'],
-                    "สถานะ": status_label, "is_active": r.get('is_active', 1), "type_id": r['engine_type_id']
+                    "หมวดหมู่": cat_label, 
+                    "ID": r['id'], 
+                    "ชื่อ/รหัส": r['name_code'], 
+                    "ชนิดรถ": t_name,
+                    "branch_id": r['branch_id'], 
+                    "สาขา": r['branch_name'], 
+                    "วันที่ลงทะเบียน": r['created_at'], 
+                    "วันหมดอายุ": r['expiration_date'], 
+                    "หมายเหตุ": r['remark'],
+                    "สถานะ": status_label, 
+                    "is_active": r.get('is_active', 1), 
+                    "type_id": r.get('engine_type_id')
                 })
         conn.close()
     except Exception as e:
@@ -251,17 +250,16 @@ def render_add_new_equipment():
                             new_is_active = 1 if "🟢" in edit_status else 0
                             conn = get_db_connection()
                             with conn.cursor() as cur:
+                                # 🎯 อัปเดตตาราง machines_set 
                                 if is_machine_edit:
-                                    cur.execute("UPDATE machines SET machine_name=%s, branch_id=%s, created_at=%s, expiration_date=%s, remark=%s, is_active=%s WHERE id=%s", 
+                                    cur.execute("UPDATE machines_set SET machine_name=%s, branch_id=%s, created_at=%s, expiration_date=%s, remark=%s, is_active=%s WHERE id=%s", 
                                                 (edit_name, available_branches_dict[edit_branch], edit_reg, edit_exp, edit_remark, new_is_active, sel_data['ID']))
-                                    log_msg = f"อัปเดตเครื่องจักร ID: {sel_data['ID']} (Active={new_is_active})"
                                 else:
-                                    cur.execute("UPDATE engines SET engine_code=%s, engine_type_id=%s, branch_id=%s, created_at=%s, expiration_date=%s, remark=%s, is_active=%s WHERE id=%s", 
+                                    cur.execute("UPDATE machines_set SET machine_name=%s, engine_type_id=%s, branch_id=%s, created_at=%s, expiration_date=%s, remark=%s, is_active=%s WHERE id=%s", 
                                                 (edit_name, engine_type_dict[edit_type], available_branches_dict[edit_branch], edit_reg, edit_exp, edit_remark, new_is_active, sel_data['ID']))
-                                    log_msg = f"อัปเดตรถ ID: {sel_data['ID']} (Active={new_is_active})"
                                 conn.commit()
                             conn.close()
-                            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "Master Data Setup", log_msg)
+                            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "Master Data Setup", f"อัปเดตอุปกรณ์ ID: {sel_data['ID']} (Active={new_is_active})")
                             st.success("✅ อัปเดตข้อมูลและสถานะสำเร็จ!")
                             time.sleep(1)
                             st.rerun()
@@ -274,10 +272,8 @@ def render_add_new_equipment():
                             try:
                                 conn = get_db_connection()
                                 with conn.cursor() as cur:
-                                    if is_machine_edit:
-                                        cur.execute("UPDATE machines SET is_active=0 WHERE id=%s", (sel_data['ID'],))
-                                    else:
-                                        cur.execute("UPDATE engines SET is_active=0 WHERE id=%s", (sel_data['ID'],))
+                                    # 🎯 อัปเดตตาราง machines_set 
+                                    cur.execute("UPDATE machines_set SET is_active=0 WHERE id=%s", (sel_data['ID'],))
                                     conn.commit()
                                 conn.close()
                                 log_activity(st.session_state.user_id, st.session_state.username, "DISABLE", "Master Data Setup", f"ระงับอุปกรณ์ ID: {sel_data['ID']} ({sel_data['ชื่อ/รหัส']})")
