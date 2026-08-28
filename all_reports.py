@@ -1036,7 +1036,7 @@ def render_all_reports_module(user_branch_name):
         visible_tab_keys = [k for k in allowed_tabs_list if k in all_tabs_config]
 
     if current_role in ["admin", "manager", "reporter"]:
-        st.header("📑 รายงานรวมทุกระบบและการจัดการข้อมูล (All Report)")
+        st.header("📑 ระบบรายงานและการจัดการข้อมูล")
     else:
         st.header("📑 รายงานสรุปประจำสาขา")
     st.write("---")

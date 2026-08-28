@@ -111,20 +111,34 @@ def render_admin_user_management():
         
         current_user_row = [r for r in all_users if r['user_id'] == target_id][0]
         
-        # 🎯 ปรับ Tag Pills ให้เหลือแค่รายการแท็บจริงๆ เท่านั้น
-        tab_mapping = {
-            "1": "⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์",
-            "2": "🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ",
-            "3": "💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์",
-            "4": "🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)"
-        }
-        tab_pills_options = list(tab_mapping.values())
-
-        # ดึงค่าแท็บที่ผู้ใช้มีสิทธิ์อยู่ในปัจจุบัน
         current_user_tabs = [x.strip() for x in str(current_user_row.get('allowed_tabs', '') or '').split(',') if x.strip()]
-        
-        # ค้นหาชื่อ Label ของแท็บที่ตรงกับฐานข้อมูลเพื่อนำมาตั้งเป็นค่า Default
-        default_pills = [tab_mapping[t] for t in current_user_tabs if t in tab_mapping]
+
+        sa_key = "sa_edit"
+        t1_key = "t1_edit"
+        t2_key = "t2_edit"
+        t3_key = "t3_edit"
+        t4_key = "t4_edit"
+
+        if st.session_state.get('loaded_edit_user') != target_id:
+            st.session_state['loaded_edit_user'] = target_id
+            st.session_state[sa_key] = (len(current_user_tabs) == 4)
+            st.session_state[t1_key] = ("1" in current_user_tabs)
+            st.session_state[t2_key] = ("2" in current_user_tabs)
+            st.session_state[t3_key] = ("3" in current_user_tabs)
+            st.session_state[t4_key] = ("4" in current_user_tabs)
+
+        def on_select_all():
+            val = st.session_state[sa_key]
+            st.session_state[t1_key] = val
+            st.session_state[t2_key] = val
+            st.session_state[t3_key] = val
+            st.session_state[t4_key] = val
+
+        def on_tab_change():
+            if st.session_state[t1_key] and st.session_state[t2_key] and st.session_state[t3_key] and st.session_state[t4_key]:
+                st.session_state[sa_key] = True
+            else:
+                st.session_state[sa_key] = False
 
         role_list = ["user", "reporter", "manager", "admin"]
         curr_role_idx = role_list.index(current_user_row['Role_tab']) if current_user_row['Role_tab'] in role_list else 0
@@ -136,56 +150,83 @@ def render_admin_user_management():
         all_allowed_ids = set([current_user_row['branch_id']] + extra_b_ids)
         current_allowed_branch_names = [k for k, v in branch_dict.items() if v in all_allowed_ids]
 
-        with st.form(f"admin_edit_form_{target_id}"):
+        with st.container(border=True): 
             st.markdown("**📋 แก้ไขข้อมูลส่วนตัว**")
             c_info1, c_info2 = st.columns(2)
-            with c_info1: edit_fullname = st.text_input("ชื่อ-สกุล:", value=current_user_row.get('full_name') or '')
+            with c_info1: edit_fullname = st.text_input("ชื่อ-สกุล:", value=current_user_row.get('full_name') or '', key=f"fn_{target_id}")
             
-            curr_pos = current_user_row.get('position') or ''
-            edit_pos_list = [p for p in position_list if p != "-- กรุณาเลือกตำแหน่ง --"]
-            if curr_pos and curr_pos not in edit_pos_list:
-                edit_pos_list.insert(0, curr_pos) 
-            pos_idx = edit_pos_list.index(curr_pos) if curr_pos in edit_pos_list else 0
+            raw_pos = str(current_user_row.get('position') or '').strip()
+            if not raw_pos or raw_pos == "-" or raw_pos.lower() == "none":
+                curr_pos = "-- กรุณาเลือกตำแหน่ง --"
+            else:
+                curr_pos = raw_pos
+                
+            edit_pos_list = position_list.copy() 
+            if curr_pos not in edit_pos_list:
+                edit_pos_list.insert(1, curr_pos) 
             
-            with c_info2: edit_pos = st.selectbox("ตำแหน่ง:", options=edit_pos_list, index=pos_idx)
+            pos_idx = edit_pos_list.index(curr_pos)
+            
+            with c_info2: edit_pos = st.selectbox("ตำแหน่ง:", options=edit_pos_list, index=pos_idx, key=f"pos_{target_id}")
             
             c_info3, c_info4 = st.columns(2)
-            with c_info3: edit_email = st.text_input("E-mail:", value=current_user_row.get('email') or '')
-            with c_info4: edit_phone = st.text_input("เบอร์โทรศัพท์:", value=current_user_row.get('phone_number') or '')
+            with c_info3: edit_email = st.text_input("E-mail:", value=current_user_row.get('email') or '', key=f"em_{target_id}")
+            with c_info4: edit_phone = st.text_input("เบอร์โทรศัพท์:", value=current_user_row.get('phone_number') or '', key=f"ph_{target_id}")
             
             st.markdown("---")
             st.markdown("**🔐 ปรับเปลี่ยนสิทธิ์การเข้าถึง**")
             
             c_edit1, c_edit2 = st.columns(2)
-            with c_edit1: edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx)
-            with c_edit2: edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx)
+            with c_edit1: edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx, key=f"ro_{target_id}")
+            with c_edit2: edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx, key=f"st_{target_id}")
             
-            # 🎯 แสดงผล Selection Tab ที่คลีนขึ้น
-            selected_tabs_pills = st.multiselect(
-                "🏷️ เลือกจัดสรรแท็บงานประจำบัญชี:", 
-                options=tab_pills_options, 
-                default=default_pills,
-                help="หากปล่อยว่างไว้ (ไม่เลือกแท็บใดเลย) ระบบจะ ล็อกสิทธิ์การเข้าใช้งาน ของบัญชีนี้ทันที"
-            )
+            st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 0px;'>🏷️ เลือกจัดสรรแท็บงานประจำบัญชี:</p>", unsafe_allow_html=True)
+            st.caption("☑️ ติ๊กเลือกแท็บที่ต้องการให้บัญชีนี้เข้าถึงได้ (หากไม่เลือกเลย ระบบจะทำการ 'ล็อกสิทธิ์' อัตโนมัติ)")
             
-            edit_allowed_branches = st.multiselect(
-                "📍 กำหนดสาขาที่มีสิทธิ์ (รวมสาขาหลักของ User คนนี้แล้ว):", 
-                options=list(branch_dict.keys()), 
-                default=current_allowed_branch_names,
-                help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
-            )
+            st.markdown("<div style='background-color: #F8FAFC; padding: 5px 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 10px;'>", unsafe_allow_html=True)
+            st.checkbox("☑️ **Select all (เลือกทั้งหมด)**", key=sa_key, on_change=on_select_all)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            cb_col1, cb_col2 = st.columns(2)
+            with cb_col1:
+                st.checkbox("⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์", key=t1_key, on_change=on_tab_change)
+                st.checkbox("🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ", key=t2_key, on_change=on_tab_change)
+            with cb_col2:
+                st.checkbox("💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์", key=t3_key, on_change=on_tab_change)
+                st.checkbox("🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)", key=t4_key, on_change=on_tab_change)
+            
+            st.write("")
+            
+            # 🎯 ตรวจสอบสิทธิ์แบบ Real-time ถ้าเป็น Admin ให้ซ่อนและโชว์ Full Access
+            if edit_role == "admin":
+                st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 5px;'>📍 กำหนดสาขาที่มีสิทธิ์:</p>", unsafe_allow_html=True)
+                st.success("🌟 **Full Access** (สิทธิ์ระดับ Admin สามารถเข้าถึงและจัดการข้อมูลได้ทุกสาขาอัตโนมัติ)")
+                edit_allowed_branches = [] # เคลียร์ค่าออกไปเลย เพราะ Admin ดูได้หมดอยู่แล้ว
+            else:
+                edit_allowed_branches = st.multiselect(
+                    "📍 กำหนดสาขาที่มีสิทธิ์ (รวมสาขาหลักของ User คนนี้แล้ว):", 
+                    options=list(branch_dict.keys()), 
+                    default=current_allowed_branch_names,
+                    key=f"br_{target_id}",
+                    help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
+                )
 
-            if st.form_submit_button("💾 บันทึกและอนุมัติสิทธิ์การเข้าถึง", use_container_width=True):
-                # 🎯 แปลง Label กลับเป็น "1", "2", "3", "4" เพื่อบันทึกลงฐานข้อมูล
-                reverse_tab_mapping = {v: k for k, v in tab_mapping.items()}
-                allowed_tabs_list = [reverse_tab_mapping[lbl] for lbl in selected_tabs_pills]
-                allowed_tabs_str = ",".join(sorted(allowed_tabs_list)) # หากเลือกว่างเปล่า จะได้ "" ทันที
+            if st.button("💾 บันทึกและอนุมัติสิทธิ์การเข้าถึง", type="primary", use_container_width=True):
+                allowed_tabs_list = []
+                if st.session_state[t1_key]: allowed_tabs_list.append("1")
+                if st.session_state[t2_key]: allowed_tabs_list.append("2")
+                if st.session_state[t3_key]: allowed_tabs_list.append("3")
+                if st.session_state[t4_key]: allowed_tabs_list.append("4")
+                
+                allowed_tabs_str = ",".join(allowed_tabs_list)
+                
+                final_edit_pos = edit_pos if edit_pos != "-- กรุณาเลือกตำแหน่ง --" else ""
 
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
                         cur.execute("""UPDATE system_users SET full_name=CONVERT(%s USING utf8mb4), position=CONVERT(%s USING utf8mb4), email=CONVERT(%s USING utf8mb4), phone_number=CONVERT(%s USING utf8mb4), Role_tab=%s, allowed_tabs=%s, status=%s WHERE user_id=%s""", 
-                                    (edit_fullname, edit_pos, edit_email, edit_phone, edit_role, allowed_tabs_str, edit_status, int(target_id)))
+                                    (edit_fullname, final_edit_pos, edit_email, edit_phone, edit_role, allowed_tabs_str, edit_status, int(target_id)))
                         
                         cur.execute("DELETE FROM user_branches WHERE user_id=%s", (int(target_id),))
                         for b_name in edit_allowed_branches:
@@ -195,6 +236,7 @@ def render_admin_user_management():
                         
                         conn.commit()
                     conn.close()
+                    st.session_state['loaded_edit_user'] = None 
                     st.success(f"อัปเดตสิทธิ์การใช้งานของ '{selected_target_user}' สำเร็จเรียบร้อย!")
                     time.sleep(1)
                     st.rerun()
