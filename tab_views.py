@@ -50,12 +50,12 @@ def render_engineering_system_tabs(current_branch_name):
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
-                        # 🎯 เพิ่มเงื่อนไข WHERE is_active = 1 เพื่อไม่ให้เครื่องจักรที่โดนระงับโผล่มา
+                        # 🎯 ดึงจากตารางใหม่ machines_set
                         if current_role == "admin":
-                            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines WHERE is_active = 1")
+                            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines_set WHERE machine_type = 'machine' AND is_active = 1")
                         else:
                             placeholders = ', '.join(['%s'] * len(user_allowed_branches))
-                            cur.execute(f"SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines WHERE branch_id IN ({placeholders}) AND is_active = 1", tuple(user_allowed_branches))
+                            cur.execute(f"SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines_set WHERE machine_type = 'machine' AND branch_id IN ({placeholders}) AND is_active = 1", tuple(user_allowed_branches))
                         
                         db_machines = cur.fetchall()
                         if db_machines: machine_dict = {m['machine_name']: m['id'] for m in db_machines}
@@ -64,7 +64,8 @@ def render_engineering_system_tabs(current_branch_name):
 
                 machine_select_options = ["-- กรุณาเลือกเครื่องจักร --"] + list(machine_dict.keys())
                 
-                with st.form("machine_form", clear_on_submit=True):
+                # 🎯 ถอด st.form ออก เพื่อให้หน้าเว็บอัปเดตแบบโต้ตอบได้
+                with st.container(border=True):
                     st.write("### 📝 ฟอร์มบันทึกข้อมูลเครื่องจักรลงตาราง")
                     
                     if len(available_options) > 1:
@@ -77,15 +78,19 @@ def render_engineering_system_tabs(current_branch_name):
 
                     c1, c2 = st.columns(2)
                     with c1:
-                        m_date = st.date_input("วันที่", value=datetime.now(), key="m_date")
                         m_label = st.selectbox("ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0)
-                        m_qty = st.number_input("จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน")
-                    with c2:
-                        m_work_hours = st.number_input("ชั่วโมงทำงาน *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน")
-                        m_break_hours = st.number_input("ชั่วโมงเบรกดาวน์ *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงเบรกดาวน์")
-                        m_remark = st.text_area("หมายเหตุ / สาเหตุที่ชำรุด")
                         
-                    submit_m = st.form_submit_button("💾 บันทึกข้อมูลเครื่องจักร", use_container_width=True)
+                        # 🎯 ล็อกช่องกรอกข้อมูลจนกว่าจะเลือกเครื่องจักร
+                        is_m_not_selected = (m_label == "-- กรุณาเลือกเครื่องจักร --")
+                        
+                        m_date = st.date_input("วันที่", value=datetime.now(), key="m_date", disabled=is_m_not_selected)
+                        m_qty = st.number_input("จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน", disabled=is_m_not_selected)
+                    with c2:
+                        m_work_hours = st.number_input("ชั่วโมงทำงาน *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=is_m_not_selected)
+                        m_break_hours = st.number_input("ชั่วโมงเบรกดาวน์ *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงเบรกดาวน์", disabled=is_m_not_selected)
+                        m_remark = st.text_area("หมายเหตุ / สาเหตุที่ชำรุด", disabled=is_m_not_selected)
+                        
+                    submit_m = st.button("💾 บันทึกข้อมูลเครื่องจักร", use_container_width=True, type="primary", disabled=is_m_not_selected)
                     
                     if submit_m:
                         if m_label == "-- กรุณาเลือกเครื่องจักร --" or m_qty is None or m_work_hours is None or m_break_hours is None:
@@ -109,85 +114,112 @@ def render_engineering_system_tabs(current_branch_name):
                             except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
 
         # =========================================================================
-        # 🚚 TAB 2: บันทึกการใช้เชื้อเพลิงรถยนต์ / รถยก
+        # 🚚 TAB 2: บันทึกการใช้เชื้อเพลิงรถยนต์ / รถยก (เปลี่ยนเป็น 3 ช่อง)
         # =========================================================================
         elif key == "2":
             with current_tab_ctx:
                 st.header("2. ระบบการใช้เชื้อเพลิง (เครื่องยนต์/รถยก)")
                 
-                engine_options, engine_type_mapping, engine_code_mapping, engine_branch_mapping = {}, {}, {}, {} 
-                
+                all_engines = []
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
-                        # 🎯 โค้ดส่วนนี้มีการกำหนด e.is_active = 1 เพื่อไม่ให้รถที่โดนระงับโผล่มาอยู่แล้วครับ
+                        # 🎯 ดึงจากตารางใหม่ machines_set
                         if current_role == "admin":
-                            sql_eng = """SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id
-                                        FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.is_active = 1 ORDER BY b.id ASC, e.engine_code ASC"""
+                            sql_eng = """SELECT m.id AS engine_pk_id, CONVERT(m.machine_name USING utf8mb4) AS engine_code, 
+                                        CONVERT(et.type_name USING utf8mb4) AS type_name, 
+                                        CONVERT(b.branch_name USING utf8mb4) AS branch_name, m.branch_id
+                                        FROM machines_set m 
+                                        LEFT JOIN engine_types et ON m.engine_type_id = et.id 
+                                        LEFT JOIN branches b ON m.branch_id = b.id 
+                                        WHERE m.machine_type = 'engine' AND m.is_active = 1 
+                                        ORDER BY b.id ASC, m.machine_name ASC"""
                             cur.execute(sql_eng)
                         else:
                             placeholders = ', '.join(['%s'] * len(user_allowed_branches))
-                            sql_eng = f"""SELECT e.id AS engine_pk_id, CONVERT(e.engine_code USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id
-                                        FROM engines e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id IN ({placeholders}) AND e.is_active = 1 ORDER BY e.engine_code ASC"""
+                            sql_eng = f"""SELECT m.id AS engine_pk_id, CONVERT(m.machine_name USING utf8mb4) AS engine_code, 
+                                        CONVERT(et.type_name USING utf8mb4) AS type_name, 
+                                        CONVERT(b.branch_name USING utf8mb4) AS branch_name, m.branch_id
+                                        FROM machines_set m 
+                                        LEFT JOIN engine_types et ON m.engine_type_id = et.id 
+                                        LEFT JOIN branches b ON m.branch_id = b.id 
+                                        WHERE m.branch_id IN ({placeholders}) AND m.machine_type = 'engine' AND m.is_active = 1 
+                                        ORDER BY m.machine_name ASC"""
                             cur.execute(sql_eng, tuple(user_allowed_branches))
                             
-                        for eng in cur.fetchall():
-                            pk_id = eng['engine_pk_id']
-                            code = eng['engine_code'] or ''
-                            t_name = eng['type_name'] or 'ไม่ระบุประเภท'
-                            b_name = eng['branch_name'] or ''
-                            try: branch_code = b_name.split("สาขา ")[1].split()[0]
-                            except: branch_code = b_name or "N/A"
-                            
-                            display_label = f"{code} (ประเภท: {t_name}) [{branch_code}]"
-                            engine_options[display_label] = pk_id
-                            engine_type_mapping[pk_id] = t_name
-                            engine_code_mapping[pk_id] = code
-                            engine_branch_mapping[pk_id] = eng['branch_id']
+                        all_engines = cur.fetchall()
                     conn.close()
-                except Exception as e: st.error(f"ไม่สามารถดึงข้อมูลตาราง engines ได้: {e}")
+                except Exception as e: st.error(f"ไม่สามารถดึงข้อมูลรถยนต์ได้: {e}")
 
-                engine_select_options = ["-- กรุณาเลือก รหัสงาน/ทะเบียนรถ --"] + list(engine_options.keys())
-
-                with st.form("fuel_form", clear_on_submit=True):
+                # 🎯 ถอด st.form ออก เพื่อให้ Dropdown อัปเดตแบบเรียลไทม์
+                with st.container(border=True):
                     st.write("### 📝 ฟอร์มบันทึกข้อมูลการใช้เชื้อเพลิงรถ")
-                    st.info("💡 สาขาจะถูกบันทึกอัตโนมัติตามสังกัดของรหัสงาน/ทะเบียนรถที่คุณเลือก")
+                    
+                    # 🎯 ส่วนที่ 1: แตกช่องเลือกข้อมูลเป็น 3 ส่วน (Cascading Dropdowns)
+                    c_sel1, c_sel2, c_sel3 = st.columns(3)
+                    
+                    # 1. เลือกสาขา
+                    available_branch_names = sorted(list(set([eng['branch_name'] for eng in all_engines if eng['branch_name']])))
+                    f2_branch = c_sel1.selectbox("🏢 1. สาขา *", ["-- เลือกสาขา --"] + available_branch_names, key="f2_br")
+                    
+                    # 2. เลือกชนิด/ประเภท (กรองตามสาขา)
+                    f2_type_disabled = (f2_branch == "-- เลือกสาขา --")
+                    if not f2_type_disabled:
+                        filtered_by_branch = [e for e in all_engines if e['branch_name'] == f2_branch]
+                        available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
+                    else:
+                        available_types = []
+                        filtered_by_branch = []
+                        
+                    f2_type = c_sel2.selectbox("🚜 2. ชนิด / ประเภทรถ *", ["-- เลือกประเภท --"] + available_types, key="f2_ty", disabled=f2_type_disabled)
+                    
+                    # 3. เลือกรหัส/ทะเบียนรถ (กรองตามชนิด)
+                    f2_code_disabled = (f2_type == "-- เลือกประเภท --") or f2_type_disabled
+                    if not f2_code_disabled:
+                        filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == f2_type]
+                        available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
+                    else:
+                        available_codes = []
+                        filtered_by_type = []
+                        
+                    f2_code = c_sel3.selectbox("🏷️ 3. รหัสงาน / ทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, key="f2_cd", disabled=f2_code_disabled)
+
+                    # 🎯 ล็อกช่องกรอกข้อมูลด้านล่าง หากยังเลือกรถไม่เสร็จ
+                    inputs_disabled = (f2_code == "-- เลือกรถ --") or f2_code_disabled
+                    
+                    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
 
                     c1, c2 = st.columns(2)
                     with c1:
-                        f_date = st.date_input("วันที่", value=datetime.now(), key="f_date")
-                        selected_label = st.selectbox("เลือก รหัสงาน / ทะเบียนรถ *", options=engine_select_options, index=0)
-                        f_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณน้ำมัน (ลิตร)")
+                        f_date = st.date_input("วันที่", value=datetime.now(), key="f_date", disabled=inputs_disabled)
+                        f_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณน้ำมัน (ลิตร)", disabled=inputs_disabled)
                     with c2:
-                        f_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน (ชม.)")
-                        f_remark = st.text_area("หมายเหตุ")
+                        f_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน (ชม.)", disabled=inputs_disabled)
+                        f_remark = st.text_area("หมายเหตุ", disabled=inputs_disabled)
                         
-                    submit_f = st.form_submit_button("💾 บันทึกข้อมูลเชื้อเพลิงรถ", use_container_width=True)
+                    submit_f = st.button("💾 บันทึกข้อมูลเชื้อเพลิงรถ", use_container_width=True, type="primary", disabled=inputs_disabled)
                     
                     if submit_f:
-                        if selected_label == "-- กรุณาเลือก รหัสงาน/ทะเบียนรถ --" or f_liters is None or f_hours is None:
+                        if inputs_disabled or f_liters is None or f_hours is None:
                             st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                         else:
-                            try:
-                                selected_pk_id = engine_options[selected_label]
-                                actual_engine_code = engine_code_mapping[selected_pk_id]
-                                actual_type_name = engine_type_mapping[selected_pk_id]
-                                target_branch_id = engine_branch_mapping[selected_pk_id] 
-                                
-                                conn = get_db_connection()
-                                with conn.cursor() as cur:
-                                    sql = """INSERT INTO fuel_records (branch_id, record_date, engine_code, type_name, fuel_liters, working_hours, remark) 
-                                             VALUES (%s, %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, CONVERT(%s USING utf8mb4))"""
-                                    cur.execute(sql, (target_branch_id, f_date, actual_engine_code, actual_type_name, float(f_liters), float(f_hours), f_remark))
-                                conn.commit()
-                                conn.close()
-                                
-                                st.cache_data.clear()
-                                log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 2 Data Entry", f"บันทึกเชื้อเพลิงรถ {actual_engine_code} จำนวน {f_liters} ลิตร")
-                                st.success(f"✅ บันทึกสำเร็จ! (ทะเบียน: {actual_engine_code} | ประเภท: {actual_type_name})")
-                                time.sleep(1)
-                                st.rerun()
-                            except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                            target_engine = next((e for e in filtered_by_type if e['engine_code'] == f2_code), None)
+                            if target_engine:
+                                try:
+                                    conn = get_db_connection()
+                                    with conn.cursor() as cur:
+                                        sql = """INSERT INTO fuel_records (branch_id, record_date, engine_code, type_name, fuel_liters, working_hours, remark) 
+                                                 VALUES (%s, %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, CONVERT(%s USING utf8mb4))"""
+                                        cur.execute(sql, (target_engine['branch_id'], f_date, target_engine['engine_code'], target_engine['type_name'], float(f_liters), float(f_hours), f_remark))
+                                    conn.commit()
+                                    conn.close()
+                                    
+                                    st.cache_data.clear()
+                                    log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 2 Data Entry", f"บันทึกเชื้อเพลิงรถ {target_engine['engine_code']} จำนวน {f_liters} ลิตร")
+                                    st.success(f"✅ บันทึกสำเร็จ! (ทะเบียน: {target_engine['engine_code']} | ประเภท: {target_engine['type_name']})")
+                                    time.sleep(1)
+                                    st.rerun()
+                                except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
 
         # =========================================================================
         # 💨 TAB 3: บันทึกแรงดันไอน้ำ บอยเลอร์ 
@@ -199,7 +231,7 @@ def render_engineering_system_tabs(current_branch_name):
                 if current_role == 'admin': available_options = list(branch_dict.keys())
                 else: available_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
 
-                with st.form("pressure_form", clear_on_submit=True):
+                with st.container(border=True):
                     st.write("### 📝 บันทึกข้อมูลแรงดันไอน้ำ")
                     
                     if len(available_options) > 1:
@@ -219,7 +251,7 @@ def render_engineering_system_tabs(current_branch_name):
                         non_pm_drop = st.number_input("จำนวนที่ตกนอกเหนือ PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกนอกเหนือ PM")
                         p_remark = st.text_input("หมายเหตุ (ลากขี้เถ้า / ซ่อมบำรุง)")
                         
-                    submit_p = st.form_submit_button("💾 บันทึกข้อมูลแรงดันไอน้ำ", use_container_width=True)
+                    submit_p = st.button("💾 บันทึกข้อมูลแรงดันไอน้ำ", use_container_width=True, type="primary")
                     
                     if submit_p:
                         if total_count is None or pm_drop is None or non_pm_drop is None:
@@ -253,7 +285,7 @@ def render_engineering_system_tabs(current_branch_name):
                 if current_role == 'admin': available_options = list(branch_dict.keys())
                 else: available_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
 
-                with st.form("boiler_fuel_form", clear_on_submit=True):
+                with st.container(border=True):
                     st.write("### 📝 บันทึกปริมาณเชื้อเพลิงรายวัน")
                     
                     if len(available_options) > 1:
@@ -281,7 +313,7 @@ def render_engineering_system_tabs(current_branch_name):
                         prod_val = st.number_input("ปริมาณการผลิต (ตัน/วัน) *", min_value=0.1, step=1.0, value=None, placeholder="ระบุการผลิตไอน้ำ")
                         work_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน")
                         
-                    submit_bf = st.form_submit_button("💾 บันทึกข้อมูลเชื้อเพลิงบอยเลอร์", use_container_width=True)
+                    submit_bf = st.button("💾 บันทึกข้อมูลเชื้อเพลิงบอยเลอร์", use_container_width=True, type="primary")
                     
                     if submit_bf:
                         inputs = [saw_w, wood_w, waste_wood_w, saw_p, wood_p, waste_wood_p, prod_val, work_hours]
