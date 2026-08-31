@@ -764,10 +764,15 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
     for e in engines_config:
         c_key = e['key']
-        t_h, t_l = f"{totals_hours[c_key]:,.2f}" if totals_hours[c_key] > 0 else "-", f"{totals_liters[c_key]:,.2f}" if totals_liters[c_key] > 0 else "-"
-        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;"></td>'
-    for th, tl in [(tot_toyo_hours, tot_toyo_liters), (tot_tck_hours, tot_tck_liters)]:
-        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th:,.2f}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl:,.2f}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;"></td>'
+        t_h = f"{totals_hours[c_key]:,.2f}" if totals_hours[c_key] > 0 else "-"
+        t_l = f"{totals_liters[c_key]:,.2f}" if totals_liters[c_key] > 0 else "-"
+        t_r = avg_l_hr[c_key]
+        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_r}</td>'
+    
+    for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
+        th_s = f"{th:,.2f}" if th > 0 else "-"
+        tl_s = f"{tl:,.2f}" if tl > 0 else "-"
+        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tr}</td>'
     total_row_html += '</tr>'
 
     table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body><div class='header-title'>บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class='banner'>รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div><table><thead><tr><th rowspan='3' style='border:1px solid #000;padding:3px;font-size:10px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table></body></html>"
@@ -789,7 +794,7 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
             else:
                 sql = "SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
-                cur.execute(sql, (b_id_t3, start_date_str, end_date_t3))
+                cur.execute(sql, (b_id_t3, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
     except Exception:
@@ -958,7 +963,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
             else:
                 sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"
-                cur.execute(sql, (b_id_t4, start_date_str, end_date_t4))
+                cur.execute(sql, (b_id_t4, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
     except Exception:
@@ -1011,12 +1016,48 @@ def render_all_reports_module(user_branch_name):
     st.markdown("""
         <style>
         div[data-testid="stScrollableContainer"] div[data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 1000px !important; align-items: center !important; padding: 4px 0 !important; }
-        div[data-testid="stPopover"] > button { background-color: transparent !important; border: none !important; color: #64748B !important; font-size: 20px !important; font-weight: 900 !important; padding: 0px 8px !important; box-shadow: none !important; }
-        div[data-testid="stPopover"] > button:hover { color: #0F172A !important; background-color: #E2E8F0 !important; border-radius: 50% !important; }
-        div[data-testid="stPopoverBody"] button { text-align: left !important; width: 100% !important; border: none !important; background: transparent !important; padding: 6px 12px !important; font-size: 14px !important; justify-content: flex-start !important; }
-        div[data-testid="stPopoverBody"] button:hover { background-color: #F1F5F9 !important; border-radius: 6px !important; }
-        div[data-testid="stPopoverBody"] button:has(div:contains("🗑️")) { color: #E11D48 !important; }
-        div[data-testid="stPopoverBody"] button:has(div:contains("🗑️")):hover { background-color: #FFE4E6 !important; }
+        
+        /* 🎯 Inline Quick Action Icons (ปุ่มลัดในแถวตาราง) */
+        div[data-testid="stScrollableContainer"] button {
+            background-color: #FFFFFF !important;
+            border: 1px solid #E2E8F0 !important;
+            border-radius: 6px !important;
+            padding: 2px 0px !important;
+            font-size: 14px !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+        }
+        div[data-testid="stScrollableContainer"] button:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+        }
+        div[data-testid="stScrollableContainer"] button:has(div:contains("✏️")):hover { border-color: #3B82F6 !important; background-color: #EFF6FF !important; }
+        div[data-testid="stScrollableContainer"] button:has(div:contains("🗑️")):hover { border-color: #EF4444 !important; background-color: #FEF2F2 !important; }
+        
+        /* 🎯 สไตล์ปุ่ม Export & Summary (ดีไซน์ Pill-shape ขอบมน) */
+        div[data-testid="stDownloadButton"] > button,
+        div[data-testid="stButton"] > button:has(div:contains("สรุปรายงาน")) {
+            background-color: #FFFFFF !important;
+            border: 1px solid #CBD5E1 !important;
+            color: #1E293B !important;
+            border-radius: 24px !important;
+            font-weight: 600 !important;
+            height: 42px !important;
+            transition: all 0.2s ease !important;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+        }
+        div[data-testid="stDownloadButton"] > button:hover,
+        div[data-testid="stButton"] > button:has(div:contains("สรุปรายงาน")):hover {
+            background-color: #F8FAFC !important;
+            border-color: #94A3B8 !important;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
+            transform: translateY(-1px);
+        }
+        div[data-testid="stDownloadButton"] > button p,
+        div[data-testid="stButton"] > button:has(div:contains("สรุปรายงาน")) p {
+            font-size: 14.5px !important;
+            margin: 0 !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1081,43 +1122,42 @@ def render_all_reports_module(user_branch_name):
                 if raw_data_t1:
                     pk_col_t1 = list(raw_data_t1[0].keys())[0]
                     
-                    # 🚀 ระบบแบ่งหน้า (Pagination) ช่วยลดภาระการ Render ทำให้เว็บโหลดเร็วขึ้น
                     ROWS_PER_PAGE = 15
                     total_pages_t1 = max(1, (len(raw_data_t1) - 1) // ROWS_PER_PAGE + 1)
                     
                     pc1, pc2 = st.columns([7, 3])
                     with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t1)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t1 = st.selectbox("เลือกหน้า", range(1, total_pages_t1 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", key="pg_t1", label_visibility="collapsed")
+                    with pc2: page_t1 = st.selectbox("เลือกหน้า", range(1, total_pages_t1 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", key=f"pg_t1_{start_date_t1}_{end_date_t1}_{b_id_t1}_{len(raw_data_t1)}", label_visibility="collapsed")
                     
                     paginated_t1 = raw_data_t1[(page_t1 - 1) * ROWS_PER_PAGE : page_t1 * ROWS_PER_PAGE]
 
                     st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.6, 1.2, 1, 1.6, 0.8, 1, 1.2, 1.5, 0.6])
-                    headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "ตัวเลือก"]
+                    header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
+                    headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
                         for r in paginated_t1:
                             rec_id = r[pk_col_t1]
-                            cols = st.columns([0.6, 1.2, 1, 1.6, 0.8, 1, 1.2, 1.5, 0.6])
+                            cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
                             cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                             cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                with cols[8].popover("⋮"):
-                                    st.markdown("<span style='font-size:11px; font-weight:bold; color:#94A3B8; text-transform:uppercase;'>การจัดการ</span>", unsafe_allow_html=True)
-                                    if st.button("📝 แก้ไขข้อมูล", key=f"e1_{rec_id}", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
-                                    if st.button("🗑️ ลบรายการ", key=f"d1_{rec_id}", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
+                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e1_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
+                                if c_del.button("🗑️", key=f"d1_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
                             else: cols[8].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
-                    with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
+                    st.write("")
+                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:38px; background-color:#1E293B; border:1px solid #334155; border-radius:8px; color:#F8FAFC; font-family:sans-serif; font-size:14px; font-weight:600; cursor:pointer; box-sizing:border-box;">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=40)
+                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
                 else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
         # =========================================================================
@@ -1149,19 +1189,18 @@ def render_all_reports_module(user_branch_name):
                 if raw_data_t2:
                     pk_col_t2 = list(raw_data_t2[0].keys())[0]
                     
-                    # 🚀 ระบบแบ่งหน้า (Pagination)
                     ROWS_PER_PAGE = 15
                     total_pages_t2 = max(1, (len(raw_data_t2) - 1) // ROWS_PER_PAGE + 1)
                     
                     pc1, pc2 = st.columns([7, 3])
                     with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t2)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t2 = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key="pg_t2", label_visibility="collapsed")
+                    with pc2: page_t2 = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key=f"pg_t2_{start_date_t2}_{end_date_t2}_{b_id_t2}_{len(raw_data_t2)}", label_visibility="collapsed")
                     
                     paginated_t2 = raw_data_t2[(page_t2 - 1) * ROWS_PER_PAGE : page_t2 * ROWS_PER_PAGE]
 
                     st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.6, 1.2, 1.4, 1.4, 1, 1, 1, 1.5, 0.6])
-                    headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "ตัวเลือก"]
+                    header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
+                    headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
@@ -1169,24 +1208,24 @@ def render_all_reports_module(user_branch_name):
                         for r in paginated_t2:
                             rec_id = r[pk_col_t2]
                             lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
-                            cols = st.columns([0.6, 1.2, 1.4, 1.4, 1, 1, 1, 1.5, 0.6])
+                            cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
                             cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
                             cols[3].write(r.get('engine_code') or '-'); cols[4].write(f"{lts:.2f}"); cols[5].write(f"{hrs:.2f}"); cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}"); cols[7].write(r.get('remark') or '-')
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                with cols[8].popover("⋮"):
-                                    st.markdown("<span style='font-size:11px; font-weight:bold; color:#94A3B8;'>การจัดการ</span>", unsafe_allow_html=True)
-                                    if st.button("📝 แก้ไขข้อมูล", key=f"e2_{rec_id}", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
-                                    if st.button("🗑️ ลบรายการ", key=f"d2_{rec_id}", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
+                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e2_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
+                                if c_del.button("🗑️", key=f"d2_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
                             else: cols[8].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
-                    with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
+                    st.write("")
+                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="openPrintPreview2()" style="width:100%; height:38px; background-color:#1E293B; border:1px solid #334155; border-radius:8px; color:#F8FAFC; font-family:sans-serif; font-size:14px; font-weight:600; cursor:pointer; box-sizing:border-box;">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=40)
+                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview2()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
                 else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
         # =========================================================================
@@ -1218,43 +1257,42 @@ def render_all_reports_module(user_branch_name):
                 if raw_data_t3:
                     pk_col_t3 = list(raw_data_t3[0].keys())[0]
                     
-                    # 🚀 ระบบแบ่งหน้า (Pagination)
                     ROWS_PER_PAGE = 15
                     total_pages_t3 = max(1, (len(raw_data_t3) - 1) // ROWS_PER_PAGE + 1)
                     
                     pc1, pc2 = st.columns([7, 3])
                     with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t3)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t3 = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key="pg_t3", label_visibility="collapsed")
+                    with pc2: page_t3 = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key=f"pg_t3_{start_date_t3}_{end_date_t3}_{b_id_t3}_{len(raw_data_t3)}", label_visibility="collapsed")
                     
                     paginated_t3 = raw_data_t3[(page_t3 - 1) * ROWS_PER_PAGE : page_t3 * ROWS_PER_PAGE]
 
                     st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.6, 1.2, 1, 1.2, 1.2, 1.2, 1.2, 1.6, 0.6])
-                    headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "ตัวเลือก"]
+                    header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
+                    headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
                         for r in paginated_t3:
                             rec_id = r[pk_col_t3]
-                            cols = st.columns([0.6, 1.2, 1, 1.2, 1.2, 1.2, 1.2, 1.6, 0.6])
+                            cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
                             cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                             cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                with cols[8].popover("⋮"):
-                                    st.markdown("<span style='font-size:11px; font-weight:bold; color:#94A3B8;'>การจัดการ</span>", unsafe_allow_html=True)
-                                    if st.button("📝 แก้ไขข้อมูล", key=f"e3_{rec_id}", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
-                                    if st.button("🗑️ ลบรายการ", key=f"d3_{rec_id}", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
+                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e3_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
+                                if c_del.button("🗑️", key=f"d3_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
                             else: cols[8].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
-                    with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
+                    st.write("")
+                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="openPrintPreview3()" style="width:100%; height:38px; background-color:#1E293B; border:1px solid #334155; border-radius:8px; color:#F8FAFC; font-family:sans-serif; font-size:14px; font-weight:600; cursor:pointer; box-sizing:border-box;">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=40)
+                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview3()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
                 else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
         # =========================================================================
@@ -1283,19 +1321,18 @@ def render_all_reports_module(user_branch_name):
                 if raw_data_t4:
                     pk_col_t4 = list(raw_data_t4[0].keys())[0]
                     
-                    # 🚀 ระบบแบ่งหน้า (Pagination)
                     ROWS_PER_PAGE = 15
                     total_pages_t4 = max(1, (len(raw_data_t4) - 1) // ROWS_PER_PAGE + 1)
                     
                     pc1, pc2 = st.columns([7, 3])
                     with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t4)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages_t4 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t4}", key="pg_t4", label_visibility="collapsed")
+                    with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages_t4 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t4}", key=f"pg_t4_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(raw_data_t4)}", label_visibility="collapsed")
                     
                     paginated_t4 = raw_data_t4[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
 
                     st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.6, 1.2, 1, 1.4, 1.4, 1.2, 1.6, 0.6])
-                    headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "ตัวเลือก"]
+                    header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                    headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
@@ -1305,22 +1342,22 @@ def render_all_reports_module(user_branch_name):
                             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
                             tot_w = s_w + w_w + ww_w
                             s_prod = float(r.get('steam_production') or 1.0)
-                            cols = st.columns([0.6, 1.2, 1, 1.4, 1.4, 1.2, 1.6, 0.6])
+                            cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
                             cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                             cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                with cols[7].popover("⋮"):
-                                    st.markdown("<span style='font-size:11px; font-weight:bold; color:#94A3B8;'>การจัดการ</span>", unsafe_allow_html=True)
-                                    if st.button("📝 แก้ไขข้อมูล", key=f"e4_{rec_id}", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
-                                    if st.button("🗑️ ลบรายการ", key=f"d4_{rec_id}", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
+                                c_edit, c_del = cols[7].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e4_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
+                                if c_del.button("🗑️", key=f"d4_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
                             else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
-                    with col_btn1: st.download_button("📥 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
+                    st.write("")
+                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
                     with col_btn2: 
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): show_summary_report_dialog(json.loads(json_html_t4))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:0;overflow:hidden;"><button onclick="openPrintPreview4()" style="width:100%; height:38px; background-color:#1E293B; border:1px solid #334155; border-radius:8px; color:#F8FAFC; font-family:sans-serif; font-size:14px; font-weight:600; cursor:pointer; box-sizing:border-box;">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview4(){{var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); w.document.write({json_html_t4}); w.document.close(); w.print();}}</script>""", height=40)
+                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview4(){{var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); w.document.write({json_html_t4}); w.document.close(); w.print();}}</script>""", height=50)
                 else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
