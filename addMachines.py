@@ -241,7 +241,7 @@ def render_add_new_equipment():
                     edit_remark = st.text_input("แก้ไข หมายเหตุ", value=sel_data.get('หมายเหตุ') or "")
 
                 st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-                confirm_disable = st.checkbox("⚠️ ยืนยันการเปลี่ยนแปลงสถานะเป็น 'ระงับการใช้งาน' (ข้อมูลจะไม่ถูกลบ)")
+                
 
                 a_c1, a_c2 = st.columns(2)
                 with a_c1:
@@ -265,24 +265,5 @@ def render_add_new_equipment():
                             st.rerun()
                         except Exception as e:
                             st.error(f"เกิดข้อผิดพลาดในการอัปเดต: {e}")
-                
-                with a_c2:
-                    if st.form_submit_button("🚫 ปิดระงับการใช้งานทันที (Soft Delete)", use_container_width=True):
-                        if confirm_disable:
-                            try:
-                                conn = get_db_connection()
-                                with conn.cursor() as cur:
-                                    # 🎯 อัปเดตตาราง machines_set 
-                                    cur.execute("UPDATE machines_set SET is_active=0 WHERE id=%s", (sel_data['ID'],))
-                                    conn.commit()
-                                conn.close()
-                                log_activity(st.session_state.user_id, st.session_state.username, "DISABLE", "Master Data Setup", f"ระงับอุปกรณ์ ID: {sel_data['ID']} ({sel_data['ชื่อ/รหัส']})")
-                                st.success("🚫 ระงับการใช้งานข้อมูลเรียบร้อยแล้ว!")
-                                time.sleep(1)
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"เกิดข้อผิดพลาด: {e}")
-                        else:
-                            st.error("⚠️ กรุณาติ๊กถูกยืนยันการระงับการใช้งานก่อนกดปุ่ม")
     else:
         st.info("ยังไม่มีข้อมูลอุปกรณ์ในระบบ")
