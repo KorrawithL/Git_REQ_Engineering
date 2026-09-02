@@ -46,24 +46,6 @@ def render_engineering_system_tabs(current_branch_name):
                 else:
                     available_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
 
-                machine_dict = {}
-                try:
-                    conn = get_db_connection()
-                    with conn.cursor() as cur:
-                        # 🎯 ดึงจากตารางใหม่ machines_set
-                        if current_role == "admin":
-                            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines_set WHERE machine_type = 'machine' AND is_active = 1")
-                        else:
-                            placeholders = ', '.join(['%s'] * len(user_allowed_branches))
-                            cur.execute(f"SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines_set WHERE machine_type = 'machine' AND branch_id IN ({placeholders}) AND is_active = 1", tuple(user_allowed_branches))
-                        
-                        db_machines = cur.fetchall()
-                        if db_machines: machine_dict = {m['machine_name']: m['id'] for m in db_machines}
-                    conn.close()
-                except Exception: pass
-
-                machine_select_options = ["-- กรุณาเลือกเครื่องจักร --"] + list(machine_dict.keys())
-                
                 # 🎯 ถอด st.form ออก เพื่อให้หน้าเว็บอัปเดตแบบโต้ตอบได้
                 with st.container(border=True):
                     st.write("### 📝 ฟอร์มบันทึกข้อมูลเครื่องจักรลงตาราง")
@@ -76,19 +58,35 @@ def render_engineering_system_tabs(current_branch_name):
                         st.write(f"**(สังกัด: {t1_branch_label})**")
                         target_branch_id = branch_dict.get(t1_branch_label, int(st.session_state.branch_id))
 
+                    machine_dict = {}
+                    try:
+                        conn = get_db_connection()
+                        with conn.cursor() as cur:
+                            sql = "SELECT id, CONVERT(machine_name USING utf8mb4) AS machine_name FROM machines_set WHERE machine_type = 'machine' AND branch_id = %s AND is_active = 1"
+                            cur.execute(sql, (target_branch_id,))
+                            db_machines = cur.fetchall()
+                            if db_machines: 
+                                machine_dict = {m['machine_name']: m['id'] for m in db_machines}
+                        conn.close()
+                    except Exception: 
+                        pass
+
+                    machine_select_options = ["-- กรุณาเลือกเครื่องจักร --"] + list(machine_dict.keys())
+
+                    # 🌟 1. สร้างตัวแปรนับรอบ (Dynamic Key)
+                    if "reset_t1" not in st.session_state: st.session_state.reset_t1 = 0
+                    rk1 = st.session_state.reset_t1
+
                     c1, c2 = st.columns(2)
                     with c1:
-                        m_label = st.selectbox("ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0)
-                        
-                        # 🎯 ล็อกช่องกรอกข้อมูลจนกว่าจะเลือกเครื่องจักร
+                        m_label = st.selectbox("ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0, key=f"t1_m_label_{rk1}")
                         is_m_not_selected = (m_label == "-- กรุณาเลือกเครื่องจักร --")
-                        
                         m_date = st.date_input("วันที่", value=datetime.now(), key="m_date", disabled=is_m_not_selected)
-                        m_qty = st.number_input("จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน", disabled=is_m_not_selected)
+                        m_qty = st.number_input("จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน", disabled=is_m_not_selected, key=f"t1_qty_{rk1}")
                     with c2:
-                        m_work_hours = st.number_input("ชั่วโมงทำงาน *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=is_m_not_selected)
-                        m_break_hours = st.number_input("ชั่วโมงเบรกดาวน์ *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงเบรกดาวน์", disabled=is_m_not_selected)
-                        m_remark = st.text_area("หมายเหตุ / สาเหตุที่ชำรุด", disabled=is_m_not_selected)
+                        m_work_hours = st.number_input("ชั่วโมงทำงาน *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=is_m_not_selected, key=f"t1_work_{rk1}")
+                        m_break_hours = st.number_input("ชั่วโมงเบรกดาวน์ *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงเบรกดาวน์", disabled=is_m_not_selected, key=f"t1_break_{rk1}")
+                        m_remark = st.text_area("หมายเหตุ / สาเหตุที่ชำรุด", disabled=is_m_not_selected, key=f"t1_rem_{rk1}")
                         
                     submit_m = st.button("💾 บันทึกข้อมูลเครื่องจักร", use_container_width=True, type="primary", disabled=is_m_not_selected)
                     
@@ -109,6 +107,9 @@ def render_engineering_system_tabs(current_branch_name):
                                 st.cache_data.clear()
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 1 Data Entry", f"บันทึกเครื่องจักร {m_label} วันที่ {m_date}")
                                 st.success("✅ บันทึกข้อมูลเครื่องจักรสำเร็จเรียบร้อยแล้ว!")
+                                
+                                # 🌟 2. สั่งบวกเลขเพื่อล้างฟอร์ม
+                                st.session_state.reset_t1 += 1
                                 time.sleep(1)
                                 st.rerun()
                             except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
@@ -155,36 +156,31 @@ def render_engineering_system_tabs(current_branch_name):
                 with st.container(border=True):
                     st.write("### 📝 ฟอร์มบันทึกข้อมูลการใช้เชื้อเพลิงรถ")
                     
-                    # 🎯 ส่วนที่ 1: แตกช่องเลือกข้อมูลเป็น 3 ส่วน (Cascading Dropdowns)
+                    # 🌟 1. สร้างตัวแปรนับรอบ (Dynamic Key)
+                    if "reset_t2" not in st.session_state: st.session_state.reset_t2 = 0
+                    rk2 = st.session_state.reset_t2
+
                     c_sel1, c_sel2, c_sel3 = st.columns(3)
-                    
-                    # 1. เลือกสาขา
                     available_branch_names = sorted(list(set([eng['branch_name'] for eng in all_engines if eng['branch_name']])))
                     f2_branch = c_sel1.selectbox("🏢 1. สาขา *", ["-- เลือกสาขา --"] + available_branch_names, key="f2_br")
                     
-                    # 2. เลือกชนิด/ประเภท (กรองตามสาขา)
                     f2_type_disabled = (f2_branch == "-- เลือกสาขา --")
                     if not f2_type_disabled:
                         filtered_by_branch = [e for e in all_engines if e['branch_name'] == f2_branch]
                         available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
                     else:
-                        available_types = []
-                        filtered_by_branch = []
+                        available_types = []; filtered_by_branch = []
                         
                     f2_type = c_sel2.selectbox("🚜 2. ชนิด / ประเภทรถ *", ["-- เลือกประเภท --"] + available_types, key="f2_ty", disabled=f2_type_disabled)
                     
-                    # 3. เลือกรหัส/ทะเบียนรถ (กรองตามชนิด)
                     f2_code_disabled = (f2_type == "-- เลือกประเภท --") or f2_type_disabled
                     if not f2_code_disabled:
                         filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == f2_type]
                         available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
                     else:
-                        available_codes = []
-                        filtered_by_type = []
+                        available_codes = []; filtered_by_type = []
                         
-                    f2_code = c_sel3.selectbox("🏷️ 3. รหัสงาน / ทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, key="f2_cd", disabled=f2_code_disabled)
-
-                    # 🎯 ล็อกช่องกรอกข้อมูลด้านล่าง หากยังเลือกรถไม่เสร็จ
+                    f2_code = c_sel3.selectbox("🏷️ 3. รหัสงาน / ทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, key=f"f2_cd_{rk2}", disabled=f2_code_disabled)
                     inputs_disabled = (f2_code == "-- เลือกรถ --") or f2_code_disabled
                     
                     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
@@ -192,10 +188,10 @@ def render_engineering_system_tabs(current_branch_name):
                     c1, c2 = st.columns(2)
                     with c1:
                         f_date = st.date_input("วันที่", value=datetime.now(), key="f_date", disabled=inputs_disabled)
-                        f_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณน้ำมัน (ลิตร)", disabled=inputs_disabled)
+                        f_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณน้ำมัน", disabled=inputs_disabled, key=f"t2_lit_{rk2}")
                     with c2:
-                        f_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน (ชม.)", disabled=inputs_disabled)
-                        f_remark = st.text_area("หมายเหตุ", disabled=inputs_disabled)
+                        f_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=inputs_disabled, key=f"t2_hrs_{rk2}")
+                        f_remark = st.text_area("หมายเหตุ", disabled=inputs_disabled, key=f"t2_rem_{rk2}")
                         
                     submit_f = st.button("💾 บันทึกข้อมูลเชื้อเพลิงรถ", use_container_width=True, type="primary", disabled=inputs_disabled)
                     
@@ -217,6 +213,9 @@ def render_engineering_system_tabs(current_branch_name):
                                     st.cache_data.clear()
                                     log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 2 Data Entry", f"บันทึกเชื้อเพลิงรถ {target_engine['engine_code']} จำนวน {f_liters} ลิตร")
                                     st.success(f"✅ บันทึกสำเร็จ! (ทะเบียน: {target_engine['engine_code']} | ประเภท: {target_engine['type_name']})")
+                                    
+                                    # 🌟 2. สั่งบวกเลขเพื่อล้างฟอร์ม
+                                    st.session_state.reset_t2 += 1
                                     time.sleep(1)
                                     st.rerun()
                                 except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
@@ -242,14 +241,18 @@ def render_engineering_system_tabs(current_branch_name):
                         st.write(f"**(สังกัด: {t3_branch_label})**")
                         target_branch_id = branch_dict.get(t3_branch_label, int(st.session_state.branch_id))
 
+                    # 🌟 1. สร้างตัวแปรนับรอบ (Dynamic Key)
+                    if "reset_t3" not in st.session_state: st.session_state.reset_t3 = 0
+                    rk3 = st.session_state.reset_t3
+
                     col1, col2 = st.columns(2)
                     with col1:
                         p_date = st.date_input("วันที่", value=datetime.now(), key="p_date")
-                        total_count = st.number_input("จำนวนครั้งทั้งหมด *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนครั้งทั้งหมด")
+                        total_count = st.number_input("จำนวนครั้งทั้งหมด *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนครั้งทั้งหมด", key=f"t3_tot_{rk3}")
                     with col2:
-                        pm_drop = st.number_input("จำนวนที่ตกตามเงื่อนไข PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกตามเงื่อนไข PM")
-                        non_pm_drop = st.number_input("จำนวนที่ตกนอกเหนือ PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกนอกเหนือ PM")
-                        p_remark = st.text_input("หมายเหตุ (ลากขี้เถ้า / ซ่อมบำรุง)")
+                        pm_drop = st.number_input("จำนวนที่ตกตามเงื่อนไข PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกตามเงื่อนไข PM", key=f"t3_pm_{rk3}")
+                        non_pm_drop = st.number_input("จำนวนที่ตกนอกเหนือ PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกนอกเหนือ PM", key=f"t3_npm_{rk3}")
+                        p_remark = st.text_input("หมายเหตุ (ลากขี้เถ้า / ซ่อมบำรุง)", key=f"t3_rem_{rk3}")
                         
                     submit_p = st.button("💾 บันทึกข้อมูลแรงดันไอน้ำ", use_container_width=True, type="primary")
                     
@@ -269,6 +272,9 @@ def render_engineering_system_tabs(current_branch_name):
                                 st.cache_data.clear()
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 3 Data Entry", f"บันทึกแรงดันไอน้ำตก วันที่ {p_date}")
                                 st.success("✅ บันทึกข้อมูลแรงดันไอน้ำเรียบร้อยแล้ว!")
+                                
+                                # 🌟 2. สั่งบวกเลขเพื่อล้างฟอร์ม
+                                st.session_state.reset_t3 += 1
                                 time.sleep(1)
                                 st.rerun()
                             except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
@@ -296,24 +302,42 @@ def render_engineering_system_tabs(current_branch_name):
                         st.write(f"**(สังกัด: {t4_branch_label})**")
                         target_branch_id = branch_dict.get(t4_branch_label, int(st.session_state.branch_id))
 
+                    boiler_options = []
+                    try:
+                        conn = get_db_connection()
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT CONVERT(boiler_name USING utf8mb4) AS b_name FROM boilers WHERE branch_id = %s AND is_active = 1 ORDER BY id ASC", (target_branch_id,))
+                            for r in cur.fetchall():
+                                if r['b_name']: boiler_options.append(r['b_name'])
+                        conn.close()
+                    except Exception: pass
+                    
+                    if not boiler_options: boiler_options = ["-- ไม่มีข้อมูลบอยเลอร์ --"]
+                    boiler_name_input = st.selectbox("ระบุเครื่องบอยเลอร์ที่ใช้งาน *", boiler_options, key="t4_boiler")
+                    is_boiler_invalid = (boiler_name_input == "-- ไม่มีข้อมูลบอยเลอร์ --")
+
+                    # 🌟 1. สร้างตัวแปรนับรอบ (Dynamic Key)
+                    if "reset_t4" not in st.session_state: st.session_state.reset_t4 = 0
+                    rk4 = st.session_state.reset_t4
+
                     c1, c2, c3 = st.columns(3)
                     with c1:
                         st.write("**📦 ส่วนที่ 4.1: เชื้อเพลิงที่ใช้ (ตัน/วัน)**")
-                        saw_w = st.number_input("น้ำหนักขี้เลื่อย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักขี้เลื่อย")
-                        wood_w = st.number_input("น้ำหนักปีกไม้ (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักปีกไม้")
-                        waste_wood_w = st.number_input("น้ำหนักเศษไม้เสีย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักเศษไม้เสีย")
+                        saw_w = st.number_input("น้ำหนักขี้เลื่อย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักขี้เลื่อย", key=f"t4_sw_{rk4}")
+                        wood_w = st.number_input("น้ำหนักปีกไม้ (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักปีกไม้", key=f"t4_ww_{rk4}")
+                        waste_wood_w = st.number_input("น้ำหนักเศษไม้เสีย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักเศษไม้เสีย", key=f"t4_www_{rk4}")
                     with c2:
                         st.write("**💰 ส่วนที่ 4.2: ราคาเชื้อเพลิง (ต่อตัน)**")
-                        saw_p = st.number_input("ราคาขี้เลื่อย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาขี้เลื่อย")
-                        wood_p = st.number_input("ราคาปีกไม้ (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาปีกไม้")
-                        waste_wood_p = st.number_input("ราคาเศษไม้เสีย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาเศษไม้เสีย")
+                        saw_p = st.number_input("ราคาขี้เลื่อย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาขี้เลื่อย", key=f"t4_sp_{rk4}")
+                        wood_p = st.number_input("ราคาปีกไม้ (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาปีกไม้", key=f"t4_wp_{rk4}")
+                        waste_wood_p = st.number_input("ราคาเศษไม้เสีย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาเศษไม้เสีย", key=f"t4_wwp_{rk4}")
                     with c3:
                         st.write("**💨 ส่วนที่ 4.3: การผลิตไอน้ำ (ตัน/วัน)**")
                         bf_date = st.date_input("วันที่", value=datetime.now(), key="bf_date")
-                        prod_val = st.number_input("ปริมาณการผลิต (ตัน/วัน) *", min_value=0.1, step=1.0, value=None, placeholder="ระบุการผลิตไอน้ำ")
-                        work_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน")
+                        prod_val = st.number_input("ปริมาณการผลิต (ตัน/วัน) *", min_value=0.1, step=1.0, value=None, placeholder="ระบุการผลิตไอน้ำ", key=f"t4_prod_{rk4}")
+                        work_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", key=f"t4_wh_{rk4}")
                         
-                    submit_bf = st.button("💾 บันทึกข้อมูลเชื้อเพลิงบอยเลอร์", use_container_width=True, type="primary")
+                    submit_bf = st.button("💾 บันทึกข้อมูลเชื้อเพลิงบอยเลอร์", use_container_width=True, type="primary", disabled=is_boiler_invalid)
                     
                     if submit_bf:
                         inputs = [saw_w, wood_w, waste_wood_w, saw_p, wood_p, waste_wood_p, prod_val, work_hours]
@@ -323,15 +347,18 @@ def render_engineering_system_tabs(current_branch_name):
                             try:
                                 conn = get_db_connection()
                                 with conn.cursor() as cur:
-                                    sql = """INSERT INTO boiler_fuel_records (branch_id, record_date, sawdust_weight, wood_weight, waste_wood_weight, sawdust_price, wood_price, waste_wood_price, steam_production, working_hours, created_by) 
-                                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                                    cur.execute(sql, (target_branch_id, bf_date, float(saw_w), float(wood_w), float(waste_wood_w), float(saw_p), float(wood_p), float(waste_wood_p), float(prod_val), float(work_hours), int(st.session_state.user_id)))
+                                    sql = """INSERT INTO boiler_fuel_records (branch_id, record_date, boiler_name, sawdust_weight, wood_weight, waste_wood_weight, sawdust_price, wood_price, waste_wood_price, steam_production, working_hours, created_by) 
+                                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                                    cur.execute(sql, (target_branch_id, bf_date, boiler_name_input, float(saw_w), float(wood_w), float(waste_wood_w), float(saw_p), float(wood_p), float(waste_wood_p), float(prod_val), float(work_hours), int(st.session_state.user_id)))
                                 conn.commit()
                                 conn.close()
                                 
                                 st.cache_data.clear()
-                                log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Data Entry", f"บันทึกเชื้อเพลิงบอยเลอร์ วันที่ {bf_date}")
-                                st.success("✅ บันทึกข้อมูลเชื้อเพลิงบอยเลอร์สำเร็จแล้ว!")
+                                log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Data Entry", f"บันทึกเชื้อเพลิง {boiler_name_input} วันที่ {bf_date}")
+                                st.success(f"✅ บันทึกข้อมูลเชื้อเพลิง {boiler_name_input} สำเร็จแล้ว!")
+                                
+                                # 🌟 2. สั่งบวกเลขเพื่อล้างฟอร์ม
+                                st.session_state.reset_t4 += 1
                                 time.sleep(1)
                                 st.rerun()
                             except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")

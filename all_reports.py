@@ -218,8 +218,25 @@ def update_record_dialog_t3(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 4)", width="large")
 def update_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
+    branch_id = row_data.get('branch_id')
+    
+    # 🎯 ดึงชื่อบอยเลอร์เฉพาะสาขานี้มาเป็นตัวเลือกตอนแก้ไข
+    b_options = []
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT CONVERT(boiler_name USING utf8mb4) AS b_name FROM boilers WHERE branch_id = %s AND is_active = 1", (branch_id,))
+            b_options = [r['b_name'] for r in cur.fetchall()]
+        conn.close()
+    except Exception: pass
+    
+    if not b_options: b_options = [str(row_data.get('boiler_name') or 'ไม่ระบุ')]
+    current_b = str(row_data.get('boiler_name') or b_options[0])
+    b_idx = b_options.index(current_b) if current_b in b_options else 0
+
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขา: {row_data.get('branch_name')}")
     with st.form(f"u_form4_{rec_id}", clear_on_submit=False):
+        e_boiler = st.selectbox("แก้ไข บอยเลอร์", b_options, index=b_idx)
         c1, c2, c3 = st.columns(3)
         with c1:
             e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
@@ -240,13 +257,12 @@ def update_record_dialog_t4(row_data, pk_col):
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute(f"""UPDATE boiler_fuel_records SET record_date=%s, sawdust_weight=%s, wood_weight=%s, waste_wood_weight=%s, 
+                    cur.execute(f"""UPDATE boiler_fuel_records SET record_date=%s, boiler_name=%s, sawdust_weight=%s, wood_weight=%s, waste_wood_weight=%s, 
                                    sawdust_price=%s, wood_price=%s, waste_wood_price=%s, steam_production=%s, working_hours=%s WHERE {pk_col}=%s""",
-                                (e_date, e_saw_w, e_wood_w, e_waste_w, e_saw_p, e_wood_p, e_waste_p, e_prod, e_hrs, rec_id))
+                                (e_date, e_boiler, e_saw_w, e_wood_w, e_waste_w, e_saw_p, e_wood_p, e_waste_p, e_prod, e_hrs, rec_id))
                     conn.commit()
                 conn.close()
                 st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4", f"แก้ไข ID: {rec_id}")
                 st.success("✅ อัปเดตข้อมูลสำเร็จ!")
                 time.sleep(1)
                 st.rerun()
@@ -256,6 +272,19 @@ def update_record_dialog_t4(row_data, pk_col):
 def show_summary_report_dialog(html_content):
     components.html(html_content, height=650, scrolling=True)
 
+@st.dialog("📊 หน้าต่างดูสรุปรายงาน", width="large")
+def show_summary_report_dialog_t4(boiler_dict):
+    boilers = list(boiler_dict.keys())
+    if not boilers:
+        st.info("ไม่มีข้อมูลรายงาน")
+        return
+        
+    tab_names = [f"🔥 ข้อมูล {b_name}" for b_name in boilers]
+    tabs = st.tabs(tab_names)
+    
+    for idx, b_name in enumerate(boilers):
+        with tabs[idx]:
+            st.components.v1.html(boiler_dict[b_name], height=600, scrolling=True)
 
 # ==========================================================
 # 🚀 3. ฟังก์ชัน CACHE ประมวลผลข้อมูล
@@ -955,59 +984,259 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         conn = get_db_connection()
         with conn.cursor() as cur:
             if b_id_t4 == "ทั้งหมด":
-                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"
+                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
             elif b_id_t4 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
-                sql = f"SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"
+                sql = f"SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
             else:
-                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date DESC"
+                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (b_id_t4, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
-    except Exception:
-        return [], None, None
-
+    except Exception: return [], None, None
+    
     if not raw_data: return [], None, None
 
-    pk_col = list(raw_data[0].keys())[0]
-
+    # 🎯 1. จัดเตรียมข้อมูลพื้นฐาน
     std_fuel_val = 280.00
-    df_display = []
-    for r in raw_data:
-        s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
-        s_p, w_p, ww_p = float(r.get('sawdust_price') or 0.0), float(r.get('wood_price') or 0.0), float(r.get('waste_wood_price') or 0.0)
-        steam_prod, w_hours = float(r.get('steam_production') or 1.0), float(r.get('working_hours') or 1.0)
-        
-        tot_w, tot_p = s_w + w_w + ww_w, s_p + w_p + ww_p
-        act_r = (tot_w / steam_prod) * 1000 if steam_prod > 0 else 0.0
-        
-        df_display.append({
-            'ID รายการ': r[pk_col], 'วันที่': str(r.get('record_date')), 'สาขา': r.get('branch_name'),
-            'นหน.ขี้เลื่อย (ตัน)': s_w, 'นหน.ปีกไม้ (ตัน)': w_w, 'นหน.เศษไม้เสีย (ตัน)': ww_w,
-            '4.1 รวมน้ำหนักเชื้อเพลิง (ตัน)': round(tot_w, 2),
-            'ราคาขี้เลื่อย (บาท)': s_p, 'ราคาปีกไม้ (บาท)': w_p, 'ราคาเศษไม้เสีย (บาท)': ww_p,
-            '4.2 รวมราคาเชื้อเพลิง (บาท)': round(tot_p, 2),
-            'ผลิตไอน้ำ (ตัน/วัน)': steam_prod, 'ชม.ทำงาน': w_hours,
-            '4.3 ตันต่อชั่วโมง': round(steam_prod/w_hours, 2) if w_hours > 0 else 0.0,
-            '4.4 ค่าเชื้อเพลิง (บาท/ตันไอน้ำ)': round(tot_p/steam_prod, 2) if steam_prod > 0 else 0.0,
-            '4.5 ผลงาน (กก./ตันไอน้ำ)': round(act_r, 2), '4.5 ผลต่าง (STD-ผลงาน)': round(std_fuel_val - act_r, 2)
-        })
-
-    buffer = io.BytesIO()
-    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-        pd.DataFrame(df_display).to_excel(writer, index=False, sheet_name='Boiler Fuel Report')
-    
-    table_html = pd.DataFrame(df_display).to_html(index=False, classes='report-table')
-    
     start_dt = pd.to_datetime(start_date_str)
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
 
-    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 10px; color: #000000 !important; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; border: 1px solid #000; padding: 6px; font-size: 11px; text-align: center; color: #000000 !important; }} th {{ background-color: #E2EFDA; color: #000000 !important; }}</style></head><body><div class='header-title'>รายงานสรุปเชื้อเพลิงบอยเลอร์ สาขา {selected_branch_display} <br>ประจำเดือน {month_str} {year_buddhist}</div>{table_html}</body></html>"
+    # จัดกลุ่มข้อมูลตามชื่อบอยเลอร์
+    grouped_data = {}
+    for r in raw_data:
+        b_name = str(r.get('boiler_name') or 'บอยเลอร์ 1')
+        if b_name not in grouped_data: grouped_data[b_name] = []
+        grouped_data[b_name].append(r)
+
+    # 🎯 2. เตรียมสร้าง Excel และ HTML
+    wb = Workbook()
+    wb.remove(wb.active) # ลบชีตเริ่มต้นทิ้ง
     
-    return raw_data, buffer.getvalue(), json.dumps(table_full_html)
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    f_b = Font(name="Tahoma", size=10, bold=True)
+    f_w = Font(name="Tahoma", size=10, bold=True, color="FFFFFF")
+    f_n = Font(name="Tahoma", size=10)
+    f_red = Font(name="Tahoma", size=10, color="FF0000")
+    f_red_bold_ul = Font(name="Tahoma", size=10, bold=True, color="FF0000", underline="single")
+    f_bold_ul = Font(name="Tahoma", size=10, bold=True, underline="single")
+    
+    al_c = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    al_r = Alignment(horizontal="right", vertical="center")
+    tb = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
+    
+    fill_blue = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
+    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    fill_green = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
+    fill_peach = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    fill_grey = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
+
+    html_tables = ""
+    boilers_html_dict = {}
+
+    # 🎯 3. วนลูปสร้างตารางทีละบอยเลอร์
+    for boiler_name in sorted(grouped_data.keys()):
+        data_list = grouped_data[boiler_name]
+        ws = wb.create_sheet(title=boiler_name)
+
+        # --- สร้าง Header Excel ---
+        ws.merge_cells("A1:O1")
+        ws["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}"
+        ws["A1"].font = f_w; ws["A1"].fill = fill_blue; ws["A1"].alignment = al_c
+
+        headers_merge = [("A2:A3","วันที่"), ("B2:D2","เชื้อเพลิงใช้(ตัน/วัน)"), ("E2:E3","รวม น.น.\nเชื้อเพลิง"), 
+                         ("F2:I2","ค่าเชื้อเพลิง(บาท)"), ("J2:K2","ผลิตไอน้ำ"), ("L2:L3","ค่าเชื้อเพลิง\n(บาท/ตันไอน้ำ)"), 
+                         ("M2:O2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)")]
+        for cell_r, val in headers_merge: 
+            ws.merge_cells(cell_r); ws[cell_r.split(":")[0]] = val
+        
+        h3 = ["", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", "ตัน/วัน", "ตัน/ชม.", "", "STD", "ผลงาน", "ผลต่าง"]
+        for idx, val in enumerate(h3, 1):
+            if val: ws.cell(row=3, column=idx, value=val)
+
+        for r_idx in [2, 3]:
+            for c_idx in range(1, 16):
+                cell = ws.cell(row=r_idx, column=c_idx)
+                cell.font = f_b; cell.alignment = al_c; cell.border = tb
+
+        # --- สร้าง Header HTML ---
+        html_headers = """
+        <tr>
+            <th rowspan="2">วันที่</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวม น.น.<br>เชื้อเพลิง</th>
+            <th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="2">ผลิตไอน้ำ</th><th rowspan="2">ค่าเชื้อเพลิง<br>(บาท/ตันไอน้ำ)</th>
+            <th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th>
+        </tr>
+        <tr>
+            <th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th>
+            <th>ตัน/วัน</th><th>ตัน/ชม.</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th>
+        </tr>
+        """
+
+        cur_row = 4
+        body_html = ""
+        sum_sw = sum_ww = sum_www = sum_tot_w = sum_sp = sum_wp = sum_wwp = sum_tot_p = sum_steam = sum_hrs = 0
+        
+        # --- ใส่ข้อมูลแถวต่างๆ ---
+        for r in data_list:
+            dt = pd.to_datetime(r['record_date'])
+            date_str = f"{dt.month}/{dt.day}/{dt.year+543}"
+            
+            s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0), float(r.get('wood_weight') or 0), float(r.get('waste_wood_weight') or 0)
+            s_p, w_p, ww_p = float(r.get('sawdust_price') or 0), float(r.get('wood_price') or 0), float(r.get('waste_wood_price') or 0)
+            stm, hrs = float(r.get('steam_production') or 0), float(r.get('working_hours') or 0)
+            
+            t_w, t_p = (s_w + w_w + ww_w), (s_p + w_p + ww_p)
+            stm_hr = stm / hrs if hrs > 0 else 0
+            cost_ton = t_p / stm if stm > 0 else 0
+            fuel_ton = (t_w * 1000) / stm if stm > 0 else 0
+            diff = std_fuel_val - fuel_ton
+            
+            sum_sw+=s_w; sum_ww+=w_w; sum_www+=ww_w; sum_tot_w+=t_w; sum_sp+=s_p; sum_wp+=w_p; sum_wwp+=ww_p; sum_tot_p+=t_p; sum_steam+=stm; sum_hrs+=hrs
+
+            row_vals = [date_str, s_w, w_w, ww_w, t_w, s_p, w_p, ww_p, t_p, stm, stm_hr, cost_ton, std_fuel_val, fuel_ton, diff]
+            
+            body_html += "<tr>"
+            for idx, val in enumerate(row_vals, 1):
+                c = ws.cell(row=cur_row, column=idx, value=val)
+                c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
+                
+                # จัดสีไฮไลท์
+                if idx in [2, 3, 4, 10]: c.fill = fill_yellow
+                if idx == 13: c.fill = fill_green; c.font = f_w
+                if isinstance(val, (int, float)): c.number_format = '#,##0.000' if idx == 3 else '#,##0.00'
+                
+                # HTML Styling
+                bg = "background-color:#FFFF00;" if idx in [2,3,4,10] else ("background-color:#00B050;color:white;" if idx==13 else "")
+                tc = "color:red;" if idx==15 and val<0 else ""
+                fw = "font-weight:bold;" if idx in [5,9] else ""
+                format_str = '{:,.3f}' if idx == 3 else '{:,.2f}'
+                body_html += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else format_str.format(val)}</td>"
+            body_html += "</tr>"
+            cur_row += 1
+
+        # --- แถวสรุปผลรวม (Footer) ---
+        avg_stm_hr = sum_steam / sum_hrs if sum_hrs > 0 else 0
+        avg_cost_ton = sum_tot_p / sum_steam if sum_steam > 0 else 0
+        avg_fuel_ton = (sum_tot_w * 1000) / sum_steam if sum_steam > 0 else 0
+        avg_diff = std_fuel_val - avg_fuel_ton
+        
+        pct_sw = (sum_sw / sum_tot_w) if sum_tot_w > 0 else 0
+        pct_ww = (sum_ww / sum_tot_w) if sum_tot_w > 0 else 0
+        pct_www = (sum_www / sum_tot_w) if sum_tot_w > 0 else 0
+        
+        pct_sp = (sum_sp / sum_tot_p) if sum_tot_p > 0 else 0
+        pct_wp = (sum_wp / sum_tot_p) if sum_tot_p > 0 else 0
+        pct_wwp = (sum_wwp / sum_tot_p) if sum_tot_p > 0 else 0
+        
+        # 🎯 3.1 สร้าง Footer แถวที่ 1 (รวมทั้งหมด)
+        ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row+1, end_column=1)
+        c_title = ws.cell(row=cur_row, column=1, value="รวมทั้งหมด")
+        c_title.alignment = al_c; c_title.fill = fill_peach; c_title.border = tb
+        c_title.font = f_bold_ul
+        ws.cell(row=cur_row+1, column=1).border = tb 
+        
+        f1_vals = ["", sum_sw, sum_ww, sum_www, sum_tot_w, sum_sp, sum_wp, sum_wwp, sum_tot_p, sum_steam, avg_stm_hr, avg_cost_ton, std_fuel_val, avg_fuel_ton, avg_diff]
+        for idx in range(2, 16):
+            val = f1_vals[idx-1]
+            c = ws.cell(row=cur_row, column=idx, value=val)
+            c.border, c.font, c.alignment = tb, f_b, al_r
+            if isinstance(val, (int, float)): c.number_format = '#,##0.000' if idx == 3 else '#,##0.00'
+            if idx == 9: c.font = f_red
+            if idx == 11: c.fill = fill_yellow
+            if idx == 14: c.font = f_bold_ul
+            if idx == 15 and val < 0: c.font = f_red
+
+        # 🎯 3.2 สร้าง Footer แถวที่ 2 (เปอร์เซ็นต์สัดส่วน)
+        f2_vals = ["", pct_sw, pct_ww, pct_www, 1.0, pct_sp, pct_wp, pct_wwp, 1.0, "", "", "", "", "", ""]
+        for idx in range(2, 16):
+            val = f2_vals[idx-1]
+            c = ws.cell(row=cur_row+1, column=idx, value=val)
+            c.border, c.font, c.alignment = tb, f_b, al_r
+            if isinstance(val, float): c.number_format = '0.00%'
+            if idx in [5, 9]: c.font = f_red_bold_ul
+            if idx >= 10: c.fill = fill_grey
+
+        # 🎯 3.3 สร้าง Footer แถวที่ 3 (ป้ายกำกับ สัดส่วน(%))
+        c_prop = ws.cell(row=cur_row+2, column=1, value="สัดส่วน(%)")
+        c_prop.font = f_n; c_prop.alignment = al_c; c_prop.border = tb
+        for idx in range(2, 16):
+            ws.cell(row=cur_row+2, column=idx).border = tb
+        
+        # 🎯 HTML สำหรับ Print Preview
+        footer_html = f"""
+        <tr style="font-weight:bold;">
+            <td rowspan="2" style="background-color:#FCE4D6; text-align:center; vertical-align:middle; text-decoration:underline;">รวมทั้งหมด</td>
+            <td style="text-align:right;">{sum_sw:,.2f}</td>
+            <td style="text-align:right;">{sum_ww:,.3f}</td>
+            <td style="text-align:right;">{sum_www:,.2f}</td>
+            <td style="text-align:right;">{sum_tot_w:,.2f}</td>
+            <td style="text-align:right;">{sum_sp:,.2f}</td>
+            <td style="text-align:right;">{sum_wp:,.2f}</td>
+            <td style="text-align:right;">{sum_wwp:,.2f}</td>
+            <td style="text-align:right; color:red;">{sum_tot_p:,.2f}</td>
+            <td style="text-align:right;">{sum_steam:,.2f}</td>
+            <td style="text-align:right; background-color:#FFFF00;">{avg_stm_hr:,.2f}</td>
+            <td style="text-align:right;">{avg_cost_ton:,.2f}</td>
+            <td style="text-align:right;">{std_fuel_val:,.2f}</td>
+            <td style="text-align:right; text-decoration:underline;">{avg_fuel_ton:,.2f}</td>
+            <td style="text-align:right; color:{'red' if avg_diff < 0 else 'black'};">{avg_diff:,.2f}</td>
+        </tr>
+        <tr style="font-weight:bold;">
+            <td style="text-align:right;">{pct_sw*100:,.2f}%</td>
+            <td style="text-align:right;">{pct_ww*100:,.2f}%</td>
+            <td style="text-align:right;">{pct_www*100:,.2f}%</td>
+            <td style="text-align:right; color:red; text-decoration:underline;">100%</td>
+            <td style="text-align:right;">{pct_sp*100:,.2f}%</td>
+            <td style="text-align:right;">{pct_wp*100:,.2f}%</td>
+            <td style="text-align:right;">{pct_wwp*100:,.2f}%</td>
+            <td style="text-align:right; color:red; text-decoration:underline;">100%</td>
+            <td colspan="6" style="background-color:#D9D9D9;"></td>
+        </tr>
+        <tr>
+            <td style="text-align:center;">สัดส่วน(%)</td>
+            <td colspan="14"></td>
+        </tr>
+        """
+        
+        # ปรับความกว้างคอลัมน์ Excel
+        for col_letter in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O']:
+            ws.column_dimensions[col_letter].width = 11
+        ws.column_dimensions['A'].width = 13
+        
+        html_table = f"""
+        <table style='margin-bottom: 30px;'>
+            <thead>
+                <tr><th colspan='15' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}</th></tr>
+                {html_headers}
+            </thead>
+            <tbody>
+                {body_html}
+                {footer_html}
+            </tbody>
+        </table>
+        """
+        html_tables += html_table
+        
+        # เก็บ HTML ย่อยแต่ละบอยเลอร์
+        single_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_table}</body></html>"""
+        boilers_html_dict[boiler_name] = single_html
+
+    # 🎯 4. รวบรวมข้อมูล HTML ทั้งหมดเป็น JSON
+    full_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"""
+
+    final_json_data = {
+        "full_print_html": full_html,
+        "boilers": boilers_html_dict
+    }
+
+    excel_buffer = io.BytesIO()
+    wb.save(excel_buffer)
+    
+    return raw_data, excel_buffer.getvalue(), json.dumps(final_json_data)
+
 
 # ==========================================================
 # 📊 4. ฟังก์ชันหลักสำหรับ Render Report Tabs
@@ -1308,56 +1537,77 @@ def render_all_reports_module(user_branch_name):
                     if current_role in ["admin", "reporter"]:
                         b_label_t4 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s4")
                         b_id_t4 = "ทั้งหมด" if b_label_t4 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t4]
+                        selected_branch_display = b_label_t4 if b_label_t4 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
                     elif len(user_allowed_branches) > 1:
                         allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
                         b_label_t4 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s4")
                         b_id_t4 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t4 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t4]
+                        selected_branch_display = b_label_t4 if b_label_t4 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
                     else:
                         st.info(f"📍 สังกัด: {user_branch_name}")
                         b_id_t4 = st.session_state.branch_id
+                        selected_branch_display = user_branch_name
 
                 raw_data_t4, excel_data_t4, json_html_t4 = process_t4(b_id_t4, str(start_date_t4), str(end_date_t4), tuple(user_allowed_branches), selected_branch_display)
 
                 if raw_data_t4:
                     pk_col_t4 = list(raw_data_t4[0].keys())[0]
                     
-                    ROWS_PER_PAGE = 15
-                    total_pages_t4 = max(1, (len(raw_data_t4) - 1) // ROWS_PER_PAGE + 1)
-                    
-                    pc1, pc2 = st.columns([7, 3])
-                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t4)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages_t4 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t4}", key=f"pg_t4_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(raw_data_t4)}", label_visibility="collapsed")
-                    
-                    paginated_t4 = raw_data_t4[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
+                    # 🎯 หาชื่อบอยเลอร์ทั้งหมดที่มีในข้อมูลชุดนี้มาสร้างแท็บอัตโนมัติ
+                    unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4])))
+                    tabs_list = st.tabs([f"🔥 ข้อมูล {b}" for b in unique_boilers])
 
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                    headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                    # 🎯 ฟังก์ชันสำหรับสร้างตาราง
+                    def render_boiler_table(data_list, boiler_label):
+                        if not data_list:
+                            st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
+                            return
 
-                    with st.container(height=380, border=False):
-                        for r in paginated_t4:
-                            rec_id = r[pk_col_t4]
-                            s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
-                            tot_w = s_w + w_w + ww_w
-                            s_prod = float(r.get('steam_production') or 1.0)
-                            cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                            cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                            cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
-                            
-                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                            if can_crud:
-                                c_edit, c_del = cols[7].columns(2, gap="small")
-                                if c_edit.button("✏️", key=f"e4_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
-                                if c_del.button("🗑️", key=f"d4_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
-                            else: cols[7].write("-")
-                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                        ROWS_PER_PAGE = 15
+                        total_pages = max(1, (len(data_list) - 1) // ROWS_PER_PAGE + 1)
+                        
+                        pc1, pc2 = st.columns([7, 3])
+                        with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(data_list)}</b> รายการ</div>", unsafe_allow_html=True)
+                        with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_t4_{boiler_label}_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(data_list)}", label_visibility="collapsed")
+                        
+                        paginated_t4 = data_list[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
+
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                        headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
+                        for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+
+                        with st.container(height=380, border=False):
+                            for r in paginated_t4:
+                                rec_id = r[pk_col_t4]
+                                s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
+                                tot_w = s_w + w_w + ww_w
+                                s_prod = float(r.get('steam_production') or 1.0)
+                                cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                                cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                                cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
+                                
+                                can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                                if can_crud:
+                                    c_edit, c_del = cols[7].columns(2, gap="small")
+                                    if c_edit.button("✏️", key=f"e4_{boiler_label}_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
+                                    if c_del.button("🗑️", key=f"d4_{boiler_label}_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
+                                else: cols[7].write("-")
+                                st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                    # 🎯 สั่ง Render ตารางลงในแต่ละแท็บย่อย
+                    for idx, boiler_label in enumerate(unique_boilers):
+                        with tabs_list[idx]:
+                            data_boiler = [r for r in raw_data_t4 if str(r.get('boiler_name') or 'ไม่ระบุ') == boiler_label]
+                            render_boiler_table(data_boiler, boiler_label)
 
                     st.write("")
                     col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
                     with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
                     with col_btn2: 
-                        if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): show_summary_report_dialog(json.loads(json_html_t4))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview4(){{var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); w.document.write({json_html_t4}); w.document.close(); w.print();}}</script>""", height=50)
+                        if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 
+                            parsed_data = json.loads(json_html_t4)
+                            show_summary_report_dialog_t4(parsed_data["boilers"])
+                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview4(){{var data = {json_html_t4}; var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); w.document.write(data.full_print_html); w.document.close(); w.print();}}</script>""", height=50)
                 else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
