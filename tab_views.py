@@ -284,23 +284,54 @@ def render_engineering_system_tabs(current_branch_name):
         # =========================================================================
         elif key == "4":
             with current_tab_ctx:
-                st.header("4. SYSTEM - การใช้เชื้อเพลิงบอยเลอร์")
-                std_fuel_val = 280.00
-                st.info(f"ค่ามาตรฐาน (STD เชื้อเพลิง) ปัจจุบันกำหนดไว้ที่: **{std_fuel_val:.2f}** กิโลกรัม/ตันไอน้ำ")
+                st.subheader("4. SYSTEM - การใช้เชื้อเพลิงบอยเลอร์")
+                """
+                # 🎯 1. ดึงค่า STD จากฐานข้อมูลแบบ Real-time มาแสดงที่กล่องสีฟ้า
+                std_fuel_val = 280.00 # ค่าสำรองฉุกเฉิน
+                try:
+                    conn = get_db_connection()
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT std_fuel_kg_per_steam_ton FROM std_settings WHERE id = 1")
+                        std_res = cur.fetchone()
+                        if std_res: std_fuel_val = float(std_res['std_fuel_kg_per_steam_ton'])
+                    conn.close()
+                except Exception: pass
                 
-                if current_role == 'admin': available_options = list(branch_dict.keys())
-                else: available_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+                st.info(f"ค่ามาตรฐาน (STD เชื้อเพลิง) ปัจจุบันกำหนดไว้ที่: **{std_fuel_val:,.2f}** กิโลกรัม/ตันไอน้ำ")
+                """
 
                 with st.container(border=True):
-                    st.write("### 📝 บันทึกปริมาณเชื้อเพลิงรายวัน")
+                    st.write("### 📝 บันทึกปริมาณเชื้อเพลิงและข้อมูลประจำวัน")
                     
-                    if len(available_options) > 1:
-                        t4_branch_label = st.selectbox("ระบุสาขาที่ต้องการบันทึก *", options=available_options, key="t4_branch")
-                        target_branch_id = branch_dict[t4_branch_label]
-                    else:
-                        t4_branch_label = available_options[0] if available_options else current_branch_name
-                        st.write(f"**(สังกัด: {t4_branch_label})**")
-                        target_branch_id = branch_dict.get(t4_branch_label, int(st.session_state.branch_id))
+                    c_top1, c_top2 = st.columns([1.5, 1])
+                    with c_top1:
+                        if len(available_options) > 1:
+                            t4_branch_label = st.selectbox("ระบุสาขาที่ต้องการบันทึก *", options=available_options, key="t4_branch")
+                            target_branch_id = branch_dict[t4_branch_label]
+                        else:
+                            t4_branch_label = available_options[0] if available_options else current_branch_name
+                            st.write(f"**(สังกัด: {t4_branch_label})**")
+                            target_branch_id = branch_dict.get(t4_branch_label, int(st.session_state.branch_id))
+                    with c_top2:
+                        # 🎯 ย้ายวันที่มาไว้บนสุด เพื่อให้ใช้ร่วมกันทั้งบล็อกสรุปสาขาและบล็อกบอยเลอร์
+                        bf_date = st.date_input("วันที่", value=datetime.now(), key="bf_date")
+
+                    if "reset_t4" not in st.session_state: st.session_state.reset_t4 = 0
+                    rk4 = st.session_state.reset_t4
+
+                    # 🎯 1. สร้าง Block แบบ DropDown (Expander) สำหรับข้อมูลรวมสาขา
+                    with st.expander("📁 บันทึกข้อมูลยอดรวมของสาขาประจำวัน (เตา, ไม้อบ, แรงดัน) - คลิกเพื่อเปิด/ปิด", expanded=True):
+                        c_ov1, c_ov2, c_ov3 = st.columns(3)
+                        with c_ov1:
+                            oven_qty = st.number_input("จำนวนเตาที่อบ (เตา) *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนเตา", key=f"t4_ov_{rk4}")
+                        with c_ov2:
+                            wood_out = st.number_input("ไม้อบออก (ลบ.ฟ.) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณ", key=f"t4_wo_{rk4}")
+                        with c_ov3:
+                            # 🎯 เพิ่มช่องเก็บแรงดันปลายทางเฉลี่ย
+                            avg_pressure = st.number_input("แรงดันปลายทางเฉลี่ย *", min_value=0.0, step=0.1, value=None, placeholder="ระบุแรงดัน", key=f"t4_avgp_{rk4}")
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    st.write("#### 🏭 ข้อมูลเชื้อเพลิงแยกตามบอยเลอร์")
 
                     boiler_options = []
                     try:
@@ -313,12 +344,9 @@ def render_engineering_system_tabs(current_branch_name):
                     except Exception: pass
                     
                     if not boiler_options: boiler_options = ["-- ไม่มีข้อมูลบอยเลอร์ --"]
+                    
                     boiler_name_input = st.selectbox("ระบุเครื่องบอยเลอร์ที่ใช้งาน *", boiler_options, key="t4_boiler")
                     is_boiler_invalid = (boiler_name_input == "-- ไม่มีข้อมูลบอยเลอร์ --")
-
-                    # 🌟 1. สร้างตัวแปรนับรอบ (Dynamic Key)
-                    if "reset_t4" not in st.session_state: st.session_state.reset_t4 = 0
-                    rk4 = st.session_state.reset_t4
 
                     c1, c2, c3 = st.columns(3)
                     with c1:
@@ -333,31 +361,37 @@ def render_engineering_system_tabs(current_branch_name):
                         waste_wood_p = st.number_input("ราคาเศษไม้เสีย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาเศษไม้เสีย", key=f"t4_wwp_{rk4}")
                     with c3:
                         st.write("**💨 ส่วนที่ 4.3: การผลิตไอน้ำ (ตัน/วัน)**")
-                        bf_date = st.date_input("วันที่", value=datetime.now(), key="bf_date")
                         prod_val = st.number_input("ปริมาณการผลิต (ตัน/วัน) *", min_value=0.1, step=1.0, value=None, placeholder="ระบุการผลิตไอน้ำ", key=f"t4_prod_{rk4}")
                         work_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", key=f"t4_wh_{rk4}")
                         
-                    submit_bf = st.button("💾 บันทึกข้อมูลเชื้อเพลิงบอยเลอร์", use_container_width=True, type="primary", disabled=is_boiler_invalid)
+                    submit_bf = st.button("💾 บันทึกข้อมูล", use_container_width=True, type="primary", disabled=is_boiler_invalid)
                     
                     if submit_bf:
-                        inputs = [saw_w, wood_w, waste_wood_w, saw_p, wood_p, waste_wood_p, prod_val, work_hours]
+                        # 🎯 ตรวจสอบข้อมูลทั้งหมดรวมถึงช่องที่เพิ่มใหม่
+                        inputs = [oven_qty, wood_out, avg_pressure, saw_w, wood_w, waste_wood_w, saw_p, wood_p, waste_wood_p, prod_val, work_hours]
                         if any(x is None for x in inputs):
                             st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                         else:
                             try:
                                 conn = get_db_connection()
                                 with conn.cursor() as cur:
-                                    sql = """INSERT INTO boiler_fuel_records (branch_id, record_date, boiler_name, sawdust_weight, wood_weight, waste_wood_weight, sawdust_price, wood_price, waste_wood_price, steam_production, working_hours, created_by) 
-                                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-                                    cur.execute(sql, (target_branch_id, bf_date, boiler_name_input, float(saw_w), float(wood_w), float(waste_wood_w), float(saw_p), float(wood_p), float(waste_wood_p), float(prod_val), float(work_hours), int(st.session_state.user_id)))
+                                    # 1. บันทึกข้อมูลภาพรวมสาขา (เตา, ไม้, แรงดัน)
+                                    sql_oven = """INSERT INTO daily_wood_oven_records (branch_id, record_date, oven_qty, wood_out_cubft, avg_terminal_pressure, created_by)
+                                                  VALUES (%s, %s, %s, %s, %s, %s)
+                                                  ON DUPLICATE KEY UPDATE oven_qty=VALUES(oven_qty), wood_out_cubft=VALUES(wood_out_cubft), avg_terminal_pressure=VALUES(avg_terminal_pressure)"""
+                                    cur.execute(sql_oven, (target_branch_id, bf_date, int(oven_qty), float(wood_out), float(avg_pressure), int(st.session_state.user_id)))
+
+                                    # 2. บันทึกข้อมูล เชื้อเพลิงบอยเลอร์ แยกเครื่อง
+                                    sql_fuel = """INSERT INTO boiler_fuel_records (branch_id, record_date, boiler_name, sawdust_weight, wood_weight, waste_wood_weight, sawdust_price, wood_price, waste_wood_price, steam_production, working_hours, created_by) 
+                                                  VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+                                    cur.execute(sql_fuel, (target_branch_id, bf_date, boiler_name_input, float(saw_w), float(wood_w), float(waste_wood_w), float(saw_p), float(wood_p), float(waste_wood_p), float(prod_val), float(work_hours), int(st.session_state.user_id)))
                                 conn.commit()
                                 conn.close()
                                 
                                 st.cache_data.clear()
-                                log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Data Entry", f"บันทึกเชื้อเพลิง {boiler_name_input} วันที่ {bf_date}")
-                                st.success(f"✅ บันทึกข้อมูลเชื้อเพลิง {boiler_name_input} สำเร็จแล้ว!")
+                                log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Data Entry", f"บันทึกข้อมูลวันที่ {bf_date}")
+                                st.success(f"✅ บันทึกข้อมูลสำเร็จแล้ว!")
                                 
-                                # 🌟 2. สั่งบวกเลขเพื่อล้างฟอร์ม
                                 st.session_state.reset_t4 += 1
                                 time.sleep(1)
                                 st.rerun()
