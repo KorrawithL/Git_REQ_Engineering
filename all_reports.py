@@ -120,153 +120,280 @@ def delete_record_dialog_t4(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 1)", width="large")
 def update_record_dialog_t1(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่อง: {row_data.get('machine_name')} ({row_data.get('branch_name')})")
-    with st.form(f"u_form1_{rec_id}", clear_on_submit=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
-            e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
-        with col2:
-            e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), format="%.2f")
-            e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), format="%.2f")
-        e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
-        
-        if st.form_submit_button("💾 บันทึกการแก้ไข", use_container_width=True):
-            try:
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute(f"UPDATE machine_trans SET record_date=%s, machine_qty=%s, working_hours=%s, breakdown_hours=%s, remarks=%s, updated_at=NOW() WHERE {pk_col}=%s",
-                                (e_date, e_qty, e_work, e_break, e_rem, rec_id))
-                    conn.commit()
-                conn.close()
-                st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 1", f"แก้ไข ID: {rec_id}")
-                st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e: st.error(f"Error: {e}")
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่องเดิม: {row_data.get('machine_name')} ({row_data.get('branch_name')})")
+    
+    # 🎯 ตรวจสอบสิทธิ์และสร้างตัวเลือกสาขา (Dynamic)
+    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
+    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
+        edit_branch_options = list(branch_dict.keys())
+    else: 
+        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    
+    curr_branch = str(row_data.get('branch_name') or '')
+    def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
+    
+    c_top1, c_top2 = st.columns([1.5, 1.5])
+    with c_top1:
+        e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e1_br_{rec_id}")
+        new_branch_id = branch_dict[e_branch_lbl]
+    
+    # 🎯 ดึงรายชื่อเครื่องจักรใหม่ตามสาขาที่เลือก
+    m_dict = {}
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS m_name FROM machines_set WHERE branch_id = %s AND machine_type = 'machine' AND is_active = 1", (new_branch_id,))
+            for m in cur.fetchall(): m_dict[m['m_name']] = m['id']
+        conn.close()
+    except Exception: pass
+    
+    m_options = list(m_dict.keys())
+    if not m_options: m_options = ["-- ไม่พบเครื่องจักร --"]
+    
+    curr_m = str(row_data.get('machine_name') or '')
+    def_m_idx = m_options.index(curr_m) if (curr_m in m_options and e_branch_lbl == curr_branch) else 0
+    
+    with c_top2:
+        e_machine_lbl = st.selectbox("⚙️ 2. แก้ไขเครื่องจักร *", m_options, index=def_m_idx, key=f"e1_m_{rec_id}")
+    
+    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
+        e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
+    with col2:
+        e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), format="%.2f")
+        e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), format="%.2f")
+    e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
+    
+    btn_disabled = (e_machine_lbl == "-- ไม่พบเครื่องจักร --")
+    if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
+        try:
+            new_m_id = m_dict.get(e_machine_lbl, row_data.get('machine_id'))
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute(f"UPDATE machine_trans SET branch_id=%s, machine_id=%s, record_date=%s, machine_qty=%s, working_hours=%s, breakdown_hours=%s, remarks=%s, updated_at=NOW() WHERE {pk_col}=%s",
+                            (new_branch_id, new_m_id, e_date, e_qty, e_work, e_break, e_rem, rec_id))
+                conn.commit()
+            conn.close()
+            st.cache_data.clear()
+            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 1", f"แก้ไข ID: {rec_id}")
+            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 2)", width="large")
 def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียน: {row_data.get('engine_code')} ({row_data.get('branch_name')})")
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียนเดิม: {row_data.get('engine_code')} ({row_data.get('branch_name')})")
     
-    curr_code = str(row_data.get('engine_code') or '')
+    # 🎯 ดึงข้อมูลรถทั้งหมดจาก DB เพื่อมาสร้าง Dropdown แบบ 3 ขั้นตอน (Dynamic)
+    all_engines = []
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            sql = """SELECT CONVERT(e.machine_name USING utf8mb4) AS engine_code, 
+                            CONVERT(et.type_name USING utf8mb4) AS type_name, 
+                            CONVERT(b.branch_name USING utf8mb4) AS branch_name 
+                     FROM machines_set e 
+                     LEFT JOIN engine_types et ON e.engine_type_id = et.id 
+                     LEFT JOIN branches b ON e.branch_id = b.id 
+                     WHERE e.machine_type = 'engine' AND e.is_active = 1"""
+            cur.execute(sql)
+            all_engines = cur.fetchall()
+        conn.close()
+    except Exception: pass
+
+    # เก็บค่าเดิมของแถวนี้เพื่อเป็นค่าเริ่มต้นใน Dropdown
+    curr_branch = str(row_data.get('branch_name') or '')
     curr_type = str(row_data.get('type_name') or '')
-    def_idx = 0
-    for idx, lbl in enumerate(engine_lbl_list):
-        if engine_details_t2[lbl]['code'] == curr_code and engine_details_t2[lbl]['type'] == curr_type:
-            def_idx = idx; break
+    curr_code = str(row_data.get('engine_code') or '')
 
-    with st.form(f"u_form2_{rec_id}", clear_on_submit=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
-            e_eng_lbl = st.selectbox("แก้ไข ทะเบียนรถ:", options=engine_lbl_list if engine_lbl_list else ["-- ไม่พบข้อมูล --"], index=def_idx)
-        with col2:
-            e_liters = st.number_input("แก้ไข น้ำมัน (ลิตร)", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0))
-            e_work = st.number_input("แก้ไข ชม.ทำงาน", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0))
-        e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''))
+    c_sel1, c_sel2, c_sel3 = st.columns(3)
+    
+    # 🏢 1. Dropdown: สาขา
+    available_branches = sorted(list(set([e['branch_name'] for e in all_engines if e['branch_name']])))
+    def_branch_idx = available_branches.index(curr_branch) + 1 if curr_branch in available_branches else 0
+    e_branch = c_sel1.selectbox("🏢 1. สาขา *", ["-- เลือกสาขา --"] + available_branches, index=def_branch_idx, key=f"e2_br_{rec_id}")
 
-        if st.form_submit_button("💾 บันทึกการแก้ไข", use_container_width=True):
-            try:
-                e_info = engine_details_t2.get(e_eng_lbl, {'code': curr_code, 'type': curr_type})
-                u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute(f"""UPDATE fuel_records SET record_date=%s, engine_code=CONVERT(%s USING utf8mb4), type_name=CONVERT(%s USING utf8mb4), 
-                                   fuel_liters=%s, working_hours=%s, liter_hr=%s, remark=CONVERT(%s USING utf8mb4) WHERE {pk_col}=%s""",
-                                (e_date, e_info['code'], e_info['type'], e_liters, e_work, u_liter_hr, e_rem, rec_id))
-                    conn.commit()
-                conn.close()
-                st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 2", f"แก้ไข ID: {rec_id}")
-                st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e: st.error(f"Error: {e}")
+    # 🚜 2. Dropdown: ประเภทรถ
+    f2_type_disabled = (e_branch == "-- เลือกสาขา --")
+    if not f2_type_disabled:
+        filtered_by_branch = [e for e in all_engines if e['branch_name'] == e_branch]
+        available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
+    else:
+        available_types = []; filtered_by_branch = []
+        
+    def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
+    e_type = c_sel2.selectbox("🚜 2. ชนิด / ประเภทรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
+
+    # 🏷️ 3. Dropdown: ทะเบียนรถ
+    f2_code_disabled = (e_type == "-- เลือกประเภท --") or f2_type_disabled
+    if not f2_code_disabled:
+        filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == e_type]
+        available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
+    else:
+        available_codes = []; filtered_by_type = []
+        
+    def_code_idx = available_codes.index(curr_code) + 1 if (curr_code in available_codes and e_type == curr_type and e_branch == curr_branch) else 0
+    e_code = c_sel3.selectbox("🏷️ 3. รหัสงาน / ทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled)
+    
+    inputs_disabled = (e_code == "-- เลือกรถ --") or f2_code_disabled
+
+    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+    
+    # 🎯 ฟอร์มกรอกข้อมูลทั่วไป
+    col1, col2 = st.columns(2)
+    with col1:
+        e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), key=f"e2_dt_{rec_id}")
+        e_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
+    with col2:
+        e_work = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
+        e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}")
+
+    # 🎯 ปุ่มบันทึกข้อมูล
+    if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
+        try:
+            u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                # ตรวจสอบ ID สาขาใหม่เผื่อผู้ใช้เปลี่ยนสาขา
+                cur.execute("SELECT id FROM branches WHERE branch_name = %s", (e_branch,))
+                b_res = cur.fetchone()
+                new_branch_id = b_res['id'] if b_res else row_data.get('branch_id')
+
+                cur.execute(f"""UPDATE fuel_records SET branch_id=%s, record_date=%s, engine_code=CONVERT(%s USING utf8mb4), type_name=CONVERT(%s USING utf8mb4), 
+                               fuel_liters=%s, working_hours=%s, liter_hr=%s, remark=CONVERT(%s USING utf8mb4) WHERE {pk_col}=%s""",
+                            (new_branch_id, e_date, e_code, e_type, e_liters, e_work, u_liter_hr, e_rem, rec_id))
+                conn.commit()
+            conn.close()
+            st.cache_data.clear()
+            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 2", f"แก้ไข ID: {rec_id} ({e_code})")
+            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 3)", width="large")
 def update_record_dialog_t3(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขา: {row_data.get('branch_name')}")
-    with st.form(f"u_form3_{rec_id}", clear_on_submit=False):
-        col1, col2 = st.columns(2)
-        with col1:
-            e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
-            e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0))
-        with col2:
-            e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0))
-            e_npm = st.number_input("แก้ไข ตกนอกเหนือ PM", min_value=0, value=int(row_data.get('non_pm_drop') or 0))
-        e_rem = st.text_input("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''))
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
+    
+    # 🎯 ตรวจสอบสิทธิ์และสร้างตัวเลือกสาขา (Dynamic)
+    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
+    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
+        edit_branch_options = list(branch_dict.keys())
+    else: 
+        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    
+    curr_branch = str(row_data.get('branch_name') or '')
+    def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
+    
+    e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e3_br_{rec_id}")
+    new_branch_id = branch_dict[e_branch_lbl]
+    
+    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
+        e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0))
+    with col2:
+        e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0))
+        e_npm = st.number_input("แก้ไข ตกนอกเหนือ PM", min_value=0, value=int(row_data.get('non_pm_drop') or 0))
+    e_rem = st.text_input("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''))
 
-        if st.form_submit_button("💾 บันทึกการแก้ไข", use_container_width=True):
-            try:
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute(f"UPDATE boiler_pressure_records SET record_date=%s, total_count=%s, total_drop=%s, pm_drop=%s, non_pm_drop=%s, remark=%s WHERE {pk_col}=%s",
-                                (e_date, e_tot, (e_pm + e_npm), e_pm, e_npm, e_rem, rec_id))
-                    conn.commit()
-                conn.close()
-                st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 3", f"แก้ไข ID: {rec_id}")
-                st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e: st.error(f"Error: {e}")
+    if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary"):
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute(f"UPDATE boiler_pressure_records SET branch_id=%s, record_date=%s, total_count=%s, total_drop=%s, pm_drop=%s, non_pm_drop=%s, remark=%s WHERE {pk_col}=%s",
+                            (new_branch_id, e_date, e_tot, (e_pm + e_npm), e_pm, e_npm, e_rem, rec_id))
+                conn.commit()
+            conn.close()
+            st.cache_data.clear()
+            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 3", f"แก้ไข ID: {rec_id}")
+            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 4)", width="large")
 def update_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
-    branch_id = row_data.get('branch_id')
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
     
-    # 🎯 ดึงชื่อบอยเลอร์เฉพาะสาขานี้มาเป็นตัวเลือกตอนแก้ไข
+    # 🎯 ตรวจสอบสิทธิ์และสร้างตัวเลือกสาขา (Dynamic)
+    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
+    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
+        edit_branch_options = list(branch_dict.keys())
+    else: 
+        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    
+    curr_branch = str(row_data.get('branch_name') or '')
+    def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
+    
+    c_top1, c_top2 = st.columns([1.5, 1.5])
+    with c_top1:
+        e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e4_br_{rec_id}")
+        new_branch_id = branch_dict[e_branch_lbl]
+    
+    # 🎯 ดึงข้อมูลบอยเลอร์ใหม่ตามสาขาที่เลือก
     b_options = []
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT CONVERT(boiler_name USING utf8mb4) AS b_name FROM boilers WHERE branch_id = %s AND is_active = 1", (branch_id,))
+            cur.execute("SELECT CONVERT(boiler_name USING utf8mb4) AS b_name FROM boilers WHERE branch_id = %s AND is_active = 1", (new_branch_id,))
             b_options = [r['b_name'] for r in cur.fetchall()]
         conn.close()
     except Exception: pass
     
-    if not b_options: b_options = [str(row_data.get('boiler_name') or 'ไม่ระบุ')]
-    current_b = str(row_data.get('boiler_name') or b_options[0])
-    b_idx = b_options.index(current_b) if current_b in b_options else 0
+    if not b_options: b_options = ["-- ไม่มีข้อมูลบอยเลอร์ --"]
+    curr_b = str(row_data.get('boiler_name') or '')
+    b_idx = b_options.index(curr_b) if (curr_b in b_options and e_branch_lbl == curr_branch) else 0
 
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขา: {row_data.get('branch_name')}")
-    with st.form(f"u_form4_{rec_id}", clear_on_submit=False):
-        e_boiler = st.selectbox("แก้ไข บอยเลอร์", b_options, index=b_idx)
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
-            e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, value=float(row_data.get('sawdust_weight') or 0.0))
-            e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, value=float(row_data.get('wood_weight') or 0.0))
-            e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, value=float(row_data.get('waste_wood_weight') or 0.0))
-        with c2:
-            st.write(" ")
-            e_saw_p = st.number_input("ราคาขี้เลื่อย", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0))
-            e_wood_p = st.number_input("ราคาปีกไม้", min_value=0.0, value=float(row_data.get('wood_price') or 0.0))
-            e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
-        with c3:
-            st.write(" ")
-            e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.1, value=float(row_data.get('steam_production') or 1.0))
-            e_hrs = st.number_input("ชม.ทำงาน", min_value=0.1, value=float(row_data.get('working_hours') or 1.0))
+    with c_top2:
+        e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
+    
+    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+    e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        st.write(" ")
+        e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, value=float(row_data.get('sawdust_weight') or 0.0))
+        e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, value=float(row_data.get('wood_weight') or 0.0))
+        e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, value=float(row_data.get('waste_wood_weight') or 0.0))
+    with c2:
+        st.write(" ")
+        e_saw_p = st.number_input("ราคาขี้เลื่อย", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0))
+        e_wood_p = st.number_input("ราคาปีกไม้", min_value=0.0, value=float(row_data.get('wood_price') or 0.0))
+        e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
+    with c3:
+        st.write(" ")
+        e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.1, value=float(row_data.get('steam_production') or 1.0))
+        e_hrs = st.number_input("ชม.ทำงาน", min_value=0.1, value=float(row_data.get('working_hours') or 1.0))
 
-        if st.form_submit_button("💾 บันทึกการแก้ไข", use_container_width=True):
-            try:
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute(f"""UPDATE boiler_fuel_records SET record_date=%s, boiler_name=%s, sawdust_weight=%s, wood_weight=%s, waste_wood_weight=%s, 
-                                   sawdust_price=%s, wood_price=%s, waste_wood_price=%s, steam_production=%s, working_hours=%s WHERE {pk_col}=%s""",
-                                (e_date, e_boiler, e_saw_w, e_wood_w, e_waste_w, e_saw_p, e_wood_p, e_waste_p, e_prod, e_hrs, rec_id))
-                    conn.commit()
-                conn.close()
-                st.cache_data.clear()
-                st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e: st.error(f"Error: {e}")
+    btn_disabled = (e_boiler == "-- ไม่มีข้อมูลบอยเลอร์ --")
+    if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute(f"""UPDATE boiler_fuel_records SET branch_id=%s, record_date=%s, boiler_name=%s, sawdust_weight=%s, wood_weight=%s, waste_wood_weight=%s, 
+                               sawdust_price=%s, wood_price=%s, waste_wood_price=%s, steam_production=%s, working_hours=%s WHERE {pk_col}=%s""",
+                            (new_branch_id, e_date, e_boiler, e_saw_w, e_wood_w, e_waste_w, e_saw_p, e_wood_p, e_waste_p, e_prod, e_hrs, rec_id))
+                conn.commit()
+            conn.close()
+            st.cache_data.clear()
+            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4", f"แก้ไข ID: {rec_id}")
+            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("📊 หน้าต่างดูสรุปรายงาน", width="large")
 def show_summary_report_dialog(html_content):
@@ -983,45 +1110,96 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
+            # 🎯 1. ดึงข้อมูลค่ามาตรฐาน (STD) จากตารางใหม่
+            std = {'p_cubft': 12.00, 'stm_mul': 0.1875, 'p_ton': 240.00, 'avg_p': 3.00, 'kg_ton': 300.00, 'kg_cubft': 15.00}
+            cur.execute("SELECT * FROM std_settings LIMIT 1")
+            s_res = cur.fetchone()
+            if s_res:
+                std['p_cubft'] = float(s_res.get('std_fuel_price_per_cubft', 12.00))
+                std['stm_mul'] = float(s_res.get('std_steam_multiplier', 0.1875))
+                std['p_ton'] = float(s_res.get('std_fuel_price_per_steam_ton', 240.00))
+                std['avg_p'] = float(s_res.get('std_avg_pressure', 3.00))
+                std['kg_ton'] = float(s_res.get('std_fuel_kg_per_steam_ton', 300.00))
+                std['kg_cubft'] = float(s_res.get('std_fuel_kg_per_cubft', 15.00))
+
+            # 🎯 2. ดึงข้อมูลเชื้อเพลิงและบอยเลอร์
             if b_id_t4 == "ทั้งหมด":
                 sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
+                raw_data = cur.fetchall()
+                
+                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.record_date BETWEEN %s AND %s"
+                cur.execute(sql_oven, (start_date_str, end_date_str))
+                oven_raw = cur.fetchall()
             elif b_id_t4 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
                 sql = f"SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
+                raw_data = cur.fetchall()
+                
+                sql_oven = f"SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id IN ({placeholders}) AND o.record_date BETWEEN %s AND %s"
+                cur.execute(sql_oven, allowed_tuple + (start_date_str, end_date_str))
+                oven_raw = cur.fetchall()
             else:
                 sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (b_id_t4, start_date_str, end_date_str))
-            raw_data = cur.fetchall()
+                raw_data = cur.fetchall()
+                
+                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id = %s AND o.record_date BETWEEN %s AND %s"
+                cur.execute(sql_oven, (b_id_t4, start_date_str, end_date_str))
+                oven_raw = cur.fetchall()
         conn.close()
     except Exception: return [], None, None
     
     if not raw_data: return [], None, None
 
-    # 🎯 1. จัดเตรียมข้อมูลพื้นฐาน
-    std_fuel_val = 280.00
     start_dt = pd.to_datetime(start_date_str)
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
 
-    # จัดกลุ่มข้อมูลตามชื่อบอยเลอร์
-    grouped_data = {}
+    # จัดกลุ่มข้อมูลรายสาขา/รายวัน (สำหรับตารางรวม 1+2)
+    master_summary = {}
+    grouped_data = {} # สำหรับตารางแยกเครื่อง
+
     for r in raw_data:
         b_name = str(r.get('boiler_name') or 'บอยเลอร์ 1')
         if b_name not in grouped_data: grouped_data[b_name] = []
         grouped_data[b_name].append(r)
+        
+        bn = str(r.get('branch_name') or '-')
+        dt = r['record_date']
+        k = (bn, dt)
+        if k not in master_summary:
+            master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
+            
+        master_summary[k]['sw'] += float(r.get('sawdust_weight') or 0)
+        master_summary[k]['ww'] += float(r.get('wood_weight') or 0)
+        master_summary[k]['www'] += float(r.get('waste_wood_weight') or 0)
+        master_summary[k]['sp'] += float(r.get('sawdust_price') or 0)
+        master_summary[k]['wp'] += float(r.get('wood_price') or 0)
+        master_summary[k]['wwp'] += float(r.get('waste_wood_price') or 0)
+        master_summary[k]['stm'] += float(r.get('steam_production') or 0)
+        master_summary[k]['hrs'] += float(r.get('working_hours') or 0)
 
-    # 🎯 2. เตรียมสร้าง Excel และ HTML
+    for o in oven_raw:
+        bn = str(o.get('branch_name') or '-')
+        dt = o['record_date']
+        k = (bn, dt)
+        if k not in master_summary:
+            master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
+        master_summary[k]['oven'] = float(o.get('oven_qty') or 0)
+        master_summary[k]['wood'] = float(o.get('wood_out_cubft') or 0)
+        master_summary[k]['press'] += float(o.get('avg_terminal_pressure') or 0)
+        master_summary[k]['press_cnt'] += 1
+
     wb = Workbook()
-    wb.remove(wb.active) # ลบชีตเริ่มต้นทิ้ง
+    wb.remove(wb.active)
     
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
     f_b = Font(name="Tahoma", size=10, bold=True)
     f_w = Font(name="Tahoma", size=10, bold=True, color="FFFFFF")
     f_n = Font(name="Tahoma", size=10)
     f_red = Font(name="Tahoma", size=10, color="FF0000")
-    f_red_bold_ul = Font(name="Tahoma", size=10, bold=True, color="FF0000", underline="single")
     f_bold_ul = Font(name="Tahoma", size=10, bold=True, underline="single")
     
     al_c = Alignment(horizontal="center", vertical="center", wrap_text=True)
@@ -1032,17 +1210,161 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
     fill_green = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
     fill_peach = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
-    fill_grey = PatternFill(start_color="D9D9D9", end_color="D9D9D9", fill_type="solid")
 
     html_tables = ""
     boilers_html_dict = {}
 
-    # 🎯 3. วนลูปสร้างตารางทีละบอยเลอร์
+    # ==============================================================================
+    # 🎯 3.1 สร้างตารางรวม Master (บอยเลอร์ 1+2) รวมทุกสาขาที่เลือก
+    # ==============================================================================
+    ws_m = wb.create_sheet(title=f"สรุปรวม 1+2")
+
+    ws_m.merge_cells("A1:AD1")
+    ws_m["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}"
+    ws_m["A1"].font = f_w; ws_m["A1"].fill = fill_blue; ws_m["A1"].alignment = al_c
+
+    headers_m = [
+        ("A2:A3","วันที่"), ("B2:B3","จำนวน\nเตาที่อบ"), ("C2:C3","ไม้อบออก\n(ลบ.ฟ.)"),
+        ("D2:F2","เชื้อเพลิงใช้(ตัน/วัน)"), ("G2:G3","รวมน.น.\nเชื้อเพลิง"), 
+        ("H2:K2","ค่าเชื้อเพลิง(บาท)"), ("L2:N2","ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)"),
+        ("O2:R2","ผลิตไอน้ำ"), ("S2:U2","ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)"),
+        ("V2:X2","แรงดันปลายทางเฉลี่ย"), ("Y2:AA2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)"),
+        ("AB2:AD2","เชื้อเพลิงใช้(กก./ลบ.ฟ.)")
+    ]
+    for cell_r, val in headers_m: 
+        ws_m.merge_cells(cell_r); ws_m[cell_r.split(":")[0]] = val
+    
+    h3_m = ["", "", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", 
+            "STD", "ผลงาน", "ผลต่าง", "ตัน/วัน", "STD\nตัน/ชม.", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง",
+            "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง"]
+    for idx, val in enumerate(h3_m, 1):
+        if val: ws_m.cell(row=3, column=idx, value=val)
+
+    for r_idx in [2, 3]:
+        for c_idx in range(1, 31):
+            c = ws_m.cell(row=r_idx, column=c_idx); c.font = f_b; c.alignment = al_c; c.border = tb
+
+    html_headers_m = """
+    <tr><th rowspan="2">วันที่</th><th rowspan="2">จำนวน<br>เตาที่อบ</th><th rowspan="2">ไม้อบออก<br>(ลบ.ฟ.)</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวมน.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)</th><th colspan="4">ผลิตไอน้ำ</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)</th><th colspan="3">แรงดันปลายทางเฉลี่ย</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ลบ.ฟ.)</th></tr>
+    <tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>ตัน/วัน</th><th>STD<br>ตัน/ชม.</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>
+    """
+
+    cur_row = 4; body_html_m = ""
+    s_ov = s_wo = s_sw = s_ww = s_www = s_tw = s_sp = s_wp = s_wwp = s_tp = s_stm = s_hrs = s_prs = s_pcnt = 0
+
+    # 🎯 3.1.1 เรียงข้อมูลตาม วันที่ -> สาขา เพื่อให้แสดงแถวสลับกันตามวันที่
+    sorted_master_data = sorted(master_summary.items(), key=lambda x: (x[0][1], x[0][0]))
+
+    for k, v in sorted_master_data:
+        branch_full = k[0]
+        dt_val = k[1]
+        
+        # หาย่อสาขามาใส่วงเล็บ
+        try: b_short = branch_full.split("สาขา ")[1].split()[0]
+        except: b_short = branch_full
+        if not b_short or b_short == '-': b_short = "N/A"
+        
+        dt = pd.to_datetime(dt_val)
+        # สร้าง Format: 01/09/26(WG)
+        date_str = f"{dt.strftime('%d/%m/%y')}({b_short})"
+        
+        tw = v['sw'] + v['ww'] + v['www']
+        tp = v['sp'] + v['wp'] + v['wwp']
+        avg_p = v['press'] / v['press_cnt'] if v['press_cnt'] > 0 else 0
+        
+        # คำนวณสูตร
+        act_p_cub = tp / v['wood'] if v['wood'] > 0 else 0
+        std_stm_hr = v['oven'] * std['stm_mul']
+        act_stm_hr = v['stm'] / v['hrs'] if v['hrs'] > 0 else 0
+        act_p_ton = tp / v['stm'] if v['stm'] > 0 else 0
+        act_kg_ton = (tw * 1000) / v['stm'] if v['stm'] > 0 else 0
+        act_kg_cub = (tw * 1000) / v['wood'] if v['wood'] > 0 else 0
+        
+        vals = [
+            date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp,
+            std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub,
+            v['stm'], std_stm_hr, act_stm_hr, act_stm_hr - std_stm_hr,
+            std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton,
+            std['avg_p'], avg_p, avg_p - std['avg_p'],
+            std['kg_ton'], act_kg_ton, std['kg_ton'] - act_kg_ton,
+            std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub
+        ]
+        
+        s_ov+=v['oven']; s_wo+=v['wood']; s_sw+=v['sw']; s_ww+=v['ww']; s_www+=v['www']; s_tw+=tw; s_sp+=v['sp']; s_wp+=v['wp']; s_wwp+=v['wwp']; s_tp+=tp; s_stm+=v['stm']; s_hrs+=v['hrs']; s_prs+=v['press']; s_pcnt+=v['press_cnt']
+
+        body_html_m += "<tr>"
+        for idx, val in enumerate(vals, 1):
+            c = ws_m.cell(row=cur_row, column=idx, value=val)
+            c.border = tb; c.alignment = al_c if idx==1 else al_r
+            
+            is_diff_col = idx in [14, 18, 21, 24, 27, 30]
+            is_std_col = idx in [12, 16, 19, 22, 25, 28]
+            if is_diff_col and val < 0: c.font = f_red
+            else: c.font = f_n
+            
+            if is_std_col: c.fill = fill_green; c.font = f_w
+            if idx in [2, 3, 4, 5, 6, 7]: c.fill = fill_yellow
+            if isinstance(val, (int, float)): c.number_format = '#,##0.00'
+            
+            # HTML Styling
+            bg = "background-color:#00B050;color:white;" if is_std_col else ("background-color:#FFFF00;" if idx in [2,3,4,5,6,7] else "")
+            tc = "color:red;" if is_diff_col and val < 0 else ""
+            fw = "font-weight:bold;" if idx in [7,11] else ""
+            body_html_m += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else f'{val:,.2f}'}</td>"
+        body_html_m += "</tr>"
+        cur_row += 1
+
+    # สรุป Footer รวม Master
+    avg_p_cub = s_tp / s_wo if s_wo > 0 else 0
+    sum_std_stm = s_ov * std['stm_mul']
+    avg_stm_hr = s_stm / s_hrs if s_hrs > 0 else 0
+    avg_p_ton = s_tp / s_stm if s_stm > 0 else 0
+    avg_press = s_prs / s_pcnt if s_pcnt > 0 else 0
+    avg_kg_ton = (s_tw * 1000) / s_stm if s_stm > 0 else 0
+    avg_kg_cub = (s_tw * 1000) / s_wo if s_wo > 0 else 0
+
+    f1_vals = [
+        "รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp,
+        "", avg_p_cub, std['p_cubft'] - avg_p_cub,
+        s_stm, sum_std_stm, avg_stm_hr, avg_stm_hr - sum_std_stm,
+        "", avg_p_ton, std['p_ton'] - avg_p_ton,
+        "", avg_press, avg_press - std['avg_p'],
+        "", avg_kg_ton, std['kg_ton'] - avg_kg_ton,
+        "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub
+    ]
+    
+    f_html_m = "<tr style='font-weight:bold; background-color:#FCE4D6;'>"
+    for idx, val in enumerate(f1_vals, 1):
+        c = ws_m.cell(row=cur_row, column=idx, value=val)
+        c.border, c.font, c.alignment = tb, f_b, al_r if idx > 1 else al_c
+        c.fill = fill_peach
+        is_diff_col = idx in [14, 18, 21, 24, 27, 30]
+        if is_diff_col and val != "" and val < 0: c.font = f_red
+        if isinstance(val, (int, float)): c.number_format = '#,##0.00'
+        tc = "color:red;" if is_diff_col and val != "" and val < 0 else ""
+        f_html_m += f"<td style='{tc}text-align:{'center' if idx==1 else 'right'};'>{val if val == '' or idx==1 else f'{val:,.2f}'}</td>"
+    f_html_m += "</tr>"
+    
+    # ปรับความกว้าง
+    for i in range(1, 31): ws_m.column_dimensions[get_column_letter(i)].width = 10
+    ws_m.column_dimensions['A'].width = 14
+
+    master_html = f"""<table style='margin-bottom: 30px; font-size:10px;'><thead><tr><th colspan='30' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}</th></tr>{html_headers_m}</thead><tbody>{body_html_m}{f_html_m}</tbody></table>"""
+    boilers_html_dict[f"🌟 รวมสาขา {selected_branch_display} (บอยเลอร์ 1+2)"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A3 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{master_html}</body></html>"
+    html_tables += master_html
+
+
+    # ==============================================================================
+    # 🎯 3.2 สร้างตารางย่อยแยกรายบอยเลอร์ (1 และ 2) ให้เหมือนเดิม
+    # ==============================================================================
     for boiler_name in sorted(grouped_data.keys()):
         data_list = grouped_data[boiler_name]
+        
+        # เรียงข้อมูลบอยเลอร์เดี่ยวตามวันที่ -> สาขา ด้วยเช่นกัน
+        data_list = sorted(data_list, key=lambda x: (x['record_date'], x.get('branch_name', '')))
+        
         ws = wb.create_sheet(title=boiler_name)
 
-        # --- สร้าง Header Excel ---
         ws.merge_cells("A1:O1")
         ws["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}"
         ws["A1"].font = f_w; ws["A1"].fill = fill_blue; ws["A1"].alignment = al_c
@@ -1050,39 +1372,28 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         headers_merge = [("A2:A3","วันที่"), ("B2:D2","เชื้อเพลิงใช้(ตัน/วัน)"), ("E2:E3","รวม น.น.\nเชื้อเพลิง"), 
                          ("F2:I2","ค่าเชื้อเพลิง(บาท)"), ("J2:K2","ผลิตไอน้ำ"), ("L2:L3","ค่าเชื้อเพลิง\n(บาท/ตันไอน้ำ)"), 
                          ("M2:O2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)")]
-        for cell_r, val in headers_merge: 
-            ws.merge_cells(cell_r); ws[cell_r.split(":")[0]] = val
-        
+        for cell_r, val in headers_merge: ws.merge_cells(cell_r); ws[cell_r.split(":")[0]] = val
         h3 = ["", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", "ตัน/วัน", "ตัน/ชม.", "", "STD", "ผลงาน", "ผลต่าง"]
         for idx, val in enumerate(h3, 1):
             if val: ws.cell(row=3, column=idx, value=val)
-
         for r_idx in [2, 3]:
             for c_idx in range(1, 16):
-                cell = ws.cell(row=r_idx, column=c_idx)
-                cell.font = f_b; cell.alignment = al_c; cell.border = tb
+                c = ws.cell(row=r_idx, column=c_idx); c.font = f_b; c.alignment = al_c; c.border = tb
 
-        # --- สร้าง Header HTML ---
-        html_headers = """
-        <tr>
-            <th rowspan="2">วันที่</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวม น.น.<br>เชื้อเพลิง</th>
-            <th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="2">ผลิตไอน้ำ</th><th rowspan="2">ค่าเชื้อเพลิง<br>(บาท/ตันไอน้ำ)</th>
-            <th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th>
-        </tr>
-        <tr>
-            <th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th>
-            <th>ตัน/วัน</th><th>ตัน/ชม.</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th>
-        </tr>
-        """
+        html_headers = """<tr><th rowspan="2">วันที่</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวม น.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="2">ผลิตไอน้ำ</th><th rowspan="2">ค่าเชื้อเพลิง<br>(บาท/ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th></tr><tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>ตัน/วัน</th><th>ตัน/ชม.</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>"""
 
-        cur_row = 4
-        body_html = ""
+        cur_row = 4; body_html = ""
         sum_sw = sum_ww = sum_www = sum_tot_w = sum_sp = sum_wp = sum_wwp = sum_tot_p = sum_steam = sum_hrs = 0
         
-        # --- ใส่ข้อมูลแถวต่างๆ ---
         for r in data_list:
             dt = pd.to_datetime(r['record_date'])
-            date_str = f"{dt.month}/{dt.day}/{dt.year+543}"
+            
+            # หาย่อสาขามาใส่วงเล็บสำหรับตารางแยกเครื่องเช่นกัน
+            bn = str(r.get('branch_name') or '-')
+            try: b_short = bn.split("สาขา ")[1].split()[0]
+            except: b_short = bn
+            if not b_short or b_short == '-': b_short = "N/A"
+            date_str = f"{dt.strftime('%d/%m/%y')}({b_short})"
             
             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0), float(r.get('wood_weight') or 0), float(r.get('waste_wood_weight') or 0)
             s_p, w_p, ww_p = float(r.get('sawdust_price') or 0), float(r.get('wood_price') or 0), float(r.get('waste_wood_price') or 0)
@@ -1092,140 +1403,63 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             stm_hr = stm / hrs if hrs > 0 else 0
             cost_ton = t_p / stm if stm > 0 else 0
             fuel_ton = (t_w * 1000) / stm if stm > 0 else 0
-            diff = std_fuel_val - fuel_ton
+            diff = std['kg_ton'] - fuel_ton
             
             sum_sw+=s_w; sum_ww+=w_w; sum_www+=ww_w; sum_tot_w+=t_w; sum_sp+=s_p; sum_wp+=w_p; sum_wwp+=ww_p; sum_tot_p+=t_p; sum_steam+=stm; sum_hrs+=hrs
 
-            row_vals = [date_str, s_w, w_w, ww_w, t_w, s_p, w_p, ww_p, t_p, stm, stm_hr, cost_ton, std_fuel_val, fuel_ton, diff]
+            row_vals = [date_str, s_w, w_w, ww_w, t_w, s_p, w_p, ww_p, t_p, stm, stm_hr, cost_ton, std['kg_ton'], fuel_ton, diff]
             
             body_html += "<tr>"
             for idx, val in enumerate(row_vals, 1):
                 c = ws.cell(row=cur_row, column=idx, value=val)
                 c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
-                
-                # จัดสีไฮไลท์
-                if idx in [2, 3, 4, 10]: c.fill = fill_yellow
+                if idx in [2, 3, 4, 10]: c.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
                 if idx == 13: c.fill = fill_green; c.font = f_w
-                if isinstance(val, (int, float)): c.number_format = '#,##0.000' if idx == 3 else '#,##0.00'
+                if isinstance(val, (int, float)): c.number_format = '#,##0.00'
                 
-                # HTML Styling
                 bg = "background-color:#FFFF00;" if idx in [2,3,4,10] else ("background-color:#00B050;color:white;" if idx==13 else "")
                 tc = "color:red;" if idx==15 and val<0 else ""
                 fw = "font-weight:bold;" if idx in [5,9] else ""
-                format_str = '{:,.3f}' if idx == 3 else '{:,.2f}'
-                body_html += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else format_str.format(val)}</td>"
+                body_html += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else f'{val:,.2f}'}</td>"
             body_html += "</tr>"
             cur_row += 1
 
-        # --- แถวสรุปผลรวม (Footer) ---
         avg_stm_hr = sum_steam / sum_hrs if sum_hrs > 0 else 0
         avg_cost_ton = sum_tot_p / sum_steam if sum_steam > 0 else 0
         avg_fuel_ton = (sum_tot_w * 1000) / sum_steam if sum_steam > 0 else 0
-        avg_diff = std_fuel_val - avg_fuel_ton
+        avg_diff = std['kg_ton'] - avg_fuel_ton
         
-        pct_sw = (sum_sw / sum_tot_w) if sum_tot_w > 0 else 0
-        pct_ww = (sum_ww / sum_tot_w) if sum_tot_w > 0 else 0
-        pct_www = (sum_www / sum_tot_w) if sum_tot_w > 0 else 0
-        
-        pct_sp = (sum_sp / sum_tot_p) if sum_tot_p > 0 else 0
-        pct_wp = (sum_wp / sum_tot_p) if sum_tot_p > 0 else 0
-        pct_wwp = (sum_wwp / sum_tot_p) if sum_tot_p > 0 else 0
-        
-        # 🎯 3.1 สร้าง Footer แถวที่ 1 (รวมทั้งหมด)
-        ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row+1, end_column=1)
+        ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row, end_column=1)
         c_title = ws.cell(row=cur_row, column=1, value="รวมทั้งหมด")
-        c_title.alignment = al_c; c_title.fill = fill_peach; c_title.border = tb
-        c_title.font = f_bold_ul
-        ws.cell(row=cur_row+1, column=1).border = tb 
+        c_title.alignment = al_c; c_title.fill = fill_peach; c_title.border = tb; c_title.font = f_bold_ul
         
-        f1_vals = ["", sum_sw, sum_ww, sum_www, sum_tot_w, sum_sp, sum_wp, sum_wwp, sum_tot_p, sum_steam, avg_stm_hr, avg_cost_ton, std_fuel_val, avg_fuel_ton, avg_diff]
+        f1_vals = ["", sum_sw, sum_ww, sum_www, sum_tot_w, sum_sp, sum_wp, sum_wwp, sum_tot_p, sum_steam, avg_stm_hr, avg_cost_ton, std['kg_ton'], avg_fuel_ton, avg_diff]
+        footer_html = f"<tr style='font-weight:bold; background-color:#FCE4D6;'><td style='text-align:center; text-decoration:underline;'>รวมทั้งหมด</td>"
+        
         for idx in range(2, 16):
             val = f1_vals[idx-1]
             c = ws.cell(row=cur_row, column=idx, value=val)
             c.border, c.font, c.alignment = tb, f_b, al_r
-            if isinstance(val, (int, float)): c.number_format = '#,##0.000' if idx == 3 else '#,##0.00'
+            if isinstance(val, (int, float)): c.number_format = '#,##0.00'
             if idx == 9: c.font = f_red
             if idx == 11: c.fill = fill_yellow
             if idx == 14: c.font = f_bold_ul
             if idx == 15 and val < 0: c.font = f_red
+            
+            bg = "background-color:#FFFF00;" if idx==11 else ""
+            tc = "color:red;" if idx==9 or (idx==15 and val<0) else ""
+            ul = "text-decoration:underline;" if idx==14 else ""
+            footer_html += f"<td style='{bg}{tc}{ul}text-align:right;'>{f'{val:,.2f}' if isinstance(val, (int, float)) else ''}</td>"
+        footer_html += "</tr>"
+        
+        for i in range(1, 16): ws.column_dimensions[get_column_letter(i)].width = 11
+        ws.column_dimensions['A'].width = 14
+        
+        single_table_html = f"<table style='margin-bottom: 30px;'><thead><tr><th colspan='15' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}</th></tr>{html_headers}</thead><tbody>{body_html}{footer_html}</tbody></table>"
+        html_tables += single_table_html
+        boilers_html_dict[f"     {boiler_name}"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{single_table_html}</body></html>"
 
-        # 🎯 3.2 สร้าง Footer แถวที่ 2 (เปอร์เซ็นต์สัดส่วน)
-        f2_vals = ["", pct_sw, pct_ww, pct_www, 1.0, pct_sp, pct_wp, pct_wwp, 1.0, "", "", "", "", "", ""]
-        for idx in range(2, 16):
-            val = f2_vals[idx-1]
-            c = ws.cell(row=cur_row+1, column=idx, value=val)
-            c.border, c.font, c.alignment = tb, f_b, al_r
-            if isinstance(val, float): c.number_format = '0.00%'
-            if idx in [5, 9]: c.font = f_red_bold_ul
-            if idx >= 10: c.fill = fill_grey
-
-        # 🎯 3.3 สร้าง Footer แถวที่ 3 (ป้ายกำกับ สัดส่วน(%))
-        c_prop = ws.cell(row=cur_row+2, column=1, value="สัดส่วน(%)")
-        c_prop.font = f_n; c_prop.alignment = al_c; c_prop.border = tb
-        for idx in range(2, 16):
-            ws.cell(row=cur_row+2, column=idx).border = tb
-        
-        # 🎯 HTML สำหรับ Print Preview
-        footer_html = f"""
-        <tr style="font-weight:bold;">
-            <td rowspan="2" style="background-color:#FCE4D6; text-align:center; vertical-align:middle; text-decoration:underline;">รวมทั้งหมด</td>
-            <td style="text-align:right;">{sum_sw:,.2f}</td>
-            <td style="text-align:right;">{sum_ww:,.3f}</td>
-            <td style="text-align:right;">{sum_www:,.2f}</td>
-            <td style="text-align:right;">{sum_tot_w:,.2f}</td>
-            <td style="text-align:right;">{sum_sp:,.2f}</td>
-            <td style="text-align:right;">{sum_wp:,.2f}</td>
-            <td style="text-align:right;">{sum_wwp:,.2f}</td>
-            <td style="text-align:right; color:red;">{sum_tot_p:,.2f}</td>
-            <td style="text-align:right;">{sum_steam:,.2f}</td>
-            <td style="text-align:right; background-color:#FFFF00;">{avg_stm_hr:,.2f}</td>
-            <td style="text-align:right;">{avg_cost_ton:,.2f}</td>
-            <td style="text-align:right;">{std_fuel_val:,.2f}</td>
-            <td style="text-align:right; text-decoration:underline;">{avg_fuel_ton:,.2f}</td>
-            <td style="text-align:right; color:{'red' if avg_diff < 0 else 'black'};">{avg_diff:,.2f}</td>
-        </tr>
-        <tr style="font-weight:bold;">
-            <td style="text-align:right;">{pct_sw*100:,.2f}%</td>
-            <td style="text-align:right;">{pct_ww*100:,.2f}%</td>
-            <td style="text-align:right;">{pct_www*100:,.2f}%</td>
-            <td style="text-align:right; color:red; text-decoration:underline;">100%</td>
-            <td style="text-align:right;">{pct_sp*100:,.2f}%</td>
-            <td style="text-align:right;">{pct_wp*100:,.2f}%</td>
-            <td style="text-align:right;">{pct_wwp*100:,.2f}%</td>
-            <td style="text-align:right; color:red; text-decoration:underline;">100%</td>
-            <td colspan="6" style="background-color:#D9D9D9;"></td>
-        </tr>
-        <tr>
-            <td style="text-align:center;">สัดส่วน(%)</td>
-            <td colspan="14"></td>
-        </tr>
-        """
-        
-        # ปรับความกว้างคอลัมน์ Excel
-        for col_letter in ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O']:
-            ws.column_dimensions[col_letter].width = 11
-        ws.column_dimensions['A'].width = 13
-        
-        html_table = f"""
-        <table style='margin-bottom: 30px;'>
-            <thead>
-                <tr><th colspan='15' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}</th></tr>
-                {html_headers}
-            </thead>
-            <tbody>
-                {body_html}
-                {footer_html}
-            </tbody>
-        </table>
-        """
-        html_tables += html_table
-        
-        # เก็บ HTML ย่อยแต่ละบอยเลอร์
-        single_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_table}</body></html>"""
-        boilers_html_dict[boiler_name] = single_html
-
-    # 🎯 4. รวบรวมข้อมูล HTML ทั้งหมดเป็น JSON
-    full_html = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"""
+    full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A3 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"
 
     final_json_data = {
         "full_print_html": full_html,
