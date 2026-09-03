@@ -113,6 +113,30 @@ def delete_record_dialog_t4(row_data, pk_col):
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
 
+@st.dialog("⚠️ ยืนยันการลบข้อมูล (ยอดรวมสาขา)")
+def delete_record_dialog_oven(row_data, pk_col):
+    rec_id = row_data[pk_col]
+    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
+    st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
+    st.write(f"**จำนวนเตา:** {row_data.get('oven_qty')} เตา | **ไม้อบออก:** {row_data.get('wood_out_cubft')} ลบ.ฟ.")
+    st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"c_d_ov_{rec_id}"): st.rerun()
+    with c2:
+        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"d_d_ov_{rec_id}"):
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    cur.execute(f"DELETE FROM daily_wood_oven_records WHERE {pk_col}=%s", (rec_id,))
+                    conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4 Oven", f"ลบข้อมูล ID: {rec_id}")
+                st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
+                time.sleep(1)
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================================
 # 🛠️ 2. ฟังก์ชัน Popup สำหรับแก้ไขข้อมูล (Update Dialogs)
@@ -122,7 +146,6 @@ def update_record_dialog_t1(row_data, pk_col):
     rec_id = row_data[pk_col]
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่องเดิม: {row_data.get('machine_name')} ({row_data.get('branch_name')})")
     
-    # 🎯 ตรวจสอบสิทธิ์และสร้างตัวเลือกสาขา (Dynamic)
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
     if str(raw_role).strip().lower() in ["admin", "reporter"]: 
@@ -138,7 +161,6 @@ def update_record_dialog_t1(row_data, pk_col):
         e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e1_br_{rec_id}")
         new_branch_id = branch_dict[e_branch_lbl]
     
-    # 🎯 ดึงรายชื่อเครื่องจักรใหม่ตามสาขาที่เลือก
     m_dict = {}
     try:
         conn = get_db_connection()
@@ -190,7 +212,6 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     rec_id = row_data[pk_col]
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียนเดิม: {row_data.get('engine_code')} ({row_data.get('branch_name')})")
     
-    # 🎯 ดึงข้อมูลรถทั้งหมดจาก DB เพื่อมาสร้าง Dropdown แบบ 3 ขั้นตอน (Dynamic)
     all_engines = []
     try:
         conn = get_db_connection()
@@ -207,19 +228,16 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         conn.close()
     except Exception: pass
 
-    # เก็บค่าเดิมของแถวนี้เพื่อเป็นค่าเริ่มต้นใน Dropdown
     curr_branch = str(row_data.get('branch_name') or '')
     curr_type = str(row_data.get('type_name') or '')
     curr_code = str(row_data.get('engine_code') or '')
 
     c_sel1, c_sel2, c_sel3 = st.columns(3)
     
-    # 🏢 1. Dropdown: สาขา
     available_branches = sorted(list(set([e['branch_name'] for e in all_engines if e['branch_name']])))
     def_branch_idx = available_branches.index(curr_branch) + 1 if curr_branch in available_branches else 0
     e_branch = c_sel1.selectbox("🏢 1. สาขา *", ["-- เลือกสาขา --"] + available_branches, index=def_branch_idx, key=f"e2_br_{rec_id}")
 
-    # 🚜 2. Dropdown: ประเภทรถ
     f2_type_disabled = (e_branch == "-- เลือกสาขา --")
     if not f2_type_disabled:
         filtered_by_branch = [e for e in all_engines if e['branch_name'] == e_branch]
@@ -230,7 +248,6 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
     e_type = c_sel2.selectbox("🚜 2. ชนิด / ประเภทรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
 
-    # 🏷️ 3. Dropdown: ทะเบียนรถ
     f2_code_disabled = (e_type == "-- เลือกประเภท --") or f2_type_disabled
     if not f2_code_disabled:
         filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == e_type]
@@ -245,7 +262,6 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
 
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
-    # 🎯 ฟอร์มกรอกข้อมูลทั่วไป
     col1, col2 = st.columns(2)
     with col1:
         e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), key=f"e2_dt_{rec_id}")
@@ -254,13 +270,11 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         e_work = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
         e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}")
 
-    # 🎯 ปุ่มบันทึกข้อมูล
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
         try:
             u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
             conn = get_db_connection()
             with conn.cursor() as cur:
-                # ตรวจสอบ ID สาขาใหม่เผื่อผู้ใช้เปลี่ยนสาขา
                 cur.execute("SELECT id FROM branches WHERE branch_name = %s", (e_branch,))
                 b_res = cur.fetchone()
                 new_branch_id = b_res['id'] if b_res else row_data.get('branch_id')
@@ -282,7 +296,6 @@ def update_record_dialog_t3(row_data, pk_col):
     rec_id = row_data[pk_col]
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
     
-    # 🎯 ตรวจสอบสิทธิ์และสร้างตัวเลือกสาขา (Dynamic)
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
     if str(raw_role).strip().lower() in ["admin", "reporter"]: 
@@ -327,7 +340,6 @@ def update_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
     
-    # 🎯 ตรวจสอบสิทธิ์และสร้างตัวเลือกสาขา (Dynamic)
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
     if str(raw_role).strip().lower() in ["admin", "reporter"]: 
@@ -343,7 +355,6 @@ def update_record_dialog_t4(row_data, pk_col):
         e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e4_br_{rec_id}")
         new_branch_id = branch_dict[e_branch_lbl]
     
-    # 🎯 ดึงข้อมูลบอยเลอร์ใหม่ตามสาขาที่เลือก
     b_options = []
     try:
         conn = get_db_connection()
@@ -395,6 +406,47 @@ def update_record_dialog_t4(row_data, pk_col):
             st.rerun()
         except Exception as e: st.error(f"Error: {e}")
 
+@st.dialog("🛠️ แก้ไขข้อมูล (ยอดรวมสาขา)", width="large")
+def update_record_dialog_oven(row_data, pk_col):
+    rec_id = row_data[pk_col]
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
+    
+    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
+    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
+        edit_branch_options = list(branch_dict.keys())
+    else: 
+        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    
+    curr_branch = str(row_data.get('branch_name') or '')
+    def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
+    
+    e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e_ov_br_{rec_id}")
+    new_branch_id = branch_dict[e_branch_lbl]
+    
+    st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
+    e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')), key=f"e_ov_dt_{rec_id}")
+    
+    c1, c2, c3 = st.columns(3)
+    with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}")
+    with c2: e_wd = st.number_input("แก้ไข ไม้อบออก (ลบ.ฟ.)", min_value=0.0, value=float(row_data.get('wood_out_cubft') or 0.0), key=f"e_ov_w_{rec_id}")
+    with c3: e_pr = st.number_input("แก้ไข แรงดันปลายทางเฉลี่ย", min_value=0.0, value=float(row_data.get('avg_terminal_pressure') or 0.0), key=f"e_ov_p_{rec_id}")
+
+    if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", key=f"e_ov_save_{rec_id}"):
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute(f"UPDATE daily_wood_oven_records SET branch_id=%s, record_date=%s, oven_qty=%s, wood_out_cubft=%s, avg_terminal_pressure=%s WHERE {pk_col}=%s",
+                            (new_branch_id, e_date, e_ov, e_wd, e_pr, rec_id))
+                conn.commit()
+            conn.close()
+            st.cache_data.clear()
+            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4 Oven", f"แก้ไข ID: {rec_id}")
+            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e: st.error(f"Error: {e}")
+
 @st.dialog("📊 หน้าต่างดูสรุปรายงาน", width="large")
 def show_summary_report_dialog(html_content):
     components.html(html_content, height=650, scrolling=True)
@@ -406,7 +458,7 @@ def show_summary_report_dialog_t4(boiler_dict):
         st.info("ไม่มีข้อมูลรายงาน")
         return
         
-    tab_names = [f"🔥 ข้อมูล {b_name}" for b_name in boilers]
+    tab_names = [b_name for b_name in boilers]
     tabs = st.tabs(tab_names)
     
     for idx, b_name in enumerate(boilers):
@@ -1128,7 +1180,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
                 
-                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.record_date BETWEEN %s AND %s"
+                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, (start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
             elif b_id_t4 == "รวมเฉพาะที่มีสิทธิ์":
@@ -1137,7 +1189,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
                 
-                sql_oven = f"SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id IN ({placeholders}) AND o.record_date BETWEEN %s AND %s"
+                sql_oven = f"SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id IN ({placeholders}) AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, allowed_tuple + (start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
             else:
@@ -1145,13 +1197,13 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, (b_id_t4, start_date_str, end_date_str))
                 raw_data = cur.fetchall()
                 
-                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id = %s AND o.record_date BETWEEN %s AND %s"
+                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id = %s AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, (b_id_t4, start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
         conn.close()
-    except Exception: return [], None, None
+    except Exception: return [], [], None, None
     
-    if not raw_data: return [], None, None
+    if not raw_data and not oven_raw: return [], [], None, None
 
     start_dt = pd.to_datetime(start_date_str)
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
@@ -1265,8 +1317,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         if not b_short or b_short == '-': b_short = "N/A"
         
         dt = pd.to_datetime(dt_val)
-        # สร้าง Format: 01/09/26(WG)
-        date_str = f"{dt.strftime('%d/%m/%y')}({b_short})"
+        date_str = f"{dt.day:02d}/{dt.month:02d}/{(dt.year+543)%100}({b_short})"
         
         tw = v['sw'] + v['ww'] + v['www']
         tp = v['sp'] + v['wp'] + v['wwp']
@@ -1359,10 +1410,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     # ==============================================================================
     for boiler_name in sorted(grouped_data.keys()):
         data_list = grouped_data[boiler_name]
-        
-        # เรียงข้อมูลบอยเลอร์เดี่ยวตามวันที่ -> สาขา ด้วยเช่นกัน
         data_list = sorted(data_list, key=lambda x: (x['record_date'], x.get('branch_name', '')))
-        
         ws = wb.create_sheet(title=boiler_name)
 
         ws.merge_cells("A1:O1")
@@ -1387,13 +1435,11 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         
         for r in data_list:
             dt = pd.to_datetime(r['record_date'])
-            
-            # หาย่อสาขามาใส่วงเล็บสำหรับตารางแยกเครื่องเช่นกัน
             bn = str(r.get('branch_name') or '-')
             try: b_short = bn.split("สาขา ")[1].split()[0]
             except: b_short = bn
             if not b_short or b_short == '-': b_short = "N/A"
-            date_str = f"{dt.strftime('%d/%m/%y')}({b_short})"
+            date_str = f"{dt.day:02d}/{dt.month:02d}/{(dt.year+543)%100}({b_short})"
             
             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0), float(r.get('wood_weight') or 0), float(r.get('waste_wood_weight') or 0)
             s_p, w_p, ww_p = float(r.get('sawdust_price') or 0), float(r.get('wood_price') or 0), float(r.get('waste_wood_price') or 0)
@@ -1457,7 +1503,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         
         single_table_html = f"<table style='margin-bottom: 30px;'><thead><tr><th colspan='15' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}</th></tr>{html_headers}</thead><tbody>{body_html}{footer_html}</tbody></table>"
         html_tables += single_table_html
-        boilers_html_dict[f"     {boiler_name}"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{single_table_html}</body></html>"
+        boilers_html_dict[f"🔥 ข้อมูล {boiler_name}"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{single_table_html}</body></html>"
 
     full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A3 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"
 
@@ -1469,7 +1515,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
     
-    return raw_data, excel_buffer.getvalue(), json.dumps(final_json_data)
+    return raw_data, oven_raw, excel_buffer.getvalue(), json.dumps(final_json_data)
 
 
 # ==========================================================
@@ -1782,16 +1828,64 @@ def render_all_reports_module(user_branch_name):
                         b_id_t4 = st.session_state.branch_id
                         selected_branch_display = user_branch_name
 
-                raw_data_t4, excel_data_t4, json_html_t4 = process_t4(b_id_t4, str(start_date_t4), str(end_date_t4), tuple(user_allowed_branches), selected_branch_display)
+                # 🎯 เรียกใช้ process_t4 แบบใหม่ที่คืนค่า oven_raw มาด้วย
+                raw_data_t4, oven_raw_t4, excel_data_t4, json_html_t4 = process_t4(b_id_t4, str(start_date_t4), str(end_date_t4), tuple(user_allowed_branches), selected_branch_display)
 
-                if raw_data_t4:
-                    pk_col_t4 = list(raw_data_t4[0].keys())[0]
+                if raw_data_t4 or oven_raw_t4:
+                    pk_col_t4 = list(raw_data_t4[0].keys())[0] if raw_data_t4 else None
+                    pk_col_ov = list(oven_raw_t4[0].keys())[0] if oven_raw_t4 else None
                     
                     # 🎯 หาชื่อบอยเลอร์ทั้งหมดที่มีในข้อมูลชุดนี้มาสร้างแท็บอัตโนมัติ
-                    unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4])))
-                    tabs_list = st.tabs([f"🔥 ข้อมูล {b}" for b in unique_boilers])
+                    unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4]))) if raw_data_t4 else []
+                    
+                    # 🎯 สร้างแท็บ โดยเอา "ยอดรวมสาขา" ขึ้นก่อน แล้วตามด้วยข้อมูลแยกแต่ละบอยเลอร์
+                    tab_names = ["📁 ข้อมูลยอดรวมสาขา (เตา/ไม้อบ/แรงดัน)"] + [f"🔥 ข้อมูล {b}" for b in unique_boilers]
+                    tabs_list = st.tabs(tab_names)
 
-                    # 🎯 ฟังก์ชันสำหรับสร้างตาราง
+                    # ==========================================
+                    # 🎯 สร้างตารางย่อย 1: ข้อมูลยอดรวมสาขา
+                    # ==========================================
+                    with tabs_list[0]:
+                        if oven_raw_t4:
+                            ROWS_PER_PAGE = 15
+                            total_pages = max(1, (len(oven_raw_t4) - 1) // ROWS_PER_PAGE + 1)
+                            
+                            pc1, pc2 = st.columns([7, 3])
+                            with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(oven_raw_t4)}</b> รายการ</div>", unsafe_allow_html=True)
+                            with pc2: page_ov = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_ov_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(oven_raw_t4)}", label_visibility="collapsed")
+                            
+                            paginated_ov = oven_raw_t4[(page_ov - 1) * ROWS_PER_PAGE : page_ov * ROWS_PER_PAGE]
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+                            header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                            headers = ["ID", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
+                            for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
+                            st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+
+                            with st.container(height=380, border=False):
+                                for r in paginated_ov:
+                                    rec_id = r[pk_col_ov]
+                                    cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                                    cols[0].write(rec_id)
+                                    cols[1].write(r.get('record_date'))
+                                    cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                                    cols[3].write(r.get('oven_qty') or 0)
+                                    cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
+                                    cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
+                                    
+                                    can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                                    if can_crud:
+                                        c_edit, c_del = cols[6].columns(2, gap="small")
+                                        if c_edit.button("✏️", key=f"e_ov_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_oven(r, pk_col_ov)
+                                        if c_del.button("🗑️", key=f"d_ov_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_oven(r, pk_col_ov)
+                                    else: cols[6].write("-")
+                                    st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                        else:
+                            st.info("ไม่พบข้อมูลยอดรวมสาขาในช่วงเวลาที่เลือก")
+
+                    # ==========================================
+                    # 🎯 สร้างตารางย่อย 2: ข้อมูลเชื้อเพลิงแยกตามบอยเลอร์
+                    # ==========================================
                     def render_boiler_table(data_list, boiler_label):
                         if not data_list:
                             st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
@@ -1830,9 +1924,8 @@ def render_all_reports_module(user_branch_name):
                                 else: cols[7].write("-")
                                 st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    # 🎯 สั่ง Render ตารางลงในแต่ละแท็บย่อย
                     for idx, boiler_label in enumerate(unique_boilers):
-                        with tabs_list[idx]:
+                        with tabs_list[idx + 1]:
                             data_boiler = [r for r in raw_data_t4 if str(r.get('boiler_name') or 'ไม่ระบุ') == boiler_label]
                             render_boiler_table(data_boiler, boiler_label)
 
