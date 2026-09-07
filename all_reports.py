@@ -1867,22 +1867,25 @@ def render_all_reports_module(user_branch_name):
                         b_id_t4 = st.session_state.branch_id
                         selected_branch_display = user_branch_name
 
-                # 🎯 เรียกใช้ process_t4 แบบใหม่ที่คืนค่า oven_raw มาด้วย
+                # 🎯 เรียกใช้ process_t4 ที่คืนค่า oven_raw มาด้วย
                 raw_data_t4, oven_raw_t4, excel_data_t4, json_html_t4 = process_t4(b_id_t4, str(start_date_t4), str(end_date_t4), tuple(user_allowed_branches), selected_branch_display)
 
                 if raw_data_t4 or oven_raw_t4:
                     pk_col_t4 = list(raw_data_t4[0].keys())[0] if raw_data_t4 else None
                     pk_col_ov = list(oven_raw_t4[0].keys())[0] if oven_raw_t4 else None
                     
-                    # 🎯 หาชื่อบอยเลอร์ทั้งหมดที่มีในข้อมูลชุดนี้มาสร้างแท็บอัตโนมัติ
                     unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4]))) if raw_data_t4 else []
                     
                     # 🎯 สร้างแท็บ โดยเอา "ยอดรวมสาขา" ขึ้นก่อน แล้วตามด้วยข้อมูลแยกแต่ละบอยเลอร์
                     tab_names = ["📁 ข้อมูลยอดรวมสาขา (เตา/ไม้อบ/แรงดัน)"] + [f"🔥 ข้อมูล {b}" for b in unique_boilers]
                     tabs_list = st.tabs(tab_names)
 
+                    # แปลงข้อมูล JSON สำหรับสั่งปริ้นแยกตามแต่ละแท็บ
+                    parsed_print_data = json.loads(json_html_t4)
+                    boilers_print_dict = parsed_print_data.get("boilers", {})
+
                     # ==========================================
-                    # 🎯 สร้างตารางย่อย 1: ข้อมูลยอดรวมสาขา
+                    # 🎯 แท็บย่อยที่ 0: ข้อมูลยอดรวมสาขา
                     # ==========================================
                     with tabs_list[0]:
                         if oven_raw_t4:
@@ -1923,7 +1926,7 @@ def render_all_reports_module(user_branch_name):
                             st.info("ไม่พบข้อมูลยอดรวมสาขาในช่วงเวลาที่เลือก")
 
                     # ==========================================
-                    # 🎯 สร้างตารางย่อย 2: ข้อมูลเชื้อเพลิงแยกตามบอยเลอร์
+                    # 🎯 แท็บย่อยอื่นๆ: ข้อมูลเชื้อเพลิงแยกตามบอยเลอร์
                     # ==========================================
                     def render_boiler_table(data_list, boiler_label):
                         if not data_list:
@@ -1975,5 +1978,79 @@ def render_all_reports_module(user_branch_name):
                         if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 
                             parsed_data = json.loads(json_html_t4)
                             show_summary_report_dialog_t4(parsed_data["boilers"])
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview4(){{var data = {json_html_t4}; var w = window.open('', '_blank', 'height=600,width=900,scrollbars=yes'); w.document.write(data.full_print_html); w.document.close(); w.print();}}</script>""", height=50)
+                    with col_btn3: 
+                        # 🎯 แปลงข้อมูลตาราง HTML ออกมาเตรียมไว้
+                        parsed_print_data = json.loads(json_html_t4)
+                        boilers_print_dict = parsed_print_data.get("boilers", {})
+                        
+                        # 1. ค้นหาตาราง Master (หน้าข้อมูลยอดรวมสาขา)
+                        master_html_str = ""
+                        for k, v in boilers_print_dict.items():
+                            if "รวมสาขา" in k or "รวม 1+2" in k:
+                                master_html_str = v
+                                break
+                                
+                        # 2. ค้นหาตารางแยกของบอยเลอร์แต่ละเครื่อง
+                        boiler_html_snippets = {}
+                        for b_lbl in unique_boilers:
+                            found_html = ""
+                            for k, v in boilers_print_dict.items():
+                                if b_lbl in k and "รวมสาขา" not in k and "รวม 1+2" not in k:
+                                    found_html = v
+                                    break
+                            boiler_html_snippets[b_lbl] = found_html
+
+                        # 🎯 สคริปต์ตรวจสอบแท็บย่อยที่เลือกอยู่ก่อนเปิดหน้าต่างพิมพ์
+                        components.html(f"""
+                        <body style="margin:0;padding:2px;overflow:hidden;">
+                            <button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button>
+                        </body>
+                        <script>
+                        function openPrintPreview4() {{
+                            try {{
+                                // ค้นหาแท็บที่กำลังถูกคลิก (Active) อยู่บนหน้าเว็บ Streamlit
+                                var activeTabs = window.parent.document.querySelectorAll('[role="tab"][aria-selected="true"], [data-baseweb="tab"][aria-selected="true"]');
+                                var selectedTabName = "";
+                                for(var i=0; i<activeTabs.length; i++) {{
+                                    var text = activeTabs[i].innerText || activeTabs[i].textContent;
+                                    if(text.includes("ยอดรวมสาขา") || text.includes("ข้อมูล บอยเลอร์") || text.includes("ข้อมูลบอยเลอร์")) {{
+                                        selectedTabName = text.trim();
+                                    }}
+                                }}
+
+                                var printHtml = "";
+                                var masterHtml = {json.dumps(master_html_str)};
+                                var boilerSnippets = {json.dumps(boiler_html_snippets)};
+
+                                // ถ้าผู้ใช้อยู่หน้ายอดรวมสาขา ให้ปริ้นตารางรวม 1+2
+                                if(selectedTabName.includes("ยอดรวมสาขา") || selectedTabName === "") {{
+                                    printHtml = masterHtml;
+                                }} else {{
+                                    // ถ้าผู้ใช้อยู่หน้าบอยเลอร์ย่อย ให้หาตารางบอยเลอร์ชื่อนั้นๆ มาปริ้น
+                                    for (var bKey in boilerSnippets) {{
+                                        if(selectedTabName.includes(bKey)) {{
+                                            printHtml = boilerSnippets[bKey];
+                                            break;
+                                        }}
+                                    }}
+                                    // ถ้าหาไม่เจอจริงๆ ให้ปริ้นหน้า Master ป้องกัน Error
+                                    if(printHtml === "") {{
+                                        printHtml = masterHtml; 
+                                    }}
+                                }}
+
+                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                                w.document.write(printHtml);
+                                w.document.close();
+                                setTimeout(function(){{ w.print(); }}, 500);
+                            }} catch (e) {{
+                                console.error("Print Error:", e);
+                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                                w.document.write({json.dumps(master_html_str)});
+                                w.document.close();
+                                setTimeout(function(){{ w.print(); }}, 500);
+                            }}
+                        }}
+                        </script>
+                        """, height=50)
                 else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
