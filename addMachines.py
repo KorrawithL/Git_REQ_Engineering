@@ -154,7 +154,7 @@ def render_add_new_equipment():
                 cur.execute(base_query + f"WHERE m.branch_id IN ({placeholders}) ORDER BY m.id DESC", tuple(user_allowed_branches))
             
             for r in cur.fetchall():
-                status_label = "🟢 ใช้งาน" if r.get('is_active') == 1 else "🔴 ระงับ"
+                status_label = "▶️ ใช้งาน" if r.get('is_active') == 1 else "🔴 ระงับ"
                 is_mach = (r.get('machine_type') == 'machine')
                 
                 cat_label = "⚙️ เครื่องจักร" if is_mach else "🚚 รถยนต์/รถยก"
@@ -191,7 +191,7 @@ def render_add_new_equipment():
             f_c1, f_c2, f_c3 = st.columns(3)
             with f_c1:
                 search_q = st.text_input("🔍 ค้นหาชื่อ/รหัส:", placeholder="พิมพ์เพื่อค้นหา...")
-                f_status = st.selectbox("📍 สถานะการใช้งาน:", ["ทั้งหมด", "🟢 ใช้งาน", "🔴 ระงับ"])
+                f_status = st.selectbox("📍 สถานะการใช้งาน:", ["ทั้งหมด", "▶️ ใช้งาน", "🔴 ระงับ"])
                 # f_reg = st.date_input("📅 วันที่ลงทะเบียน (ช่วงเวลา):", value=[])
             with f_c2:
                 branch_list = ["ทั้งหมด"] + sorted(df['สาขา'].dropna().unique().tolist())
