@@ -1050,32 +1050,56 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
     ws.title = "Pressure Report Matrix"
     ws.views.sheetView[0].showGridLines = True
     
-    font_title, font_banner, font_header_purple, font_total, font_total_red, font_total_blue = Font(name="Sarabun", size=13, bold=True, color="006100"), Font(name="Sarabun", size=12, bold=True), Font(name="Sarabun", size=11, bold=True, color="FFFFFF"), Font(name="Sarabun", size=9, bold=True), Font(name="Sarabun", size=9, bold=True, color="FF0000"), Font(name="Sarabun", size=9, bold=True, color="0000FF")
-    align_center, align_right = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center")
-    thin_border = Border(left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"), top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000"))
-    fill_green_banner, fill_yellow_banner, fill_purple, fill_yellow_cell = PatternFill(start_color="00FF00", end_color="00FF00", fill_type="solid"), PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid"), PatternFill(start_color="E000E0", end_color="E000E0", fill_type="solid"), PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
+    # 🎨 1. ชุดสีและฟอนต์แบบ Minimalist (Slate & Soft Blue)
+    font_title = Font(name="Sarabun", size=14, bold=True, color="FFFFFF") # ตัวหนังสือขาว
+    font_banner = Font(name="Sarabun", size=12, bold=True, color="334155") # สีเทาเข้ม
+    font_header = Font(name="Sarabun", size=10, bold=True, color="1E293B") # สีกรมท่าเกือบดำ
+    font_body = Font(name="Sarabun", size=9, color="1E293B")
+    font_body_bold = Font(name="Sarabun", size=9, bold=True, color="1E293B")
+    font_total = Font(name="Sarabun", size=10, bold=True, color="1E293B")
+    font_total_red = Font(name="Sarabun", size=10, bold=True, color="D32F2F") # สีแดงแบบ Soft
+    font_total_blue = Font(name="Sarabun", size=10, bold=True, color="1976D2") # สีน้ำเงินแบบ Soft
+    
+    align_center, align_right, align_left = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center"), Alignment(horizontal="left", vertical="center")
+    
+    bd_color = "94A3B8" # สีเทาอ่อนสำหรับเส้นขอบ
+    thin_border = Border(left=Side(style="thin", color=bd_color), right=Side(style="thin", color=bd_color), top=Side(style="thin", color=bd_color), bottom=Side(style="thin", color=bd_color))
+    
+    fill_title = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid") # สีกรมท่า (Dark Slate)
+    fill_banner_bg = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") # สีเทาขาว (Slate 50)
+    fill_header_1 = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid") # สีเทาอ่อน (Slate 200)
+    fill_header_2 = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid") # สีเทาสว่าง (Slate 100)
+    fill_drop_bg = PatternFill(start_color="FFFBEB", end_color="FFFBEB", fill_type="solid") # สีเหลืองพาสเทลอ่อนๆ
+    fill_total_bg = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid") # สีเทาสว่าง
 
     last_col_letter = get_column_letter(1 + (len(branches_config) * 8))
 
-    ws.merge_cells(f"A1:{last_col_letter}1"); ws["A1"] = "รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ"; ws["A1"].font, ws["A1"].alignment, ws["A1"].fill = font_title, align_center, fill_green_banner
-    ws.merge_cells(f"A2:{last_col_letter}2"); ws["A2"] = f"ประจำเดือน {month_str} {year_buddhist}"; ws["A2"].font, ws["A2"].alignment, ws["A2"].fill = font_banner, align_center, fill_yellow_banner
-    ws.merge_cells("A3:A5"); ws["A3"] = "วันที่"; ws["A3"].font, ws["A3"].alignment, ws["A3"].fill, ws["A3"].border = font_header_purple, align_center, fill_purple, thin_border
+    # 🎨 2. สร้าง Header ของ Excel
+    ws.merge_cells(f"A1:{last_col_letter}1"); ws["A1"] = "รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ"; ws["A1"].font, ws["A1"].alignment, ws["A1"].fill, ws["A1"].border = font_title, align_center, fill_title, thin_border
+    ws.merge_cells(f"A2:{last_col_letter}2"); ws["A2"] = f"ประจำเดือน {month_str} {year_buddhist}"; ws["A2"].font, ws["A2"].alignment, ws["A2"].fill, ws["A2"].border = font_banner, align_center, fill_banner_bg, thin_border
+    ws.merge_cells("A3:A5"); ws["A3"] = "วันที่"; ws["A3"].font, ws["A3"].alignment, ws["A3"].fill, ws["A3"].border = font_header, align_center, fill_header_1, thin_border
     ws["A4"].border, ws["A5"].border = thin_border, thin_border
 
     col_idx = 2
     for b in branches_config:
         st_c, en_c = get_column_letter(col_idx), get_column_letter(col_idx + 7)
-        ws.merge_cells(f"{st_c}3:{en_c}3"); ws[f"{st_c}3"] = b["code"]; ws[f"{st_c}3"].font, ws[f"{st_c}3"].alignment, ws[f"{st_c}3"].fill = font_header_purple, align_center, fill_purple
+        ws.merge_cells(f"{st_c}3:{en_c}3"); ws[f"{st_c}3"] = b["code"]; ws[f"{st_c}3"].font, ws[f"{st_c}3"].alignment, ws[f"{st_c}3"].fill, ws[f"{st_c}3"].border = font_header, align_center, fill_header_1, thin_border
+        for c in range(col_idx, col_idx + 8): ws[f"{get_column_letter(c)}3"].border = thin_border
+        
         c_cnt, c_drp_st, c_drp_en, c_pct_st, c_pct_en, c_rem = get_column_letter(col_idx), get_column_letter(col_idx + 1), get_column_letter(col_idx + 3), get_column_letter(col_idx + 4), get_column_letter(col_idx + 6), get_column_letter(col_idx + 7)
         ws[f"{c_cnt}4"] = "นับทั้งหมด"; ws.merge_cells(f"{c_drp_st}4:{c_drp_en}4"); ws[f"{c_drp_st}4"] = "แรงดันตก (ครั้ง)"; ws.merge_cells(f"{c_pct_st}4:{c_pct_en}4"); ws[f"{c_pct_st}4"] = "แรงดันตก (%)"; ws[f"{c_rem}4"] = "หมายเหตุ"
-        for c_i in range(col_idx, col_idx + 8): cell_h = ws[f"{get_column_letter(c_i)}4"]; cell_h.font, cell_h.alignment, cell_h.fill, cell_h.border = font_header_purple, align_center, fill_purple, thin_border
+        for c_i in range(col_idx, col_idx + 8): 
+            cell_h = ws[f"{get_column_letter(c_i)}4"]; cell_h.font, cell_h.alignment, cell_h.fill, cell_h.border = font_header, align_center, fill_header_2, thin_border
+            
         sub_cols = ["จำนวน\n(ครั้ง)", "ตกทั้งหมด", "ตกตาม\nเงื่อนไขPM", "เกินนอกเหนือ\nจากการPM", "ตกทั้งหมด", "ตกตาม\nเงื่อนไขPM", "เกินนอกเหนือ\nจากการPM", ""]
-        for i, sh in enumerate(sub_cols): cell_ref = f"{get_column_letter(col_idx + i)}5"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].fill, ws[cell_ref].border = font_header_purple, align_center, fill_purple, thin_border
+        for i, sh in enumerate(sub_cols): 
+            cell_ref = f"{get_column_letter(col_idx + i)}5"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].fill, ws[cell_ref].border = Font(name="Sarabun", size=9, bold=True, color="475569"), align_center, fill_banner_bg, thin_border
         col_idx += 8
 
+    # 🎨 3. สร้าง Body ของ Excel
     current_row = 6
     for day in range(1, 32):
-        ws[f"A{current_row}"] = day; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = Font(name="Sarabun", size=9, bold=True), align_center, thin_border
+        ws[f"A{current_row}"] = day; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_body_bold, align_center, thin_border
         c_idx = 2
         for b in branches_config:
             item = matrix_data[day][b['code']]
@@ -1090,12 +1114,19 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
                 ws[f"{get_column_letter(c_idx+7)}{current_row}"].value = item['remark']
             for offset in range(8):
                 cell = ws[f"{get_column_letter(c_idx+offset)}{current_row}"]
-                cell.font, cell.border = Font(name="Sarabun", size=9), thin_border
-                if offset < 4 and cell.value != "": cell.alignment, cell.fill, cell.font = (align_center if offset==0 else align_right), fill_yellow_cell, font_total
+                cell.font, cell.border = font_body, thin_border
+                # สลับสีเฉพาะส่วนที่มีข้อมูล เพื่อให้ดูสบายตา ไม่เหลืองแสบตา
+                if offset < 4 and cell.value != "": 
+                    cell.alignment, cell.fill, cell.font = (align_center if offset==0 else align_right), fill_drop_bg, font_body_bold
+                elif offset >= 4 and offset < 7 and cell.value != "":
+                    cell.alignment = align_right
+                elif offset == 7:
+                    cell.alignment = align_left
             c_idx += 8
         current_row += 1
 
-    ws[f"A{current_row}"] = "รวม"; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_total, align_center, thin_border
+    # 🎨 4. สร้าง Footer (ผลรวม) ของ Excel
+    ws[f"A{current_row}"] = "รวม"; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].fill, ws[f"A{current_row}"].border = font_total, align_center, fill_total_bg, thin_border
     c_idx = 2
     for b in branches_config:
         bt = branch_totals[b['code']]
@@ -1107,11 +1138,17 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         ws[f"{get_column_letter(c_idx+5)}{current_row}"] = bt['p_pm']
         ws[f"{get_column_letter(c_idx+6)}{current_row}"] = bt['p_npm']
 
-        for offset in range(4): cell = ws[f"{get_column_letter(c_idx+offset)}{current_row}"]; cell.font, cell.alignment, cell.border = font_total, (align_center if offset==0 else align_right), thin_border
-        ws[f"{get_column_letter(c_idx+4)}{current_row}"].font, ws[f"{get_column_letter(c_idx+4)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx+4)}{current_row}"].border = font_total_red, align_right, thin_border
-        ws[f"{get_column_letter(c_idx+5)}{current_row}"].font, ws[f"{get_column_letter(c_idx+5)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx+5)}{current_row}"].border = font_total, align_right, thin_border
-        ws[f"{get_column_letter(c_idx+6)}{current_row}"].font, ws[f"{get_column_letter(c_idx+6)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx+6)}{current_row}"].border = font_total_blue, align_right, thin_border
-        ws[f"{get_column_letter(c_idx+7)}{current_row}"].border = thin_border
+        for offset in range(8): 
+            cell = ws[f"{get_column_letter(c_idx+offset)}{current_row}"]
+            cell.fill, cell.border = fill_total_bg, thin_border
+            
+        ws[f"{get_column_letter(c_idx)}{current_row}"].font, ws[f"{get_column_letter(c_idx)}{current_row}"].alignment = font_total, align_center
+        for offset in range(1, 4):
+            ws[f"{get_column_letter(c_idx+offset)}{current_row}"].font, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment = font_total, align_right
+
+        ws[f"{get_column_letter(c_idx+4)}{current_row}"].font, ws[f"{get_column_letter(c_idx+4)}{current_row}"].alignment = font_total_red, align_right
+        ws[f"{get_column_letter(c_idx+5)}{current_row}"].font, ws[f"{get_column_letter(c_idx+5)}{current_row}"].alignment = font_total, align_right
+        ws[f"{get_column_letter(c_idx+6)}{current_row}"].font, ws[f"{get_column_letter(c_idx+6)}{current_row}"].alignment = font_total_blue, align_right
         c_idx += 8
 
     ws.column_dimensions['A'].width = 8
@@ -1122,13 +1159,14 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
     wb.save(excel_buffer)
     excel_data = excel_buffer.getvalue()
 
-    header_row1 = "".join([f'<th colspan="8" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:4px;font-size:11px;text-align:center;">{b["code"]}</th>' for b in branches_config])
-    header_row2 = "".join(['<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">นับทั้งหมด</th><th colspan="3" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">แรงดันตก (ครั้ง)</th><th colspan="3" style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">แรงดันตก (%)</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:9px;">หมายเหตุ</th>' for _ in branches_config])
-    header_row3 = "".join(['<th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">จำนวน<br>(ครั้ง)</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกทั้งหมด</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:40px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกทั้งหมด</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:35px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:40px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#E000E0;color:#FFF;border:1px solid #000;padding:2px;font-size:8px;width:90px;"></th>' for _ in branches_config])
+    # 🎨 5. สร้าง HTML สำหรับแสดงบนหน้าเว็บ (สีแมตช์กับ Excel ด้านบนเป๊ะๆ)
+    header_row1 = "".join([f'<th colspan="8" style="background-color:#E2E8F0;color:#1E293B;border:1px solid #CBD5E1;padding:6px;font-size:12px;text-align:center;">{b["code"]}</th>' for b in branches_config])
+    header_row2 = "".join(['<th style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">นับทั้งหมด</th><th colspan="3" style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">แรงดันตก (ครั้ง)</th><th colspan="3" style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">แรงดันตก (%)</th><th style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">หมายเหตุ</th>' for _ in branches_config])
+    header_row3 = "".join(['<th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">จำนวน<br>(ครั้ง)</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">ตกทั้งหมด</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">ตกทั้งหมด</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:100px;"></th>' for _ in branches_config])
 
     body_rows = ""
     for day in range(1, 32):
-        body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
+        body_rows += f'<tr><td style="background-color:#F8FAFC; border:1px solid #CBD5E1;padding:4px;text-align:center;font-size:10px;font-weight:bold;color:#1E293B;">{day}</td>'
         for b in branches_config:
             item = matrix_data[day][b['code']]
             if item['has_data']:
@@ -1140,20 +1178,21 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
                 rem_s = item['remark']
             else:
                 c_tot_s, c_drp_s, c_pm_s, c_npm_s, p_drp_s, p_pm_s, p_npm_s, rem_s = "", "", "", "", "", "", "", ""
-            body_rows += f'<td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{c_tot_s}</td><td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{c_drp_s}</td><td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{c_pm_s}</td><td style="background-color:#FFFF00;border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{c_npm_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{p_drp_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{p_pm_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;font-weight:bold;">{p_npm_s}</td><td style="border:1px solid #000;padding:2px;text-align:left;font-size:9px;">{rem_s}</td>'
+                
+            body_rows += f'<td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:center;font-size:10px;font-weight:bold;">{c_tot_s}</td><td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;font-weight:bold;">{c_drp_s}</td><td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;font-weight:bold;">{c_pm_s}</td><td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;font-weight:bold;">{c_npm_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;">{p_drp_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;">{p_pm_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;">{p_npm_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:left;font-size:10px;color:#475569;">{rem_s}</td>'
         body_rows += '</tr>'
 
-    total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
+    total_row_html = '<tr><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:center;font-size:11px;font-weight:bold;color:#1E293B;">รวม</td>'
     for b in branches_config:
         bt = branch_totals[b['code']]
         t_cnt_s = f"{int(bt['total']):,}" if bt['total'] > 0 else "-"
         t_drp_s = f"{int(bt['drop']):,}" if bt['drop'] > 0 else "-"
         t_pm_s = f"{int(bt['pm']):,}" if bt['pm'] > 0 else "-"
         t_npm_s = f"{int(bt['non_pm']):,}" if bt['non_pm'] > 0 else "-"
-        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;">{t_cnt_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_drp_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_pm_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_npm_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;color:red;">{bt["p_tot"]}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{bt["p_pm"]}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;color:blue;">{bt["p_npm"]}</td><td style="border:1px solid #000;padding:3px;text-align:left;font-size:9px;"></td>'
+        total_row_html += f'<td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:center;font-size:10px;font-weight:bold;">{t_cnt_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_drp_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_pm_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_npm_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#D32F2F;">{bt["p_tot"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#1E293B;">{bt["p_pm"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#1976D2;">{bt["p_npm"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:left;font-size:10px;"></td>'
     total_row_html += '</tr>'
 
-    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; }} .header-banner1 {{ background-color: #00FF00; color: #006100; text-align: center; font-size: 16px; font-weight: bold; padding: 6px; border: 1px solid #000; }} .header-banner2 {{ background-color: #FFFF00; color: #000; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body><div class='header-banner1'>รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div><div class='header-banner2'>ประจำเดือน {month_str} {year_buddhist}</div><table><thead><tr><th rowspan='3' style='background-color:#E000E0;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;width:35px;color:#000000 !important;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table></body></html>"
+    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 10px; background-color: #FFFFFF; color: #1E293B; }} .header-banner1 {{ background-color: #1E293B; color: #FFFFFF; text-align: center; font-size: 18px; font-weight: bold; padding: 12px; border: 1px solid #CBD5E1; border-bottom: none; border-radius: 8px 8px 0 0; letter-spacing: 0.5px; }} .header-banner2 {{ background-color: #F8FAFC; color: #475569; text-align: center; font-size: 14px; font-weight: bold; padding: 8px; border: 1px solid #CBD5E1; border-top: none; margin-bottom: 12px; border-radius: 0 0 8px 8px; }} table {{ width: 100%; border-collapse: collapse; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #1E293B !important; border: 1px solid #CBD5E1; }} th {{ text-transform: uppercase; letter-spacing: 0.5px; }}</style></head><body><div class='header-banner1'>รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div><div class='header-banner2'>ประจำเดือน {month_str} {year_buddhist}</div><table><thead><tr><th rowspan='3' style='background-color:#E2E8F0;color:#1E293B;border:1px solid #CBD5E1;padding:6px;font-size:12px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table></body></html>"
     
     return raw_data, excel_buffer.getvalue(), json.dumps(table_full_html)
 
