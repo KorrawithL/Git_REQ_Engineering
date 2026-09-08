@@ -55,7 +55,7 @@ def delete_record_dialog_t2(row_data, pk_col):
                 with conn.cursor() as cur:
                     cur.execute(f"DELETE FROM fuel_records WHERE {pk_col}=%s", (rec_id,))
                     conn.commit()
-                conn.close()
+                
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 2", f"ลบข้อมูล ID: {rec_id}")
                 st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
@@ -105,7 +105,7 @@ def delete_record_dialog_t4(row_data, pk_col):
                 with conn.cursor() as cur:
                     cur.execute(f"DELETE FROM boiler_fuel_records WHERE {pk_col}=%s", (rec_id,))
                     conn.commit()
-                conn.close()
+                
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4", f"ลบข้อมูล ID: {rec_id}")
                 st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
@@ -144,43 +144,71 @@ def delete_record_dialog_oven(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 1)", width="large")
 def update_record_dialog_t1(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่องเดิม: {row_data.get('machine_name')} ({row_data.get('branch_name')})")
     
-    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
-    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
-    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
-        edit_branch_options = list(branch_dict.keys())
-    else: 
-        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
-    
+    # 🎯 ดึงข้อมูลเดิมมาเก็บไว้
+    curr_m = str(row_data.get('machine_name') or 'ไม่ทราบชื่อเครื่องจักร')
     curr_branch = str(row_data.get('branch_name') or '')
-    def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
+    curr_branch_id = row_data.get('branch_id')
+    curr_m_id = row_data.get('machine_id')
+    
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่องเดิม: {curr_m} ({curr_branch})")
+    
+    # 🎯 ตรวจสอบสิทธิ์ผู้ใช้งาน
+    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
+    current_role = str(raw_role).strip().lower()
+    
+    new_branch_id = curr_branch_id
+    new_m_id = curr_m_id
+    btn_disabled = False
     
     c_top1, c_top2 = st.columns([1.5, 1.5])
-    with c_top1:
-        e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e1_br_{rec_id}")
-        new_branch_id = branch_dict[e_branch_lbl]
     
-    m_dict = {}
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS m_name FROM machines_set WHERE branch_id = %s AND machine_type = 'machine' AND is_active = 1", (new_branch_id,))
-            for m in cur.fetchall(): m_dict[m['m_name']] = m['id']
-        conn.close()
-    except Exception: pass
+    # 🌟 ถ้าเป็นแอดมิน: ให้แสดง Dropdown เลือกสาขาและเครื่องจักรได้
+    if current_role == "admin":
+        edit_branch_options = list(branch_dict.keys())
+        
+        # 🎯 ค้นหาค่า Default ของสาขาโดยเทียบจาก ID ของสาขา (แม่นยำ 100%)
+        def_branch_lbl = next((k for k, v in branch_dict.items() if v == curr_branch_id), edit_branch_options[0] if edit_branch_options else None)
+        def_branch_idx = edit_branch_options.index(def_branch_lbl) if def_branch_lbl in edit_branch_options else 0
+        
+        with c_top1:
+            e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e1_br_{rec_id}")
+            new_branch_id = branch_dict[e_branch_lbl]
+        
+        m_dict = {}
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, CONVERT(machine_name USING utf8mb4) AS m_name FROM machines_set WHERE branch_id = %s AND machine_type = 'machine' AND is_active = 1", (new_branch_id,))
+                for m in cur.fetchall(): m_dict[m['m_name']] = m['id']
+            conn.close()
+        except Exception: pass
+        
+        m_options = list(m_dict.keys())
+        if not m_options: m_options = ["-- ไม่พบเครื่องจักร --"]
+        
+        # 🎯 ค้นหาค่า Default ของเครื่องจักร โดยเช็คว่า ID สาขายังเป็นอันเดิมหรือไม่
+        def_m_idx = 0
+        if new_branch_id == curr_branch_id and curr_m in m_options:
+            def_m_idx = m_options.index(curr_m)
+        
+        with c_top2:
+            e_machine_lbl = st.selectbox("⚙️ 2. แก้ไขเครื่องจักร *", m_options, index=def_m_idx, key=f"e1_m_{rec_id}")
+            if e_machine_lbl != "-- ไม่พบเครื่องจักร --":
+                new_m_id = m_dict.get(e_machine_lbl, curr_m_id)
+            else:
+                btn_disabled = True
     
-    m_options = list(m_dict.keys())
-    if not m_options: m_options = ["-- ไม่พบเครื่องจักร --"]
-    
-    curr_m = str(row_data.get('machine_name') or '')
-    def_m_idx = m_options.index(curr_m) if (curr_m in m_options and e_branch_lbl == curr_branch) else 0
-    
-    with c_top2:
-        e_machine_lbl = st.selectbox("⚙️ 2. แก้ไขเครื่องจักร *", m_options, index=def_m_idx, key=f"e1_m_{rec_id}")
+    # 🚫 ถ้าเป็น User / Manager: ล็อคช่องสาขาและเครื่องจักร
+    else:
+        with c_top1:
+            st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e1_br_{rec_id}")
+        with c_top2:
+            st.text_input("⚙️ 2. เครื่องจักร (ไม่อนุญาตให้แก้ไข)", value=curr_m, disabled=True, key=f"e1_m_{rec_id}")
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
+    # 🎯 ฟอร์มกรอกข้อมูลตัวเลขและวันที่ (แก้ไขได้ทุกคน)
     col1, col2 = st.columns(2)
     with col1:
         e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
@@ -190,12 +218,11 @@ def update_record_dialog_t1(row_data, pk_col):
         e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), format="%.2f")
     e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
     
-    btn_disabled = (e_machine_lbl == "-- ไม่พบเครื่องจักร --")
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
         try:
-            new_m_id = m_dict.get(e_machine_lbl, row_data.get('machine_id'))
             conn = get_db_connection()
             with conn.cursor() as cur:
+                # อัปเดตข้อมูลรวมถึง branch_id และ machine_id (ถ้าไม่ใช่แอดมินค่าจะคงเดิม)
                 cur.execute(f"UPDATE machine_trans SET branch_id=%s, machine_id=%s, record_date=%s, machine_qty=%s, working_hours=%s, breakdown_hours=%s, remarks=%s, updated_at=NOW() WHERE {pk_col}=%s",
                             (new_branch_id, new_m_id, e_date, e_qty, e_work, e_break, e_rem, rec_id))
                 conn.commit()
@@ -210,58 +237,81 @@ def update_record_dialog_t1(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 2)", width="large")
 def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียนเดิม: {row_data.get('engine_code')} ({row_data.get('branch_name')})")
     
-    all_engines = []
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            sql = """SELECT CONVERT(e.machine_name USING utf8mb4) AS engine_code, 
-                            CONVERT(et.type_name USING utf8mb4) AS type_name, 
-                            CONVERT(b.branch_name USING utf8mb4) AS branch_name 
-                     FROM machines_set e 
-                     LEFT JOIN engine_types et ON e.engine_type_id = et.id 
-                     LEFT JOIN branches b ON e.branch_id = b.id 
-                     WHERE e.machine_type = 'engine' AND e.is_active = 1"""
-            cur.execute(sql)
-            all_engines = cur.fetchall()
-        conn.close()
-    except Exception: pass
-
     curr_branch = str(row_data.get('branch_name') or '')
     curr_type = str(row_data.get('type_name') or '')
     curr_code = str(row_data.get('engine_code') or '')
+    curr_branch_id = row_data.get('branch_id')
 
+    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียนเดิม: {curr_code} ({curr_branch})")
+    
+    # 🎯 ตรวจสอบสิทธิ์ผู้ใช้งาน
+    raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
+    current_role = str(raw_role).strip().lower()
+    
     c_sel1, c_sel2, c_sel3 = st.columns(3)
     
-    available_branches = sorted(list(set([e['branch_name'] for e in all_engines if e['branch_name']])))
-    def_branch_idx = available_branches.index(curr_branch) + 1 if curr_branch in available_branches else 0
-    e_branch = c_sel1.selectbox("🏢 1. สาขา *", ["-- เลือกสาขา --"] + available_branches, index=def_branch_idx, key=f"e2_br_{rec_id}")
+    new_type = curr_type
+    new_code = curr_code
+    inputs_disabled = False
+    e_branch = curr_branch # สำรองไว้หา ID กรณีแอดมินแก้สาขา
 
-    f2_type_disabled = (e_branch == "-- เลือกสาขา --")
-    if not f2_type_disabled:
-        filtered_by_branch = [e for e in all_engines if e['branch_name'] == e_branch]
-        available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
-    else:
-        available_types = []; filtered_by_branch = []
-        
-    def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
-    e_type = c_sel2.selectbox("🚜 2. ชนิด / ประเภทรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
+    # 🌟 ถ้าเป็นแอดมิน: ให้แสดง Dropdown เลือกข้อมูลรถได้
+    if current_role == "admin":
+        all_engines = []
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                sql = """SELECT CONVERT(e.machine_name USING utf8mb4) AS engine_code, 
+                                CONVERT(et.type_name USING utf8mb4) AS type_name, 
+                                CONVERT(b.branch_name USING utf8mb4) AS branch_name 
+                         FROM machines_set e 
+                         LEFT JOIN engine_types et ON e.engine_type_id = et.id 
+                         LEFT JOIN branches b ON e.branch_id = b.id 
+                         WHERE e.machine_type = 'engine' AND e.is_active = 1"""
+                cur.execute(sql)
+                all_engines = cur.fetchall()
+            conn.close()
+        except Exception: pass
 
-    f2_code_disabled = (e_type == "-- เลือกประเภท --") or f2_type_disabled
-    if not f2_code_disabled:
-        filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == e_type]
-        available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
-    else:
-        available_codes = []; filtered_by_type = []
+        available_branches = sorted(list(set([e['branch_name'] for e in all_engines if e['branch_name']])))
+        def_branch_idx = available_branches.index(curr_branch) + 1 if curr_branch in available_branches else 0
+        e_branch = c_sel1.selectbox("🏢 1. แก้ไขสาขา *", ["-- เลือกสาขา --"] + available_branches, index=def_branch_idx, key=f"e2_br_{rec_id}")
+
+        f2_type_disabled = (e_branch == "-- เลือกสาขา --")
+        if not f2_type_disabled:
+            filtered_by_branch = [e for e in all_engines if e['branch_name'] == e_branch]
+            available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
+        else:
+            available_types = []; filtered_by_branch = []
+            
+        def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
+        e_type = c_sel2.selectbox("🚜 2. แก้ไขชนิดรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
+
+        f2_code_disabled = (e_type == "-- เลือกประเภท --") or f2_type_disabled
+        if not f2_code_disabled:
+            filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == e_type]
+            available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
+        else:
+            available_codes = []; filtered_by_type = []
+            
+        def_code_idx = available_codes.index(curr_code) + 1 if (curr_code in available_codes and e_type == curr_type and e_branch == curr_branch) else 0
+        e_code = c_sel3.selectbox("🏷️ 3. แก้ไขทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled)
         
-    def_code_idx = available_codes.index(curr_code) + 1 if (curr_code in available_codes and e_type == curr_type and e_branch == curr_branch) else 0
-    e_code = c_sel3.selectbox("🏷️ 3. รหัสงาน / ทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled)
-    
-    inputs_disabled = (e_code == "-- เลือกรถ --") or f2_code_disabled
+        inputs_disabled = (e_code == "-- เลือกรถ --") or f2_code_disabled
+        if not inputs_disabled:
+            new_type = e_type
+            new_code = e_code
+
+    # 🚫 ถ้าเป็น User / Manager: ล็อคช่องสาขาและรถยนต์
+    else:
+        with c_sel1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e2_br_{rec_id}")
+        with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ (ไม่อนุญาตให้แก้ไข)", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}")
+        with c_sel3: st.text_input("🏷️ 3. รหัสงาน / ทะเบียนรถ (ไม่อนุญาตให้แก้ไข)", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}")
 
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
+    # 🎯 ฟอร์มกรอกข้อมูลทั่วไป (แก้ไขได้ทุกคน)
     col1, col2 = st.columns(2)
     with col1:
         e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), key=f"e2_dt_{rec_id}")
@@ -273,19 +323,25 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
         try:
             u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
+            
+            # ค้นหา Branch ID ถ้าแอดมินแก้ไขสาขาใหม่ (ถ้าไม่ใช่แอดมินจะใช้ ID เดิม)
+            new_branch_id = curr_branch_id
             conn = get_db_connection()
             with conn.cursor() as cur:
-                cur.execute("SELECT id FROM branches WHERE branch_name = %s", (e_branch,))
-                b_res = cur.fetchone()
-                new_branch_id = b_res['id'] if b_res else row_data.get('branch_id')
+                if current_role == "admin":
+                    cur.execute("SELECT id FROM branches WHERE branch_name = %s", (e_branch,))
+                    b_res = cur.fetchone()
+                    if b_res: new_branch_id = b_res['id']
 
+                # เซฟข้อมูลทับไปเลย
                 cur.execute(f"""UPDATE fuel_records SET branch_id=%s, record_date=%s, engine_code=CONVERT(%s USING utf8mb4), type_name=CONVERT(%s USING utf8mb4), 
                                fuel_liters=%s, working_hours=%s, liter_hr=%s, remark=CONVERT(%s USING utf8mb4) WHERE {pk_col}=%s""",
-                            (new_branch_id, e_date, e_code, e_type, e_liters, e_work, u_liter_hr, e_rem, rec_id))
+                            (new_branch_id, e_date, new_code, new_type, e_liters, e_work, u_liter_hr, e_rem, rec_id))
                 conn.commit()
             conn.close()
+            
             st.cache_data.clear()
-            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 2", f"แก้ไข ID: {rec_id} ({e_code})")
+            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 2", f"แก้ไข ID: {rec_id} ({new_code})")
             st.success("✅ อัปเดตข้อมูลสำเร็จ!")
             time.sleep(1)
             st.rerun()
@@ -1244,6 +1300,21 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     
     if not raw_data and not oven_raw: return [], [], None, None
 
+    # ==============================================================================
+    # 🎯 3. เพิ่มระบบคัดกรอง: แสดงเฉพาะข้อมูลที่ลงครบทั้ง 3 ส่วน (ในตาราง Master 1+2 และ ยอดรวมสาขา)
+    # ==============================================================================
+    complete_set = set()
+    if oven_raw and raw_data:
+        oven_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in oven_raw)
+        b1_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in raw_data if str(r.get('boiler_name')) == 'บอยเลอร์ 1')
+        b2_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in raw_data if str(r.get('boiler_name')) == 'บอยเลอร์ 2')
+        complete_set = oven_set.intersection(b1_set).intersection(b2_set)
+        
+        # กรองตารางยอดรวมสาขา ให้เหลือเฉพาะที่ครบองค์ประกอบ
+        oven_raw_filtered = [r for r in oven_raw if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set]
+    else:
+        oven_raw_filtered = []
+
     start_dt = pd.to_datetime(start_date_str)
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
@@ -1255,24 +1326,28 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     for r in raw_data:
         b_name = str(r.get('boiler_name') or 'บอยเลอร์ 1')
         if b_name not in grouped_data: grouped_data[b_name] = []
+        
+        # 📌 ข้อมูลบอยเลอร์ 1 และ 2 เก็บทั้งหมด ไม่โดนตัดทิ้ง เพื่อให้แสดงผลได้ปกติ
         grouped_data[b_name].append(r)
         
-        bn = str(r.get('branch_name') or '-')
-        dt = r['record_date']
-        k = (bn, dt)
-        if k not in master_summary:
-            master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
-            
-        master_summary[k]['sw'] += float(r.get('sawdust_weight') or 0)
-        master_summary[k]['ww'] += float(r.get('wood_weight') or 0)
-        master_summary[k]['www'] += float(r.get('waste_wood_weight') or 0)
-        master_summary[k]['sp'] += float(r.get('sawdust_price') or 0)
-        master_summary[k]['wp'] += float(r.get('wood_price') or 0)
-        master_summary[k]['wwp'] += float(r.get('waste_wood_price') or 0)
-        master_summary[k]['stm'] += float(r.get('steam_production') or 0)
-        master_summary[k]['hrs'] += float(r.get('working_hours') or 0)
+        # 📌 แต่สำหรับ Master Summary จะเอาเฉพาะอันที่ครบ 3 อย่าง
+        if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set:
+            bn = str(r.get('branch_name') or '-')
+            dt = r['record_date']
+            k = (bn, dt)
+            if k not in master_summary:
+                master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
+                
+            master_summary[k]['sw'] += float(r.get('sawdust_weight') or 0)
+            master_summary[k]['ww'] += float(r.get('wood_weight') or 0)
+            master_summary[k]['www'] += float(r.get('waste_wood_weight') or 0)
+            master_summary[k]['sp'] += float(r.get('sawdust_price') or 0)
+            master_summary[k]['wp'] += float(r.get('wood_price') or 0)
+            master_summary[k]['wwp'] += float(r.get('waste_wood_price') or 0)
+            master_summary[k]['stm'] += float(r.get('steam_production') or 0)
+            master_summary[k]['hrs'] += float(r.get('working_hours') or 0)
 
-    for o in oven_raw:
+    for o in oven_raw_filtered:
         bn = str(o.get('branch_name') or '-')
         dt = o['record_date']
         k = (bn, dt)
@@ -1343,14 +1418,12 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     cur_row = 4; body_html_m = ""
     s_ov = s_wo = s_sw = s_ww = s_www = s_tw = s_sp = s_wp = s_wwp = s_tp = s_stm = s_hrs = s_prs = s_pcnt = 0
 
-    # 🎯 3.1.1 เรียงข้อมูลตาม วันที่ -> สาขา เพื่อให้แสดงแถวสลับกันตามวันที่
     sorted_master_data = sorted(master_summary.items(), key=lambda x: (x[0][1], x[0][0]))
 
     for k, v in sorted_master_data:
         branch_full = k[0]
         dt_val = k[1]
         
-        # หาย่อสาขามาใส่วงเล็บ
         try: b_short = branch_full.split("สาขา ")[1].split()[0]
         except: b_short = branch_full
         if not b_short or b_short == '-': b_short = "N/A"
@@ -1362,7 +1435,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         tp = v['sp'] + v['wp'] + v['wwp']
         avg_p = v['press'] / v['press_cnt'] if v['press_cnt'] > 0 else 0
         
-        # คำนวณสูตร
         act_p_cub = tp / v['wood'] if v['wood'] > 0 else 0
         std_stm_hr = v['oven'] * std['stm_mul']
         act_stm_hr = v['stm'] / v['hrs'] if v['hrs'] > 0 else 0
@@ -1396,7 +1468,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             if idx in [2, 3, 4, 5, 6, 7]: c.fill = fill_yellow
             if isinstance(val, (int, float)): c.number_format = '#,##0.00'
             
-            # HTML Styling
             bg = "background-color:#00B050;color:white;" if is_std_col else ("background-color:#FFFF00;" if idx in [2,3,4,5,6,7] else "")
             tc = "color:red;" if is_diff_col and val < 0 else ""
             fw = "font-weight:bold;" if idx in [7,11] else ""
@@ -1404,7 +1475,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         body_html_m += "</tr>"
         cur_row += 1
 
-    # สรุป Footer รวม Master
     avg_p_cub = s_tp / s_wo if s_wo > 0 else 0
     sum_std_stm = s_ov * std['stm_mul']
     avg_stm_hr = s_stm / s_hrs if s_hrs > 0 else 0
@@ -1435,7 +1505,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         f_html_m += f"<td style='{tc}text-align:{'center' if idx==1 else 'right'};'>{val if val == '' or idx==1 else f'{val:,.2f}'}</td>"
     f_html_m += "</tr>"
     
-    # ปรับความกว้าง
     for i in range(1, 31): ws_m.column_dimensions[get_column_letter(i)].width = 10
     ws_m.column_dimensions['A'].width = 14
 
@@ -1449,7 +1518,10 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     # ==============================================================================
     for boiler_name in sorted(grouped_data.keys()):
         data_list = grouped_data[boiler_name]
-        data_list = sorted(data_list, key=lambda x: (x['record_date'], x.get('branch_name', '')))
+        
+        # ป้องกัน Error NoneType
+        data_list = sorted(data_list, key=lambda x: (str(x.get('record_date') or ''), str(x.get('branch_name') or '')))
+        
         ws = wb.create_sheet(title=boiler_name)
 
         ws.merge_cells("A1:O1")
@@ -1554,7 +1626,8 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
     
-    return raw_data, oven_raw, excel_buffer.getvalue(), json.dumps(final_json_data)
+    # 🎯 Return ข้อมูลที่ถูกกรองให้หน้าเว็บ (oven_raw_filtered) และคืนค่า raw_data ดิบสำหรับบอยเลอร์แยก
+    return raw_data, oven_raw_filtered, excel_buffer.getvalue(), json.dumps(final_json_data)
 
 
 # ==========================================================
