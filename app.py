@@ -244,151 +244,101 @@ if not st.session_state.get('logged_in'):
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 🎯 4. หน้าจอหลักของระบบ (Main Layout & UI - Nested Hierarchy Fixed Text)
+# 🎯 4. หน้าจอหลักของระบบ (Main Layout & UI - Dynamic Theme)
 # -----------------------------------------------------------------------------
 else:
-    st.markdown("""<style>
-    /* 🎯 ซ่อน Header และตัวควบคุมมาตรฐานของ Streamlit */
-    header[data-testid="stHeader"] { display: none !important; }
-    header { visibility: hidden !important; }
-    #MainMenu { visibility: hidden !important; }
-    [data-testid="collapsedControl"] { display: none !important; }
+    # ==========================================
+    # 🌙 จัดการสถานะโหมดกลางคืน (Dark Mode)
+    # ==========================================
+    if 'dark_mode' not in st.session_state:
+        st.session_state['dark_mode'] = False
+
+    if st.session_state['dark_mode']:
+        # 🌑 โหมดกลางคืน (Dark Mode)
+        bg_main = "#0F172A"       # สีพื้นหลังหลัก (Slate 900)
+        bg_sidebar = "#1E293B"    # สี Sidebar (Slate 800)
+        text_color = "#F8FAFC"    # สีตัวอักษร (Slate 50)
+        text_muted = "#94A3B8"    # สีตัวอักษรรอง (Slate 400)
+        border_color = "#334155"  # สีเส้นขอบ (Slate 700)
+        btn_bg = "#1E293B"        # สีปุ่มปกติ
+        btn_hover = "#334155"     # สีปุ่มตอนชี้
+        box_bg = "#1E293B"        # สีกล่อง Topbar
+    else:
+        # ☀️ โหมดกลางวัน (Light Mode)
+        bg_main = "#FDFBF7"
+        bg_sidebar = "#F4EFEA"
+        text_color = "#2C2A29"
+        text_muted = "#57534E"
+        border_color = "#E6DFD5"
+        btn_bg = "#FFFFFF"
+        btn_hover = "#FAFAFA"
+        box_bg = "#FFFFFF"
+
+    # แทรก CSS แบบ Dynamic (เปลี่ยนสีตามโหมดแบบ Real-time)
+    st.markdown(f"""<style>
+    /* 🎯 ซ่อนส่วนขวาบน (Deploy & 3 จุด) ให้เกลี้ยง */
+    .stAppDeployButton {{ display: none !important; }}
+    [data-testid="stHeaderActionElements"] {{ display: none !important; }}
+    #MainMenu {{ display: none !important; }}
     
-    /* 🎯 พื้นหลังหลักของแอปเป็นสีขาวนวล */
-    .stApp {
-        background-color: #FDFBF7 !important;
-        color: #2C2A29 !important;
-    }
+    /* 🎯 ล่องหนแถบด้านบน (Header) ให้โปร่งใส ไม่มีขอบ */
+    header[data-testid="stHeader"] {{ background: transparent !important; box-shadow: none !important; }}
     
-    /* 🎯 Sidebar เป็นสีครีมละมุน */
-    [data-testid="stSidebar"] {
-        display: block !important;
-        width: 290px !important;
-        background-color: #F4EFEA !important;
-        border-right: 1px solid #E6DFD5 !important;
-    }
+    /* 🎯 ซ่อนปุ่มพับ Sidebar ถาวร */
+    [data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
+    [data-testid="collapsedControl"] {{ display: none !important; }}
     
-    .main .block-container { 
-        padding-top: 1.5rem !important; 
-        padding-left: 2rem !important; 
-        padding-right: 2rem !important; 
-        max-width: 100% !important; 
-        background-color: #FDFBF7 !important;
-    }
+    /* 🌙 จัดการสีพื้นหลังหลักของแอป และ Sidebar */
+    .stApp {{ background-color: {bg_main} !important; color: {text_color} !important; transition: all 0.3s ease; }}
+    [data-testid="stSidebar"] {{ background-color: {bg_sidebar} !important; border-right: 1px solid {border_color} !important; transition: all 0.3s ease; }}
+    .main .block-container {{ background-color: {bg_main} !important; }}
     
-    div[data-testid="stHorizontalBlock"]:first-of-type button {
-        background-color: #FFFFFF !important; border: 1px solid #E6DFD5 !important; border-radius: 8px !important; padding: 2px 0px !important; font-size: 14px !important; transition: all 0.2s ease !important; color: #2C2A29 !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-    }
-    div[data-testid="stHorizontalBlock"]:first-of-type button:hover { transform: translateY(-1px) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important; }
+    /* เปลี่ยนสีตัวอักษรทั่วไป */
+    p, span, h1, h2, h3, h4, h5, h6, label, li {{ color: {text_color} !important; transition: all 0.3s ease; }}
+    .stMarkdown div {{ color: {text_color} !important; }}
+    
+    /* สีกล่อง Top bar และเส้นขอบ Container */
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {{ background-color: {box_bg} !important; border-color: {border_color} !important; transition: all 0.3s ease; }}
+    
+    /* ปรับสีช่องกรอกข้อมูลและตารางให้กลืนกับโหมด */
+    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {{
+        background-color: {box_bg} !important; color: {text_color} !important; border-color: {border_color} !important;
+    }}
+    table th, table td {{ color: {text_color} !important; border-color: {border_color} !important; background-color: {bg_main} !important; }}
+    
+    /* สีปุ่ม Navbar ด้านบน */
+    div[data-testid="stHorizontalBlock"]:first-of-type button {{ background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important; border-radius: 8px !important; padding: 2px 0px !important; font-size: 14px !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; }}
+    div[data-testid="stHorizontalBlock"]:first-of-type button:hover {{ background-color: {btn_hover} !important; transform: translateY(-1px) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important; }}
 
     /* =========================================================
-       🌟 1. ทำให้เมนูหลักโดดเด่น (Prominent Main Menu)
+       🌟 เมนูหลัก (Main Menu)
        ========================================================= */
-    [data-testid="stSidebar"] div.stButton > button {
-        background-color: #FFFFFF !important;
-        border: 1px solid #E6DFD5 !important;
-        color: #1C1917 !important;
-        padding: 12px 14px !important;
-        border-radius: 10px !important;
-        font-size: 15px !important;
-        font-weight: 700 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
-        text-align: left !important;
-        justify-content: flex-start !important;
-        width: 100% !important;
-        margin-bottom: 2px !important;
-        transition: all 0.2s ease !important;
-    }
+    [data-testid="stSidebar"] div.stButton > button {{
+        background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important;
+        padding: 12px 14px !important; border-radius: 10px !important; font-size: 15px !important; font-weight: 700 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left !important; justify-content: flex-start !important;
+        width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important;
+    }}
+    [data-testid="stSidebar"] div.stButton > button:hover {{ background-color: {btn_hover} !important; border-color: #D97706 !important; color: #D97706 !important; }}
     
-    [data-testid="stSidebar"] div.stButton > button:hover {
-        background-color: #FAFAFA !important;
-        border-color: #D97706 !important;
-        color: #D97706 !important;
-    }
-    
-    /* เมนูหลักที่กำลังเลือก (Active) */
-    [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {
-        background-color: #D97706 !important; 
-        color: #FFFFFF !important;
-        border: 1px solid #D97706 !important;
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important;
-    }
+    [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {{
+        background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important;
+    }}
 
     /* =========================================================
-       🌟 2. จัดระเบียบเมนูย่อย (Sub-menu) ให้ตัวหนังสือกลับมา!
+       🌟 เมนูย่อย (Sub-menu)
        ========================================================= */
-    /* จัดการกรอบและเส้นสายตาของเมนูย่อย */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] {
-        border-left: 2px solid #D1D5DB !important; /* เส้นสีเทานำสายตาด้านซ้าย */
-        margin-left: 20px !important; /* เยื้องเข้าไปอยู่ใต้เมนูหลัก */
-        padding-left: 5px !important;
-        margin-top: 5px !important;
-        margin-bottom: 15px !important;
-    }
-    
-    /* 🌟 ซ่อนวงกลม Radio อย่างปลอดภัย (ไม่กระทบข้อความ) */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] {
-        display: none !important;
-    }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div {
-        display: none !important;
-    }
-    
-    /* ระยะห่างระหว่างหัวข้อย่อย */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {
-        gap: 2px !important;
-    }
-    
-    /* พื้นหลังเมนูย่อย (แบบใส) */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label {
-        background-color: transparent !important;
-        border: 1px solid transparent !important;
-        padding: 8px 10px !important;
-        margin: 0 !important;
-        border-radius: 8px !important;
-        transition: all 0.2s ease !important;
-        display: block !important;
-        width: 100% !important;
-        cursor: pointer !important;
-    }
-    
-    /* บังคับให้กล่องข้อความแสดงผลแน่นอน */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] {
-        display: block !important;
-        width: 100% !important;
-    }
-    
-    /* จัดข้อความเมนูย่อยให้สวยงาม */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label p {
-        color: #57534E !important;
-        font-size: 13.5px !important;
-        font-weight: 500 !important;
-        margin: 0 !important;
-        line-height: 1.5 !important;
-        white-space: normal !important;
-        /* เทคนิคดันไอคอน: ย่อหน้าลบแล้วดันกลับ */
-        text-indent: -22px !important;
-        padding-left: 22px !important;
-    }
-    
-    /* เอฟเฟกต์ตอนชี้เมาส์ (Hover) */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
-        background-color: #EFECE6 !important;
-    }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover p {
-        color: #1C1917 !important;
-    }
-    
-    /* เอฟเฟกต์ตอนถูกเลือก (Active) */
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
-        background-color: #FFFFFF !important;
-        border-color: #E6DFD5 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important;
-    }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p {
-        color: #D97706 !important;
-        font-weight: 700 !important;
-    }
+    [data-testid="stSidebar"] div[data-testid="stRadio"] {{ border-left: 2px solid {border_color} !important; margin-left: 20px !important; padding-left: 5px !important; margin-top: 5px !important; margin-bottom: 15px !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] {{ display: none !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div {{ display: none !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {{ gap: 2px !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label {{ background-color: transparent !important; border: 1px solid transparent !important; padding: 8px 10px !important; margin: 0 !important; border-radius: 8px !important; transition: all 0.2s ease !important; display: block !important; width: 100% !important; cursor: pointer !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] {{ display: block !important; width: 100% !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label p {{ color: {text_muted} !important; font-size: 13.5px !important; font-weight: 500 !important; margin: 0 !important; line-height: 1.5 !important; white-space: normal !important; text-indent: -22px !important; padding-left: 22px !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover {{ background-color: {btn_hover} !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover p {{ color: {text_color} !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {{ background-color: {btn_bg} !important; border-color: {border_color} !important; box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important; }}
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p {{ color: #D97706 !important; font-weight: 700 !important; }}
     </style>""", unsafe_allow_html=True)
     
     st.session_state['last_activity'] = time.time()
@@ -479,8 +429,20 @@ else:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
 
     with st.sidebar:
-        st.markdown("<h3 style='color: #1C1917; margin-bottom: 20px; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;'>🧭 ScaleApp.</h3>", unsafe_allow_html=True)
-        
+        # 🎯 แบ่งคอลัมน์เพื่อแทรกปุ่มโหมดกลางคืน (วงสีแดง) ให้เนียนตา
+        c_title, c_toggle = st.columns([7, 3])
+        with c_title:
+            st.markdown(f"<h3 style='color: {text_color}; margin-top: 5px; margin-bottom: 0px; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;'>WORK WOOD</h3>", unsafe_allow_html=True)
+        with c_toggle:
+            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
+            # ปุ่มสวิตซ์เปิด-ปิดโหมด
+            is_dark = st.toggle("🌙", value=st.session_state['dark_mode'], label_visibility="collapsed")
+            if is_dark != st.session_state['dark_mode']:
+                st.session_state['dark_mode'] = is_dark
+                st.rerun()
+                
+        st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
+
         # กำหนดชื่อเมนูหลักของรายงานตามสิทธิ์
         report_menu_label = "📑 รายงานรวม (All Report)"
         if current_role == 'admin':

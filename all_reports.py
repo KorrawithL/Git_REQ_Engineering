@@ -4,6 +4,7 @@ import pandas as pd
 import io
 import time
 import json
+import math
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -1690,16 +1691,92 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t1:
                 pk_col_t1 = list(raw_data_t1[0].keys())[0]
+                total_records = len(raw_data_t1)
                 
-                ROWS_PER_PAGE = 15
-                total_pages_t1 = max(1, (len(raw_data_t1) - 1) // ROWS_PER_PAGE + 1)
-                
-                pc1, pc2 = st.columns([7, 3])
-                with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t1)}</b> รายการ</div>", unsafe_allow_html=True)
-                with pc2: page_t1 = st.selectbox("เลือกหน้า", range(1, total_pages_t1 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", key=f"pg_t1_{start_date_t1}_{end_date_t1}_{b_id_t1}_{len(raw_data_t1)}", label_visibility="collapsed")
-                
-                paginated_t1 = raw_data_t1[(page_t1 - 1) * ROWS_PER_PAGE : page_t1 * ROWS_PER_PAGE]
+                # 🌟 1. ตั้งค่า Session State สำหรับจำหน้าและจำนวนข้อมูล
+                if 'report1_rows_per_page' not in st.session_state:
+                    st.session_state['report1_rows_per_page'] = 15
+                if 'report1_current_page' not in st.session_state:
+                    st.session_state['report1_current_page'] = 1
 
+                # 🌟 2. ลอจิกการคำนวณจำนวนหน้าทั้งหมด (ต้องคำนวณก่อนสร้างปุ่ม)
+                rows_per_page = st.session_state['report1_rows_per_page']
+                if rows_per_page <= 0:
+                    total_pages_t1 = 1
+                elif rows_per_page >= total_records:
+                    total_pages_t1 = 1
+                else:
+                    total_pages_t1 = max(1, math.ceil(total_records / rows_per_page))
+
+                # ป้องกันกรณีหน้าปัจจุบันทะลุ
+                if st.session_state['report1_current_page'] > total_pages_t1:
+                    st.session_state['report1_current_page'] = total_pages_t1
+                if st.session_state['report1_current_page'] < 1:
+                    st.session_state['report1_current_page'] = 1
+
+                # 🌟 3. จัด Layout ด้านบน (ข้อมูลรวมตัวเลื่อนหน้าไว้ฝั่งขวา)
+                pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+                
+                with pc1: 
+                    # 🟦 ช่องให้ผู้ใช้กรอกจำนวนข้อมูลต่อหน้า
+                    new_rows = st.number_input(
+                        f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", 
+                        value=st.session_state['report1_rows_per_page'], 
+                        step=5, 
+                        key=f"rows_t1"
+                    )
+                    if new_rows != st.session_state['report1_rows_per_page']:
+                        st.session_state['report1_rows_per_page'] = new_rows
+                        st.session_state['report1_current_page'] = 1
+                        # ลบโค้ด st.session_state['pg_t1'] ออกเพื่อแก้บั๊ก Error
+                        st.rerun()
+
+                with pc2: 
+                    st.write("") # ดันให้ตรงกับกล่อง input ฝั่งซ้าย
+                    
+                    # 🟩 Dropdown เลือกหน้า (✅ ใช้ Dynamic Key แทนเพื่อแก้ปัญหา State Conflict)
+                    dynamic_key = f"pg_t1_dynamic_{st.session_state['report1_current_page']}"
+                    selected_page = st.selectbox(
+                        "เลือกหน้า", 
+                        range(1, total_pages_t1 + 1), 
+                        index=st.session_state['report1_current_page'] - 1, 
+                        format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", 
+                        key=dynamic_key, 
+                        label_visibility="collapsed"
+                    )
+                    if selected_page != st.session_state['report1_current_page']:
+                        st.session_state['report1_current_page'] = selected_page
+                        st.rerun()
+
+                    # 🟥 ชุดปุ่มเลื่อนหน้า (ย้ายมาไว้ใต้ Dropdown ทันที)
+                    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True) 
+                    c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+                    with c_prev:
+                        if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report1_current_page'] <= 1), key="prev_t1"):
+                            st.session_state['report1_current_page'] -= 1
+                            # ลบโค้ดบังคับ State ออก
+                            st.rerun()
+                    with c_page:
+                        st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report1_current_page']} / {total_pages_t1}</div>", unsafe_allow_html=True)
+                    with c_next:
+                        if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report1_current_page'] >= total_pages_t1), key="next_t1"):
+                            st.session_state['report1_current_page'] += 1
+                            # ลบโค้ดบังคับ State ออก
+                            st.rerun()
+
+                # 🌟 4. หั่นข้อมูล (Slicing) ตามหน้าที่เลือก
+                if rows_per_page <= 0:
+                    paginated_t1 = []
+                elif rows_per_page >= total_records:
+                    paginated_t1 = raw_data_t1
+                else:
+                    start_idx = (st.session_state['report1_current_page'] - 1) * rows_per_page
+                    end_idx = start_idx + rows_per_page
+                    paginated_t1 = raw_data_t1[start_idx:end_idx]
+
+                # =========================================================
+                # ส่วนแสดงผลตาราง
+                # =========================================================
                 st.markdown("<br>", unsafe_allow_html=True)
                 header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
                 headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
@@ -1724,11 +1801,14 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
                 st.write("")
+                
+                # 🌟 5. จัด Layout ด้านล่าง (เหลือแค่ 3 ปุ่มหลัก)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
                 with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
                 with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+            
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
     # =========================================================================
@@ -1759,16 +1839,57 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t2:
                 pk_col_t2 = list(raw_data_t2[0].keys())[0]
+                total_records = len(raw_data_t2)
                 
-                ROWS_PER_PAGE = 15
-                total_pages_t2 = max(1, (len(raw_data_t2) - 1) // ROWS_PER_PAGE + 1)
-                
-                pc1, pc2 = st.columns([7, 3])
-                with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t2)}</b> รายการ</div>", unsafe_allow_html=True)
-                with pc2: page_t2 = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key=f"pg_t2_{start_date_t2}_{end_date_t2}_{b_id_t2}_{len(raw_data_t2)}", label_visibility="collapsed")
-                
-                paginated_t2 = raw_data_t2[(page_t2 - 1) * ROWS_PER_PAGE : page_t2 * ROWS_PER_PAGE]
+                if 'report2_rows_per_page' not in st.session_state:
+                    st.session_state['report2_rows_per_page'] = 15
+                if 'report2_current_page' not in st.session_state:
+                    st.session_state['report2_current_page'] = 1
 
+                rows_per_page = st.session_state['report2_rows_per_page']
+                if rows_per_page <= 0: total_pages_t2 = 1
+                elif rows_per_page >= total_records: total_pages_t2 = 1
+                else: total_pages_t2 = max(1, math.ceil(total_records / rows_per_page))
+
+                if st.session_state['report2_current_page'] > total_pages_t2: st.session_state['report2_current_page'] = total_pages_t2
+                if st.session_state['report2_current_page'] < 1: st.session_state['report2_current_page'] = 1
+
+                pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+                with pc1: 
+                    new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state['report2_rows_per_page'], step=5, key="rows_t2")
+                    if new_rows != st.session_state['report2_rows_per_page']:
+                        st.session_state['report2_rows_per_page'] = new_rows
+                        st.session_state['report2_current_page'] = 1
+                        st.rerun()
+
+                with pc2: 
+                    st.write("")
+                    dynamic_key = f"pg_t2_dyn_{st.session_state['report2_current_page']}"
+                    selected_page = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), index=st.session_state['report2_current_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key=dynamic_key, label_visibility="collapsed")
+                    if selected_page != st.session_state['report2_current_page']:
+                        st.session_state['report2_current_page'] = selected_page
+                        st.rerun()
+
+                    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
+                    c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+                    with c_prev:
+                        if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report2_current_page'] <= 1), key="prev_t2"):
+                            st.session_state['report2_current_page'] -= 1
+                            st.rerun()
+                    with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report2_current_page']} / {total_pages_t2}</div>", unsafe_allow_html=True)
+                    with c_next:
+                        if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report2_current_page'] >= total_pages_t2), key="next_t2"):
+                            st.session_state['report2_current_page'] += 1
+                            st.rerun()
+
+                if rows_per_page <= 0: paginated_t2 = []
+                elif rows_per_page >= total_records: paginated_t2 = raw_data_t2
+                else:
+                    start_idx = (st.session_state['report2_current_page'] - 1) * rows_per_page
+                    end_idx = start_idx + rows_per_page
+                    paginated_t2 = raw_data_t2[start_idx:end_idx]
+
+                # =================== วาดตาราง Tab 2 ===================
                 st.markdown("<br>", unsafe_allow_html=True)
                 header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
                 headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
@@ -1798,7 +1919,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
-                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview2()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+                with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview2()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
     # =========================================================================
@@ -1829,16 +1950,57 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t3:
                 pk_col_t3 = list(raw_data_t3[0].keys())[0]
+                total_records = len(raw_data_t3)
                 
-                ROWS_PER_PAGE = 15
-                total_pages_t3 = max(1, (len(raw_data_t3) - 1) // ROWS_PER_PAGE + 1)
-                
-                pc1, pc2 = st.columns([7, 3])
-                with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t3)}</b> รายการ</div>", unsafe_allow_html=True)
-                with pc2: page_t3 = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key=f"pg_t3_{start_date_t3}_{end_date_t3}_{b_id_t3}_{len(raw_data_t3)}", label_visibility="collapsed")
-                
-                paginated_t3 = raw_data_t3[(page_t3 - 1) * ROWS_PER_PAGE : page_t3 * ROWS_PER_PAGE]
+                if 'report3_rows_per_page' not in st.session_state:
+                    st.session_state['report3_rows_per_page'] = 15
+                if 'report3_current_page' not in st.session_state:
+                    st.session_state['report3_current_page'] = 1
 
+                rows_per_page = st.session_state['report3_rows_per_page']
+                if rows_per_page <= 0: total_pages_t3 = 1
+                elif rows_per_page >= total_records: total_pages_t3 = 1
+                else: total_pages_t3 = max(1, math.ceil(total_records / rows_per_page))
+
+                if st.session_state['report3_current_page'] > total_pages_t3: st.session_state['report3_current_page'] = total_pages_t3
+                if st.session_state['report3_current_page'] < 1: st.session_state['report3_current_page'] = 1
+
+                pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+                with pc1: 
+                    new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state['report3_rows_per_page'], step=5, key="rows_t3")
+                    if new_rows != st.session_state['report3_rows_per_page']:
+                        st.session_state['report3_rows_per_page'] = new_rows
+                        st.session_state['report3_current_page'] = 1
+                        st.rerun()
+
+                with pc2: 
+                    st.write("")
+                    dynamic_key = f"pg_t3_dyn_{st.session_state['report3_current_page']}"
+                    selected_page = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), index=st.session_state['report3_current_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key=dynamic_key, label_visibility="collapsed")
+                    if selected_page != st.session_state['report3_current_page']:
+                        st.session_state['report3_current_page'] = selected_page
+                        st.rerun()
+
+                    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
+                    c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+                    with c_prev:
+                        if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report3_current_page'] <= 1), key="prev_t3"):
+                            st.session_state['report3_current_page'] -= 1
+                            st.rerun()
+                    with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report3_current_page']} / {total_pages_t3}</div>", unsafe_allow_html=True)
+                    with c_next:
+                        if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report3_current_page'] >= total_pages_t3), key="next_t3"):
+                            st.session_state['report3_current_page'] += 1
+                            st.rerun()
+
+                if rows_per_page <= 0: paginated_t3 = []
+                elif rows_per_page >= total_records: paginated_t3 = raw_data_t3
+                else:
+                    start_idx = (st.session_state['report3_current_page'] - 1) * rows_per_page
+                    end_idx = start_idx + rows_per_page
+                    paginated_t3 = raw_data_t3[start_idx:end_idx]
+
+                # =================== วาดตาราง Tab 3 ===================
                 st.markdown("<br>", unsafe_allow_html=True)
                 header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
                 headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
@@ -1867,7 +2029,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
-                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview3()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+                with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview3()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
     # =========================================================================
@@ -1909,18 +2071,59 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 boilers_print_dict = parsed_print_data.get("boilers", {})
 
                 # ==========================================
-                # 🎯 แท็บย่อยที่ 0: ข้อมูลยอดรวมสาขา
+                # 🎯 แท็บย่อยที่ 0: ข้อมูลยอดรวมสาขา (เตา/ไม้อบ)
                 # ==========================================
                 with tabs_list[0]:
                     if oven_raw_t4:
-                        ROWS_PER_PAGE = 15
-                        total_pages = max(1, (len(oven_raw_t4) - 1) // ROWS_PER_PAGE + 1)
+                        total_records = len(oven_raw_t4)
                         
-                        pc1, pc2 = st.columns([7, 3])
-                        with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(oven_raw_t4)}</b> รายการ</div>", unsafe_allow_html=True)
-                        with pc2: page_ov = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_ov_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(oven_raw_t4)}", label_visibility="collapsed")
-                        
-                        paginated_ov = oven_raw_t4[(page_ov - 1) * ROWS_PER_PAGE : page_ov * ROWS_PER_PAGE]
+                        if 'report4_ov_rows' not in st.session_state:
+                            st.session_state['report4_ov_rows'] = 15
+                        if 'report4_ov_page' not in st.session_state:
+                            st.session_state['report4_ov_page'] = 1
+
+                        rows_per_page = st.session_state['report4_ov_rows']
+                        if rows_per_page <= 0: total_pages = 1
+                        elif rows_per_page >= total_records: total_pages = 1
+                        else: total_pages = max(1, math.ceil(total_records / rows_per_page))
+
+                        if st.session_state['report4_ov_page'] > total_pages: st.session_state['report4_ov_page'] = total_pages
+                        if st.session_state['report4_ov_page'] < 1: st.session_state['report4_ov_page'] = 1
+
+                        pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+                        with pc1: 
+                            new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state['report4_ov_rows'], step=5, key="rows_t4_ov")
+                            if new_rows != st.session_state['report4_ov_rows']:
+                                st.session_state['report4_ov_rows'] = new_rows
+                                st.session_state['report4_ov_page'] = 1
+                                st.rerun()
+
+                        with pc2: 
+                            st.write("")
+                            dynamic_key = f"pg_t4_ov_dyn_{st.session_state['report4_ov_page']}"
+                            selected_page = st.selectbox("เลือกหน้า", range(1, total_pages + 1), index=st.session_state['report4_ov_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=dynamic_key, label_visibility="collapsed")
+                            if selected_page != st.session_state['report4_ov_page']:
+                                st.session_state['report4_ov_page'] = selected_page
+                                st.rerun()
+
+                            st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
+                            c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+                            with c_prev:
+                                if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report4_ov_page'] <= 1), key="prev_t4_ov"):
+                                    st.session_state['report4_ov_page'] -= 1
+                                    st.rerun()
+                            with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report4_ov_page']} / {total_pages}</div>", unsafe_allow_html=True)
+                            with c_next:
+                                if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report4_ov_page'] >= total_pages), key="next_t4_ov"):
+                                    st.session_state['report4_ov_page'] += 1
+                                    st.rerun()
+
+                        if rows_per_page <= 0: paginated_ov = []
+                        elif rows_per_page >= total_records: paginated_ov = oven_raw_t4
+                        else:
+                            start_idx = (st.session_state['report4_ov_page'] - 1) * rows_per_page
+                            end_idx = start_idx + rows_per_page
+                            paginated_ov = oven_raw_t4[start_idx:end_idx]
 
                         st.markdown("<br>", unsafe_allow_html=True)
                         header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
@@ -1957,14 +2160,56 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
                         return
 
-                    ROWS_PER_PAGE = 15
-                    total_pages = max(1, (len(data_list) - 1) // ROWS_PER_PAGE + 1)
+                    total_records = len(data_list)
+                    b_key = f"b_key_{boiler_label}"
                     
-                    pc1, pc2 = st.columns([7, 3])
-                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(data_list)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_t4_{boiler_label}_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(data_list)}", label_visibility="collapsed")
-                    
-                    paginated_t4 = data_list[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
+                    if f'{b_key}_rows' not in st.session_state:
+                        st.session_state[f'{b_key}_rows'] = 15
+                    if f'{b_key}_page' not in st.session_state:
+                        st.session_state[f'{b_key}_page'] = 1
+
+                    rows_per_page = st.session_state[f'{b_key}_rows']
+                    if rows_per_page <= 0: total_pages = 1
+                    elif rows_per_page >= total_records: total_pages = 1
+                    else: total_pages = max(1, math.ceil(total_records / rows_per_page))
+
+                    if st.session_state[f'{b_key}_page'] > total_pages: st.session_state[f'{b_key}_page'] = total_pages
+                    if st.session_state[f'{b_key}_page'] < 1: st.session_state[f'{b_key}_page'] = 1
+
+                    pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+                    with pc1: 
+                        new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state[f'{b_key}_rows'], step=5, key=f"rows_t4_{boiler_label}")
+                        if new_rows != st.session_state[f'{b_key}_rows']:
+                            st.session_state[f'{b_key}_rows'] = new_rows
+                            st.session_state[f'{b_key}_page'] = 1
+                            st.rerun()
+
+                    with pc2: 
+                        st.write("")
+                        dynamic_key = f"pg_t4_dyn_{boiler_label}_{st.session_state[f'{b_key}_page']}"
+                        selected_page = st.selectbox("เลือกหน้า", range(1, total_pages + 1), index=st.session_state[f'{b_key}_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=dynamic_key, label_visibility="collapsed")
+                        if selected_page != st.session_state[f'{b_key}_page']:
+                            st.session_state[f'{b_key}_page'] = selected_page
+                            st.rerun()
+
+                        st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
+                        c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+                        with c_prev:
+                            if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state[f'{b_key}_page'] <= 1), key=f"prev_t4_{boiler_label}"):
+                                st.session_state[f'{b_key}_page'] -= 1
+                                st.rerun()
+                        with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state[f'{b_key}_page']} / {total_pages}</div>", unsafe_allow_html=True)
+                        with c_next:
+                            if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state[f'{b_key}_page'] >= total_pages), key=f"next_t4_{boiler_label}"):
+                                st.session_state[f'{b_key}_page'] += 1
+                                st.rerun()
+
+                    if rows_per_page <= 0: paginated_t4 = []
+                    elif rows_per_page >= total_records: paginated_t4 = data_list
+                    else:
+                        start_idx = (st.session_state[f'{b_key}_page'] - 1) * rows_per_page
+                        end_idx = start_idx + rows_per_page
+                        paginated_t4 = data_list[start_idx:end_idx]
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
@@ -1992,11 +2237,17 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
+                # ==========================================
+                # 🎯 ลูปวาดแท็บย่อยบอยเลอร์ที่เหลือ
+                # ==========================================
                 for idx, boiler_label in enumerate(unique_boilers):
                     with tabs_list[idx + 1]:
                         data_boiler = [r for r in raw_data_t4 if str(r.get('boiler_name') or 'ไม่ระบุ') == boiler_label]
                         render_boiler_table(data_boiler, boiler_label)
 
+                # ==========================================
+                # 🎯 ปุ่มด้านล่าง (Export, สรุป, ปริ้น)
+                # ==========================================
                 st.write("")
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
                 with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
