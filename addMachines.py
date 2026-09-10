@@ -6,6 +6,16 @@ from database import get_db_connection, log_activity
 from config import branch_dict
 
 def render_add_new_equipment():
+    # 🎯 เพิ่ม CSS ชุดนี้เพื่อซ่อนแถบ Header ด้านบน (พื้นที่สีแดง) และขยับเนื้อหาขึ้น
+    st.markdown("""
+        <style>
+        header[data-testid="stHeader"] { display: none !important; }
+        header { visibility: hidden !important; }
+        #MainMenu { visibility: hidden !important; }
+        .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+    
     # ตรวจสอบสิทธิ์และดึงสาขาที่ Manager สามารถเข้าถึงได้
     current_role = st.session_state.get('role_tab', 'user')
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.get('branch_id'))])
@@ -19,7 +29,6 @@ def render_add_new_equipment():
 
     st.header("🛠️ จัดการข้อมูลอุปกรณ์ในระบบ")
     st.caption("หน้าจอเพิ่ม แก้ไข และระงับการใช้งานอุปกรณ์ (เพื่อรักษาประวัติข้อมูลเดิม ระบบจะใช้การเปลี่ยนสถานะแทนการลบข้อมูลจริง)")
-    st.write("---")
 
     # ==========================================
     # ⚙️ 0. ระบบตรวจสอบวันหมดอายุอัตโนมัติ (Auto-Expiration)

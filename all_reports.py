@@ -211,7 +211,7 @@ def update_record_dialog_t1(row_data, pk_col):
     # 🎯 ฟอร์มกรอกข้อมูลตัวเลขและวันที่ (แก้ไขได้ทุกคน)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
         e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
     with col2:
         e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), format="%.2f")
@@ -314,7 +314,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     # 🎯 ฟอร์มกรอกข้อมูลทั่วไป (แก้ไขได้ทุกคน)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), key=f"e2_dt_{rec_id}")
+        e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), format="DD/MM/YYYY", key=f"e2_dt_{rec_id}")
         e_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
     with col2:
         e_work = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
@@ -369,7 +369,7 @@ def update_record_dialog_t3(row_data, pk_col):
     
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
         e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0))
     with col2:
         e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0))
@@ -428,7 +428,7 @@ def update_record_dialog_t4(row_data, pk_col):
         e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')))
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
     c1, c2, c3 = st.columns(3)
     with c1:
         st.write(" ")
@@ -481,7 +481,7 @@ def update_record_dialog_oven(row_data, pk_col):
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", value=pd.to_datetime(row_data.get('record_date')), key=f"e_ov_dt_{rec_id}")
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), key=f"e_ov_dt_{rec_id}")
     
     c1, c2, c3 = st.columns(3)
     with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}")
@@ -1301,7 +1301,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     if not raw_data and not oven_raw: return [], [], None, None
 
     # ==============================================================================
-    # 🎯 3. เพิ่มระบบคัดกรอง: แสดงเฉพาะข้อมูลที่ลงครบทั้ง 3 ส่วน (ในตาราง Master 1+2 และ ยอดรวมสาขา)
+    # 🎯 3. เพิ่มระบบคัดกรอง: แสดงเฉพาะข้อมูลที่ลงครบทั้ง 3 ส่วน
     # ==============================================================================
     complete_set = set()
     if oven_raw and raw_data:
@@ -1310,7 +1310,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         b2_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in raw_data if str(r.get('boiler_name')) == 'บอยเลอร์ 2')
         complete_set = oven_set.intersection(b1_set).intersection(b2_set)
         
-        # กรองตารางยอดรวมสาขา ให้เหลือเฉพาะที่ครบองค์ประกอบ
         oven_raw_filtered = [r for r in oven_raw if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set]
     else:
         oven_raw_filtered = []
@@ -1319,18 +1318,15 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
 
-    # จัดกลุ่มข้อมูลรายสาขา/รายวัน (สำหรับตารางรวม 1+2)
     master_summary = {}
-    grouped_data = {} # สำหรับตารางแยกเครื่อง
+    grouped_data = {}
 
     for r in raw_data:
         b_name = str(r.get('boiler_name') or 'บอยเลอร์ 1')
         if b_name not in grouped_data: grouped_data[b_name] = []
         
-        # 📌 ข้อมูลบอยเลอร์ 1 และ 2 เก็บทั้งหมด ไม่โดนตัดทิ้ง เพื่อให้แสดงผลได้ปกติ
         grouped_data[b_name].append(r)
         
-        # 📌 แต่สำหรับ Master Summary จะเอาเฉพาะอันที่ครบ 3 อย่าง
         if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set:
             bn = str(r.get('branch_name') or '-')
             dt = r['record_date']
@@ -1464,11 +1460,12 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             if is_diff_col and val < 0: c.font = f_red
             else: c.font = f_n
             
+            # 🌟 สีเหลืองของ Master Tab 🌟
             if is_std_col: c.fill = fill_green; c.font = f_w
-            if idx in [2, 3, 4, 5, 6, 7]: c.fill = fill_yellow
+            elif idx in [2, 3, 23]: c.fill = fill_yellow 
             if isinstance(val, (int, float)): c.number_format = '#,##0.00'
             
-            bg = "background-color:#00B050;color:white;" if is_std_col else ("background-color:#FFFF00;" if idx in [2,3,4,5,6,7] else "")
+            bg = "background-color:#00B050;color:white;" if is_std_col else ("background-color:#FFFF00;" if idx in [2, 3, 23] else "")
             tc = "color:red;" if is_diff_col and val < 0 else ""
             fw = "font-weight:bold;" if idx in [7,11] else ""
             body_html_m += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else f'{val:,.2f}'}</td>"
@@ -1514,12 +1511,10 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
 
 
     # ==============================================================================
-    # 🎯 3.2 สร้างตารางย่อยแยกรายบอยเลอร์ (1 และ 2) ให้เหมือนเดิม
+    # 🎯 3.2 สร้างตารางย่อยแยกรายบอยเลอร์ (1 และ 2)
     # ==============================================================================
     for boiler_name in sorted(grouped_data.keys()):
         data_list = grouped_data[boiler_name]
-        
-        # ป้องกัน Error NoneType
         data_list = sorted(data_list, key=lambda x: (str(x.get('record_date') or ''), str(x.get('branch_name') or '')))
         
         ws = wb.create_sheet(title=boiler_name)
@@ -1570,8 +1565,10 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             for idx, val in enumerate(row_vals, 1):
                 c = ws.cell(row=cur_row, column=idx, value=val)
                 c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
-                if idx in [2, 3, 4, 10]: c.fill = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-                if idx == 13: c.fill = fill_green; c.font = f_w
+                
+                # 🌟 ดึงสีเหลืองของบอยเลอร์ 1 และ 2 กลับมา (คอลัมน์ 2,3,4,10) 🌟
+                if idx in [2, 3, 4, 10]: c.fill = fill_yellow
+                elif idx == 13: c.fill = fill_green; c.font = f_w
                 if isinstance(val, (int, float)): c.number_format = '#,##0.00'
                 
                 bg = "background-color:#FFFF00;" if idx in [2,3,4,10] else ("background-color:#00B050;color:white;" if idx==13 else "")
@@ -1626,59 +1623,21 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
     
-    # 🎯 Return ข้อมูลที่ถูกกรองให้หน้าเว็บ (oven_raw_filtered) และคืนค่า raw_data ดิบสำหรับบอยเลอร์แยก
     return raw_data, oven_raw_filtered, excel_buffer.getvalue(), json.dumps(final_json_data)
 
 
 # ==========================================================
 # 📊 4. ฟังก์ชันหลักสำหรับ Render Report Tabs
 # ==========================================================
-def render_all_reports_module(user_branch_name):
+# เพิ่ม parameter selected_sub_menu
+def render_all_reports_module(user_branch_name, selected_sub_menu=None):
+    
     st.markdown("""
         <style>
-        div[data-testid="stScrollableContainer"] div[data-testid="stHorizontalBlock"] { flex-wrap: nowrap !important; min-width: 1000px !important; align-items: center !important; padding: 4px 0 !important; }
-        
-        /* 🎯 Inline Quick Action Icons (ปุ่มลัดในแถวตาราง) */
-        div[data-testid="stScrollableContainer"] button {
-            background-color: #FFFFFF !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 6px !important;
-            padding: 2px 0px !important;
-            font-size: 14px !important;
-            transition: all 0.2s ease !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-        }
-        div[data-testid="stScrollableContainer"] button:hover {
-            transform: translateY(-1px) !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-        }
-        div[data-testid="stScrollableContainer"] button:has(div:contains("✏️")):hover { border-color: #3B82F6 !important; background-color: #EFF6FF !important; }
-        div[data-testid="stScrollableContainer"] button:has(div:contains("🗑️")):hover { border-color: #EF4444 !important; background-color: #FEF2F2 !important; }
-        
-        /* 🎯 สไตล์ปุ่ม Export & Summary (ดีไซน์ Pill-shape ขอบมน) */
-        div[data-testid="stDownloadButton"] > button,
-        div[data-testid="stButton"] > button:has(div:contains("สรุปรายงาน")) {
-            background-color: #FFFFFF !important;
-            border: 1px solid #CBD5E1 !important;
-            color: #1E293B !important;
-            border-radius: 24px !important;
-            font-weight: 600 !important;
-            height: 42px !important;
-            transition: all 0.2s ease !important;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
-        }
-        div[data-testid="stDownloadButton"] > button:hover,
-        div[data-testid="stButton"] > button:has(div:contains("สรุปรายงาน")):hover {
-            background-color: #F8FAFC !important;
-            border-color: #94A3B8 !important;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important;
-            transform: translateY(-1px);
-        }
-        div[data-testid="stDownloadButton"] > button p,
-        div[data-testid="stButton"] > button:has(div:contains("สรุปรายงาน")) p {
-            font-size: 14.5px !important;
-            margin: 0 !important;
-        }
+        header[data-testid="stHeader"] { display: none !important; }
+        header { visibility: hidden !important; }
+        #MainMenu { visibility: hidden !important; }
+        .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1687,443 +1646,429 @@ def render_all_reports_module(user_branch_name):
     allowed_tabs_list = st.session_state.get('allowed_tabs', [])
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
 
-    all_tabs_config = {
-        "1": "⚙️ รายงานสรุปเครื่องจักร & เบรกดาวน์", "2": "🚚 รายงานสรุปการใช้เชื้อเพลิงรถ",
-        "3": "💨 รายงานสรุปแรงดันไอน้ำ บอยเลอร์", "4": "🔥 รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)"
-    }
+    # 📌 ใช้การค้นหาตัวเลข "1.", "2.", "3.", "4." ในข้อความ เพื่อจับคู่เปิดหน้าให้แม่นยำ
+    key = "1"
+    if selected_sub_menu:
+        if "1." in selected_sub_menu: key = "1"
+        elif "2." in selected_sub_menu: key = "2"
+        elif "3." in selected_sub_menu: key = "3"
+        elif "4." in selected_sub_menu: key = "4"
 
-    if current_role == "admin":
-        visible_tab_keys = ["1", "2", "3", "4"]
-    else:
-        visible_tab_keys = [k for k in allowed_tabs_list if k in all_tabs_config]
-
-    if current_role in ["admin", "manager", "reporter"]:
-        st.header("📑 ระบบรายงานและการจัดการข้อมูล")
-    else:
-        st.header("📑 รายงานสรุปประจำสาขา")
-    st.write("---")
-
-    if not visible_tab_keys:
-        st.error("## ⏳ รอการอนุมัติสิทธิ์เลือกแท็บงานจากแอดมิน")
+    # เช็คสิทธิ์ก่อนแสดงผล
+    if current_role not in ["admin", "reporter"] and key not in allowed_tabs_list:
+        st.error("## ⏳ คุณไม่ได้รับสิทธิ์เข้าถึงหัวข้อนี้")
         return
 
-    tab_labels = [all_tabs_config[k] for k in visible_tab_keys]
-    created_tabs = st.tabs(tab_labels)
     report_options = ["ทั้งหมดทุกสาขา"] + list(branch_dict.keys())
+    current_tab_ctx = st.container()
 
-    for index, key in enumerate(visible_tab_keys):
-        current_tab_ctx = created_tabs[index]
+    # =========================================================================
+    # ⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์
+    # =========================================================================
+    if key == "1":
+        with current_tab_ctx:
+            st.subheader("📊 รายงานสรุปการทำงานและเบรกดาวน์เครื่องจักร")
+            col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
+            with col_f1: start_date_t1 = st.date_input("ตั้งแต่วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").replace(day=1), key="s_d1")
+            with col_f2: end_date_t1 = st.date_input("ถึงวันที่", format="DD/MM/YYYY", value=pd.to_datetime("today"), key="e_d1")
+            with col_f3:
+                if current_role in ["admin", "reporter"]:
+                    b_label_t1 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s1")
+                    b_id_t1 = "ทั้งหมด" if b_label_t1 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t1]
+                    selected_branch_display = b_label_t1 if b_label_t1 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
+                elif len(user_allowed_branches) > 1:
+                    allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+                    b_label_t1 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s1")
+                    b_id_t1 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t1 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t1]
+                    selected_branch_display = b_label_t1 if b_label_t1 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
+                else:
+                    st.info(f"📍 สังกัด: {user_branch_name}")
+                    b_id_t1 = st.session_state.branch_id
+                    selected_branch_display = user_branch_name
 
-        # =========================================================================
-        # ⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์
-        # =========================================================================
-        if key == "1":
-            with current_tab_ctx:
-                st.subheader("📊 รายงานสรุปการทำงานและเบรกดาวน์เครื่องจักร")
-                col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
-                with col_f1: start_date_t1 = st.date_input("ตั้งแต่วันที่", value=pd.to_datetime("today").replace(day=1), key="s_d1")
-                with col_f2: end_date_t1 = st.date_input("ถึงวันที่", value=pd.to_datetime("today"), key="e_d1")
-                with col_f3:
-                    if current_role in ["admin", "reporter"]:
-                        b_label_t1 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s1")
-                        b_id_t1 = "ทั้งหมด" if b_label_t1 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t1]
-                        selected_branch_display = b_label_t1 if b_label_t1 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
-                    elif len(user_allowed_branches) > 1:
-                        allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
-                        b_label_t1 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s1")
-                        b_id_t1 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t1 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t1]
-                        selected_branch_display = b_label_t1 if b_label_t1 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
-                    else:
-                        st.info(f"📍 สังกัด: {user_branch_name}")
-                        b_id_t1 = st.session_state.branch_id
-                        selected_branch_display = user_branch_name
+            raw_data_t1, excel_data_t1, json_html_t1 = process_t1(b_id_t1, str(start_date_t1), str(end_date_t1), tuple(user_allowed_branches), selected_branch_display)
 
-                raw_data_t1, excel_data_t1, json_html_t1 = process_t1(b_id_t1, str(start_date_t1), str(end_date_t1), tuple(user_allowed_branches), selected_branch_display)
+            if raw_data_t1:
+                pk_col_t1 = list(raw_data_t1[0].keys())[0]
+                
+                ROWS_PER_PAGE = 15
+                total_pages_t1 = max(1, (len(raw_data_t1) - 1) // ROWS_PER_PAGE + 1)
+                
+                pc1, pc2 = st.columns([7, 3])
+                with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t1)}</b> รายการ</div>", unsafe_allow_html=True)
+                with pc2: page_t1 = st.selectbox("เลือกหน้า", range(1, total_pages_t1 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", key=f"pg_t1_{start_date_t1}_{end_date_t1}_{b_id_t1}_{len(raw_data_t1)}", label_visibility="collapsed")
+                
+                paginated_t1 = raw_data_t1[(page_t1 - 1) * ROWS_PER_PAGE : page_t1 * ROWS_PER_PAGE]
 
-                if raw_data_t1:
-                    pk_col_t1 = list(raw_data_t1[0].keys())[0]
-                    
-                    ROWS_PER_PAGE = 15
-                    total_pages_t1 = max(1, (len(raw_data_t1) - 1) // ROWS_PER_PAGE + 1)
-                    
-                    pc1, pc2 = st.columns([7, 3])
-                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t1)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t1 = st.selectbox("เลือกหน้า", range(1, total_pages_t1 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", key=f"pg_t1_{start_date_t1}_{end_date_t1}_{b_id_t1}_{len(raw_data_t1)}", label_visibility="collapsed")
-                    
-                    paginated_t1 = raw_data_t1[(page_t1 - 1) * ROWS_PER_PAGE : page_t1 * ROWS_PER_PAGE]
+                st.markdown("<br>", unsafe_allow_html=True)
+                header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
+                headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
+                for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                    headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                with st.container(height=380, border=False):
+                    for r in paginated_t1:
+                        rec_id = r[pk_col_t1]
+                        cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
+                        cols[0].write(rec_id)
+                        cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                        cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                        cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
+                        
+                        can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                        if can_crud:
+                            c_edit, c_del = cols[8].columns(2, gap="small")
+                            if c_edit.button("✏️", key=f"e1_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
+                            if c_del.button("🗑️", key=f"d1_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
+                        else: cols[8].write("-")
+                        st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    with st.container(height=380, border=False):
-                        for r in paginated_t1:
-                            rec_id = r[pk_col_t1]
-                            cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                            cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                            cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
-                            
-                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                            if can_crud:
-                                c_edit, c_del = cols[8].columns(2, gap="small")
-                                if c_edit.button("✏️", key=f"e1_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
-                                if c_del.button("🗑️", key=f"d1_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
-                            else: cols[8].write("-")
-                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                st.write("")
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
+                with col_btn2: 
+                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
+                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+            else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
-                    st.write("")
-                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
-                    with col_btn2: 
-                        if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
-                else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
+    # =========================================================================
+    # 🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ
+    # =========================================================================
+    elif key == "2":
+        with current_tab_ctx:
+            st.subheader("📊 รายงานสรุปการใช้เชื้อเพลิงรถยนต์และรถยก")
+            col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
+            with col_f1: start_date_t2 = st.date_input("ตั้งแต่วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").replace(day=1), key="s_d2")
+            with col_f2: end_date_t2 = st.date_input("ถึงวันที่", format="DD/MM/YYYY", value=pd.to_datetime("today"), key="e_d2")
+            with col_f3:
+                if current_role in ["admin", "reporter"]:
+                    b_label_t2 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s2")
+                    b_id_t2 = "ทั้งหมด" if b_label_t2 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t2]
+                    selected_branch_display = b_label_t2 if b_label_t2 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
+                elif len(user_allowed_branches) > 1:
+                    allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+                    b_label_t2 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s2")
+                    b_id_t2 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t2 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t2]
+                    selected_branch_display = b_label_t2 if b_label_t2 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
+                else:
+                    st.info(f"📍 สังกัด: {user_branch_name}")
+                    b_id_t2 = st.session_state.branch_id
+                    selected_branch_display = user_branch_name
 
-        # =========================================================================
-        # 🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ
-        # =========================================================================
-        elif key == "2":
-            with current_tab_ctx:
-                st.subheader("📊 รายงานสรุปการใช้เชื้อเพลิงรถยนต์และรถยก")
-                col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
-                with col_f1: start_date_t2 = st.date_input("ตั้งแต่วันที่", value=pd.to_datetime("today").replace(day=1), key="s_d2")
-                with col_f2: end_date_t2 = st.date_input("ถึงวันที่", value=pd.to_datetime("today"), key="e_d2")
-                with col_f3:
-                    if current_role in ["admin", "reporter"]:
-                        b_label_t2 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s2")
-                        b_id_t2 = "ทั้งหมด" if b_label_t2 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t2]
-                        selected_branch_display = b_label_t2 if b_label_t2 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
-                    elif len(user_allowed_branches) > 1:
-                        allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
-                        b_label_t2 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s2")
-                        b_id_t2 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t2 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t2]
-                        selected_branch_display = b_label_t2 if b_label_t2 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
-                    else:
-                        st.info(f"📍 สังกัด: {user_branch_name}")
-                        b_id_t2 = st.session_state.branch_id
-                        selected_branch_display = user_branch_name
+            raw_data_t2, excel_data_t2, json_html_t2, engine_lbl_list, engine_details_t2 = process_t2(b_id_t2, str(start_date_t2), str(end_date_t2), tuple(user_allowed_branches), selected_branch_display)
 
-                raw_data_t2, excel_data_t2, json_html_t2, engine_lbl_list, engine_details_t2 = process_t2(b_id_t2, str(start_date_t2), str(end_date_t2), tuple(user_allowed_branches), selected_branch_display)
+            if raw_data_t2:
+                pk_col_t2 = list(raw_data_t2[0].keys())[0]
+                
+                ROWS_PER_PAGE = 15
+                total_pages_t2 = max(1, (len(raw_data_t2) - 1) // ROWS_PER_PAGE + 1)
+                
+                pc1, pc2 = st.columns([7, 3])
+                with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t2)}</b> รายการ</div>", unsafe_allow_html=True)
+                with pc2: page_t2 = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key=f"pg_t2_{start_date_t2}_{end_date_t2}_{b_id_t2}_{len(raw_data_t2)}", label_visibility="collapsed")
+                
+                paginated_t2 = raw_data_t2[(page_t2 - 1) * ROWS_PER_PAGE : page_t2 * ROWS_PER_PAGE]
 
-                if raw_data_t2:
-                    pk_col_t2 = list(raw_data_t2[0].keys())[0]
-                    
-                    ROWS_PER_PAGE = 15
-                    total_pages_t2 = max(1, (len(raw_data_t2) - 1) // ROWS_PER_PAGE + 1)
-                    
-                    pc1, pc2 = st.columns([7, 3])
-                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t2)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t2 = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key=f"pg_t2_{start_date_t2}_{end_date_t2}_{b_id_t2}_{len(raw_data_t2)}", label_visibility="collapsed")
-                    
-                    paginated_t2 = raw_data_t2[(page_t2 - 1) * ROWS_PER_PAGE : page_t2 * ROWS_PER_PAGE]
+                st.markdown("<br>", unsafe_allow_html=True)
+                header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
+                headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
+                for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                    headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                with st.container(height=380, border=False):
+                    for r in paginated_t2:
+                        rec_id = r[pk_col_t2]
+                        lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
+                        cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
+                        cols[0].write(rec_id)
+                        cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                        cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
+                        cols[3].write(r.get('engine_code') or '-'); cols[4].write(f"{lts:.2f}"); cols[5].write(f"{hrs:.2f}"); cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}"); cols[7].write(r.get('remark') or '-')
+                        
+                        can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                        if can_crud:
+                            c_edit, c_del = cols[8].columns(2, gap="small")
+                            if c_edit.button("✏️", key=f"e2_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
+                            if c_del.button("🗑️", key=f"d2_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
+                        else: cols[8].write("-")
+                        st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    with st.container(height=380, border=False):
-                        for r in paginated_t2:
-                            rec_id = r[pk_col_t2]
-                            lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
-                            cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                            cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
-                            cols[3].write(r.get('engine_code') or '-'); cols[4].write(f"{lts:.2f}"); cols[5].write(f"{hrs:.2f}"); cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}"); cols[7].write(r.get('remark') or '-')
-                            
-                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                            if can_crud:
-                                c_edit, c_del = cols[8].columns(2, gap="small")
-                                if c_edit.button("✏️", key=f"e2_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
-                                if c_del.button("🗑️", key=f"d2_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
-                            else: cols[8].write("-")
-                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                st.write("")
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
+                with col_btn2: 
+                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
+                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview2()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+            else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
-                    st.write("")
-                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
-                    with col_btn2: 
-                        if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview2()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
-                else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
+    # =========================================================================
+    # 💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์
+    # =========================================================================
+    elif key == "3":
+        with current_tab_ctx:
+            st.subheader("📊 รายงานสรุปสถิติแรงดันไอน้ำปลายทางตก")
+            col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
+            with col_f1: start_date_t3 = st.date_input("ตั้งแต่วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").replace(day=1), key="s_d3")
+            with col_f2: end_date_t3 = st.date_input("ถึงวันที่", format="DD/MM/YYYY", value=pd.to_datetime("today"), key="e_d3")
+            with col_f3:
+                if current_role in ["admin", "reporter"]:
+                    b_label_t3 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s3")
+                    b_id_t3 = "ทั้งหมด" if b_label_t3 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t3]
+                    selected_branch_display = b_label_t3 if b_label_t3 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
+                elif len(user_allowed_branches) > 1:
+                    allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+                    b_label_t3 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s3")
+                    b_id_t3 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t3 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t3]
+                    selected_branch_display = b_label_t3 if b_label_t3 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
+                else:
+                    st.info(f"📍 สังกัด: {user_branch_name}")
+                    b_id_t3 = st.session_state.branch_id
+                    selected_branch_display = user_branch_name
 
-        # =========================================================================
-        # 💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์
-        # =========================================================================
-        elif key == "3":
-            with current_tab_ctx:
-                st.subheader("📊 รายงานสรุปสถิติแรงดันไอน้ำปลายทางตก")
-                col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
-                with col_f1: start_date_t3 = st.date_input("ตั้งแต่วันที่", value=pd.to_datetime("today").replace(day=1), key="s_d3")
-                with col_f2: end_date_t3 = st.date_input("ถึงวันที่", value=pd.to_datetime("today"), key="e_d3")
-                with col_f3:
-                    if current_role in ["admin", "reporter"]:
-                        b_label_t3 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s3")
-                        b_id_t3 = "ทั้งหมด" if b_label_t3 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t3]
-                        selected_branch_display = b_label_t3 if b_label_t3 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
-                    elif len(user_allowed_branches) > 1:
-                        allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
-                        b_label_t3 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s3")
-                        b_id_t3 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t3 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t3]
-                        selected_branch_display = b_label_t3 if b_label_t3 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
-                    else:
-                        st.info(f"📍 สังกัด: {user_branch_name}")
-                        b_id_t3 = st.session_state.branch_id
-                        selected_branch_display = user_branch_name
+            raw_data_t3, excel_data_t3, json_html_t3 = process_t3(b_id_t3, str(start_date_t3), str(end_date_t3), tuple(user_allowed_branches), selected_branch_display)
 
-                raw_data_t3, excel_data_t3, json_html_t3 = process_t3(b_id_t3, str(start_date_t3), str(end_date_t3), tuple(user_allowed_branches), selected_branch_display)
+            if raw_data_t3:
+                pk_col_t3 = list(raw_data_t3[0].keys())[0]
+                
+                ROWS_PER_PAGE = 15
+                total_pages_t3 = max(1, (len(raw_data_t3) - 1) // ROWS_PER_PAGE + 1)
+                
+                pc1, pc2 = st.columns([7, 3])
+                with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t3)}</b> รายการ</div>", unsafe_allow_html=True)
+                with pc2: page_t3 = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key=f"pg_t3_{start_date_t3}_{end_date_t3}_{b_id_t3}_{len(raw_data_t3)}", label_visibility="collapsed")
+                
+                paginated_t3 = raw_data_t3[(page_t3 - 1) * ROWS_PER_PAGE : page_t3 * ROWS_PER_PAGE]
 
-                if raw_data_t3:
-                    pk_col_t3 = list(raw_data_t3[0].keys())[0]
-                    
-                    ROWS_PER_PAGE = 15
-                    total_pages_t3 = max(1, (len(raw_data_t3) - 1) // ROWS_PER_PAGE + 1)
-                    
-                    pc1, pc2 = st.columns([7, 3])
-                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(raw_data_t3)}</b> รายการ</div>", unsafe_allow_html=True)
-                    with pc2: page_t3 = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key=f"pg_t3_{start_date_t3}_{end_date_t3}_{b_id_t3}_{len(raw_data_t3)}", label_visibility="collapsed")
-                    
-                    paginated_t3 = raw_data_t3[(page_t3 - 1) * ROWS_PER_PAGE : page_t3 * ROWS_PER_PAGE]
+                st.markdown("<br>", unsafe_allow_html=True)
+                header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
+                headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
+                for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
+                st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                    st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                    headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                with st.container(height=380, border=False):
+                    for r in paginated_t3:
+                        rec_id = r[pk_col_t3]
+                        cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
+                        cols[0].write(rec_id)
+                        cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                        cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                        cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
+                        
+                        can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                        if can_crud:
+                            c_edit, c_del = cols[8].columns(2, gap="small")
+                            if c_edit.button("✏️", key=f"e3_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
+                            if c_del.button("🗑️", key=f"d3_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
+                        else: cols[8].write("-")
+                        st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
-                    with st.container(height=380, border=False):
-                        for r in paginated_t3:
-                            rec_id = r[pk_col_t3]
-                            cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                            cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                            cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
-                            
-                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                            if can_crud:
-                                c_edit, c_del = cols[8].columns(2, gap="small")
-                                if c_edit.button("✏️", key=f"e3_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
-                                if c_del.button("🗑️", key=f"d3_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
-                            else: cols[8].write("-")
-                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                st.write("")
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
+                with col_btn2: 
+                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
+                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview3()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+            else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
-                    st.write("")
-                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
-                    with col_btn2: 
-                        if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
-                    with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview3()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
-                else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
+    # =========================================================================
+    # 🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)
+    # =========================================================================
+    elif key == "4":
+        with current_tab_ctx:
+            st.subheader("📊 รายงานผลการคำนวณประสิทธิภาพเชื้อเพลิง บอยเลอร์")
+            col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
+            with col_f1: start_date_t4 = st.date_input("ตั้งแต่วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").replace(day=1), key="s_d4")
+            with col_f2: end_date_t4 = st.date_input("ถึงวันที่", format="DD/MM/YYYY", value=pd.to_datetime("today"), key="e_d4")
+            with col_f3:
+                if current_role in ["admin", "reporter"]:
+                    b_label_t4 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s4")
+                    b_id_t4 = "ทั้งหมด" if b_label_t4 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t4]
+                    selected_branch_display = b_label_t4 if b_label_t4 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
+                elif len(user_allowed_branches) > 1:
+                    allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+                    b_label_t4 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s4")
+                    b_id_t4 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t4 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t4]
+                    selected_branch_display = b_label_t4 if b_label_t4 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
+                else:
+                    st.info(f"📍 สังกัด: {user_branch_name}")
+                    b_id_t4 = st.session_state.branch_id
+                    selected_branch_display = user_branch_name
 
-        # =========================================================================
-        # 🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)
-        # =========================================================================
-        elif key == "4":
-            with current_tab_ctx:
-                st.subheader("📊 รายงานผลการคำนวณประสิทธิภาพเชื้อเพลิง บอยเลอร์")
-                col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
-                with col_f1: start_date_t4 = st.date_input("ตั้งแต่วันที่", value=pd.to_datetime("today").replace(day=1), key="s_d4")
-                with col_f2: end_date_t4 = st.date_input("ถึงวันที่", value=pd.to_datetime("today"), key="e_d4")
-                with col_f3:
-                    if current_role in ["admin", "reporter"]:
-                        b_label_t4 = st.selectbox("เลือกสาขา:", options=report_options, key="b_s4")
-                        b_id_t4 = "ทั้งหมด" if b_label_t4 == "ทั้งหมดทุกสาขา" else branch_dict[b_label_t4]
-                        selected_branch_display = b_label_t4 if b_label_t4 != "ทั้งหมดทุกสาขา" else "ทุกสาขา"
-                    elif len(user_allowed_branches) > 1:
-                        allowed_options = ["ทั้งหมดที่มีสิทธิ์"] + [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
-                        b_label_t4 = st.selectbox("เลือกสาขา:", options=allowed_options, key="b_s4")
-                        b_id_t4 = "รวมเฉพาะที่มีสิทธิ์" if b_label_t4 == "ทั้งหมดที่มีสิทธิ์" else branch_dict[b_label_t4]
-                        selected_branch_display = b_label_t4 if b_label_t4 != "ทั้งหมดที่มีสิทธิ์" else "ทุกสาขาที่มีสิทธิ์"
-                    else:
-                        st.info(f"📍 สังกัด: {user_branch_name}")
-                        b_id_t4 = st.session_state.branch_id
-                        selected_branch_display = user_branch_name
+            raw_data_t4, oven_raw_t4, excel_data_t4, json_html_t4 = process_t4(b_id_t4, str(start_date_t4), str(end_date_t4), tuple(user_allowed_branches), selected_branch_display)
 
-                # 🎯 เรียกใช้ process_t4 ที่คืนค่า oven_raw มาด้วย
-                raw_data_t4, oven_raw_t4, excel_data_t4, json_html_t4 = process_t4(b_id_t4, str(start_date_t4), str(end_date_t4), tuple(user_allowed_branches), selected_branch_display)
+            if raw_data_t4 or oven_raw_t4:
+                pk_col_t4 = list(raw_data_t4[0].keys())[0] if raw_data_t4 else None
+                pk_col_ov = list(oven_raw_t4[0].keys())[0] if oven_raw_t4 else None
+                
+                unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4]))) if raw_data_t4 else []
+                
+                tab_names = ["📁 ข้อมูลยอดรวมสาขา (เตา/ไม้อบ/แรงดัน)"] + [f"🔥 ข้อมูล {b}" for b in unique_boilers]
+                tabs_list = st.tabs(tab_names)
 
-                if raw_data_t4 or oven_raw_t4:
-                    pk_col_t4 = list(raw_data_t4[0].keys())[0] if raw_data_t4 else None
-                    pk_col_ov = list(oven_raw_t4[0].keys())[0] if oven_raw_t4 else None
-                    
-                    unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4]))) if raw_data_t4 else []
-                    
-                    # 🎯 สร้างแท็บ โดยเอา "ยอดรวมสาขา" ขึ้นก่อน แล้วตามด้วยข้อมูลแยกแต่ละบอยเลอร์
-                    tab_names = ["📁 ข้อมูลยอดรวมสาขา (เตา/ไม้อบ/แรงดัน)"] + [f"🔥 ข้อมูล {b}" for b in unique_boilers]
-                    tabs_list = st.tabs(tab_names)
+                parsed_print_data = json.loads(json_html_t4)
+                boilers_print_dict = parsed_print_data.get("boilers", {})
 
-                    # แปลงข้อมูล JSON สำหรับสั่งปริ้นแยกตามแต่ละแท็บ
-                    parsed_print_data = json.loads(json_html_t4)
-                    boilers_print_dict = parsed_print_data.get("boilers", {})
-
-                    # ==========================================
-                    # 🎯 แท็บย่อยที่ 0: ข้อมูลยอดรวมสาขา
-                    # ==========================================
-                    with tabs_list[0]:
-                        if oven_raw_t4:
-                            ROWS_PER_PAGE = 15
-                            total_pages = max(1, (len(oven_raw_t4) - 1) // ROWS_PER_PAGE + 1)
-                            
-                            pc1, pc2 = st.columns([7, 3])
-                            with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(oven_raw_t4)}</b> รายการ</div>", unsafe_allow_html=True)
-                            with pc2: page_ov = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_ov_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(oven_raw_t4)}", label_visibility="collapsed")
-                            
-                            paginated_ov = oven_raw_t4[(page_ov - 1) * ROWS_PER_PAGE : page_ov * ROWS_PER_PAGE]
-
-                            st.markdown("<br>", unsafe_allow_html=True)
-                            header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
-                            headers = ["ID", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
-                            for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
-                            st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
-
-                            with st.container(height=380, border=False):
-                                for r in paginated_ov:
-                                    rec_id = r[pk_col_ov]
-                                    cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
-                                    cols[0].write(rec_id)
-                                    cols[1].write(r.get('record_date'))
-                                    cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                                    cols[3].write(r.get('oven_qty') or 0)
-                                    cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
-                                    cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
-                                    
-                                    can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                                    if can_crud:
-                                        c_edit, c_del = cols[6].columns(2, gap="small")
-                                        if c_edit.button("✏️", key=f"e_ov_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_oven(r, pk_col_ov)
-                                        if c_del.button("🗑️", key=f"d_ov_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_oven(r, pk_col_ov)
-                                    else: cols[6].write("-")
-                                    st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
-                        else:
-                            st.info("ไม่พบข้อมูลยอดรวมสาขาในช่วงเวลาที่เลือก")
-
-                    # ==========================================
-                    # 🎯 แท็บย่อยอื่นๆ: ข้อมูลเชื้อเพลิงแยกตามบอยเลอร์
-                    # ==========================================
-                    def render_boiler_table(data_list, boiler_label):
-                        if not data_list:
-                            st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
-                            return
-
+                # ==========================================
+                # 🎯 แท็บย่อยที่ 0: ข้อมูลยอดรวมสาขา
+                # ==========================================
+                with tabs_list[0]:
+                    if oven_raw_t4:
                         ROWS_PER_PAGE = 15
-                        total_pages = max(1, (len(data_list) - 1) // ROWS_PER_PAGE + 1)
+                        total_pages = max(1, (len(oven_raw_t4) - 1) // ROWS_PER_PAGE + 1)
                         
                         pc1, pc2 = st.columns([7, 3])
-                        with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(data_list)}</b> รายการ</div>", unsafe_allow_html=True)
-                        with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_t4_{boiler_label}_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(data_list)}", label_visibility="collapsed")
+                        with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(oven_raw_t4)}</b> รายการ</div>", unsafe_allow_html=True)
+                        with pc2: page_ov = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_ov_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(oven_raw_t4)}", label_visibility="collapsed")
                         
-                        paginated_t4 = data_list[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
+                        paginated_ov = oven_raw_t4[(page_ov - 1) * ROWS_PER_PAGE : page_ov * ROWS_PER_PAGE]
 
                         st.markdown("<br>", unsafe_allow_html=True)
-                        header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                        headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
+                        header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                        headers = ["ID", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
                         for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                         st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                         with st.container(height=380, border=False):
-                            for r in paginated_t4:
-                                rec_id = r[pk_col_t4]
-                                s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
-                                tot_w = s_w + w_w + ww_w
-                                s_prod = float(r.get('steam_production') or 1.0)
-                                cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                                cols[0].write(rec_id); cols[1].write(r.get('record_date')); cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                                cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
+                            for r in paginated_ov:
+                                rec_id = r[pk_col_ov]
+                                cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                                cols[0].write(rec_id)
+                                cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                                cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                                cols[3].write(r.get('oven_qty') or 0)
+                                cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
+                                cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
                                 
                                 can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                                 if can_crud:
-                                    c_edit, c_del = cols[7].columns(2, gap="small")
-                                    if c_edit.button("✏️", key=f"e4_{boiler_label}_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
-                                    if c_del.button("🗑️", key=f"d4_{boiler_label}_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
-                                else: cols[7].write("-")
+                                    c_edit, c_del = cols[6].columns(2, gap="small")
+                                    if c_edit.button("✏️", key=f"e_ov_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_oven(r, pk_col_ov)
+                                    if c_del.button("🗑️", key=f"d_ov_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_oven(r, pk_col_ov)
+                                else: cols[6].write("-")
                                 st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                    else:
+                        st.info("ไม่พบข้อมูลยอดรวมสาขาในช่วงเวลาที่เลือก")
 
-                    for idx, boiler_label in enumerate(unique_boilers):
-                        with tabs_list[idx + 1]:
-                            data_boiler = [r for r in raw_data_t4 if str(r.get('boiler_name') or 'ไม่ระบุ') == boiler_label]
-                            render_boiler_table(data_boiler, boiler_label)
+                # ==========================================
+                # 🎯 แท็บย่อยอื่นๆ: ข้อมูลเชื้อเพลิงแยกตามบอยเลอร์
+                # ==========================================
+                def render_boiler_table(data_list, boiler_label):
+                    if not data_list:
+                        st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
+                        return
 
-                    st.write("")
-                    col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                    with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
-                    with col_btn2: 
-                        if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 
-                            parsed_data = json.loads(json_html_t4)
-                            show_summary_report_dialog_t4(parsed_data["boilers"])
-                    with col_btn3: 
-                        # 🎯 แปลงข้อมูลตาราง HTML ออกมาเตรียมไว้
-                        parsed_print_data = json.loads(json_html_t4)
-                        boilers_print_dict = parsed_print_data.get("boilers", {})
-                        
-                        # 1. ค้นหาตาราง Master (หน้าข้อมูลยอดรวมสาขา)
-                        master_html_str = ""
+                    ROWS_PER_PAGE = 15
+                    total_pages = max(1, (len(data_list) - 1) // ROWS_PER_PAGE + 1)
+                    
+                    pc1, pc2 = st.columns([7, 3])
+                    with pc1: st.markdown(f"<div style='font-size:14px; color:#475569; padding-top:8px;'>พบข้อมูลทั้งหมด <b>{len(data_list)}</b> รายการ</div>", unsafe_allow_html=True)
+                    with pc2: page_t4 = st.selectbox("เลือกหน้า", range(1, total_pages + 1), format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=f"pg_t4_{boiler_label}_{start_date_t4}_{end_date_t4}_{b_id_t4}_{len(data_list)}", label_visibility="collapsed")
+                    
+                    paginated_t4 = data_list[(page_t4 - 1) * ROWS_PER_PAGE : page_t4 * ROWS_PER_PAGE]
+
+                    st.markdown("<br>", unsafe_allow_html=True)
+                    header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                    headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
+                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+
+                    with st.container(height=380, border=False):
+                        for r in paginated_t4:
+                            rec_id = r[pk_col_t4]
+                            s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
+                            tot_w = s_w + w_w + ww_w
+                            s_prod = float(r.get('steam_production') or 1.0)
+                            cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                            cols[0].write(rec_id)
+                            cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                            cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                            cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
+                            
+                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                            if can_crud:
+                                c_edit, c_del = cols[7].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e4_{boiler_label}_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
+                                if c_del.button("🗑️", key=f"d4_{boiler_label}_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
+                            else: cols[7].write("-")
+                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                for idx, boiler_label in enumerate(unique_boilers):
+                    with tabs_list[idx + 1]:
+                        data_boiler = [r for r in raw_data_t4 if str(r.get('boiler_name') or 'ไม่ระบุ') == boiler_label]
+                        render_boiler_table(data_boiler, boiler_label)
+
+                st.write("")
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
+                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
+                with col_btn2: 
+                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 
+                        parsed_data = json.loads(json_html_t4)
+                        show_summary_report_dialog_t4(parsed_data["boilers"])
+                with col_btn3: 
+                    parsed_print_data = json.loads(json_html_t4)
+                    boilers_print_dict = parsed_print_data.get("boilers", {})
+                    
+                    master_html_str = ""
+                    for k, v in boilers_print_dict.items():
+                        if "รวมสาขา" in k or "รวม 1+2" in k:
+                            master_html_str = v
+                            break
+                            
+                    boiler_html_snippets = {}
+                    for b_lbl in unique_boilers:
+                        found_html = ""
                         for k, v in boilers_print_dict.items():
-                            if "รวมสาขา" in k or "รวม 1+2" in k:
-                                master_html_str = v
+                            if b_lbl in k and "รวมสาขา" not in k and "รวม 1+2" not in k:
+                                found_html = v
                                 break
-                                
-                        # 2. ค้นหาตารางแยกของบอยเลอร์แต่ละเครื่อง
-                        boiler_html_snippets = {}
-                        for b_lbl in unique_boilers:
-                            found_html = ""
-                            for k, v in boilers_print_dict.items():
-                                if b_lbl in k and "รวมสาขา" not in k and "รวม 1+2" not in k:
-                                    found_html = v
-                                    break
-                            boiler_html_snippets[b_lbl] = found_html
+                        boiler_html_snippets[b_lbl] = found_html
 
-                        # 🎯 สคริปต์ตรวจสอบแท็บย่อยที่เลือกอยู่ก่อนเปิดหน้าต่างพิมพ์
-                        components.html(f"""
-                        <body style="margin:0;padding:2px;overflow:hidden;">
-                            <button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button>
-                        </body>
-                        <script>
-                        function openPrintPreview4() {{
-                            try {{
-                                // ค้นหาแท็บที่กำลังถูกคลิก (Active) อยู่บนหน้าเว็บ Streamlit
-                                var activeTabs = window.parent.document.querySelectorAll('[role="tab"][aria-selected="true"], [data-baseweb="tab"][aria-selected="true"]');
-                                var selectedTabName = "";
-                                for(var i=0; i<activeTabs.length; i++) {{
-                                    var text = activeTabs[i].innerText || activeTabs[i].textContent;
-                                    if(text.includes("ยอดรวมสาขา") || text.includes("ข้อมูล บอยเลอร์") || text.includes("ข้อมูลบอยเลอร์")) {{
-                                        selectedTabName = text.trim();
-                                    }}
+                    components.html(f"""
+                    <body style="margin:0;padding:2px;overflow:hidden;">
+                        <button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button>
+                    </body>
+                    <script>
+                    function openPrintPreview4() {{
+                        try {{
+                            var activeTabs = window.parent.document.querySelectorAll('[role="tab"][aria-selected="true"], [data-baseweb="tab"][aria-selected="true"]');
+                            var selectedTabName = "";
+                            for(var i=0; i<activeTabs.length; i++) {{
+                                var text = activeTabs[i].innerText || activeTabs[i].textContent;
+                                if(text.includes("ยอดรวมสาขา") || text.includes("ข้อมูล บอยเลอร์") || text.includes("ข้อมูลบอยเลอร์")) {{
+                                    selectedTabName = text.trim();
                                 }}
-
-                                var printHtml = "";
-                                var masterHtml = {json.dumps(master_html_str)};
-                                var boilerSnippets = {json.dumps(boiler_html_snippets)};
-
-                                // ถ้าผู้ใช้อยู่หน้ายอดรวมสาขา ให้ปริ้นตารางรวม 1+2
-                                if(selectedTabName.includes("ยอดรวมสาขา") || selectedTabName === "") {{
-                                    printHtml = masterHtml;
-                                }} else {{
-                                    // ถ้าผู้ใช้อยู่หน้าบอยเลอร์ย่อย ให้หาตารางบอยเลอร์ชื่อนั้นๆ มาปริ้น
-                                    for (var bKey in boilerSnippets) {{
-                                        if(selectedTabName.includes(bKey)) {{
-                                            printHtml = boilerSnippets[bKey];
-                                            break;
-                                        }}
-                                    }}
-                                    // ถ้าหาไม่เจอจริงๆ ให้ปริ้นหน้า Master ป้องกัน Error
-                                    if(printHtml === "") {{
-                                        printHtml = masterHtml; 
-                                    }}
-                                }}
-
-                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
-                                w.document.write(printHtml);
-                                w.document.close();
-                                setTimeout(function(){{ w.print(); }}, 500);
-                            }} catch (e) {{
-                                console.error("Print Error:", e);
-                                var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
-                                w.document.write({json.dumps(master_html_str)});
-                                w.document.close();
-                                setTimeout(function(){{ w.print(); }}, 500);
                             }}
+
+                            var printHtml = "";
+                            var masterHtml = {json.dumps(master_html_str)};
+                            var boilerSnippets = {json.dumps(boiler_html_snippets)};
+
+                            if(selectedTabName.includes("ยอดรวมสาขา") || selectedTabName === "") {{
+                                printHtml = masterHtml;
+                            }} else {{
+                                for (var bKey in boilerSnippets) {{
+                                    if(selectedTabName.includes(bKey)) {{
+                                        printHtml = boilerSnippets[bKey];
+                                        break;
+                                    }}
+                                }}
+                                if(printHtml === "") {{
+                                    printHtml = masterHtml; 
+                                }}
+                            }}
+
+                            var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                            w.document.write(printHtml);
+                            w.document.close();
+                            setTimeout(function(){{ w.print(); }}, 500);
+                        }} catch (e) {{
+                            console.error("Print Error:", e);
+                            var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
+                            w.document.write({json.dumps(master_html_str)});
+                            w.document.close();
+                            setTimeout(function(){{ w.print(); }}, 500);
                         }}
-                        </script>
-                        """, height=50)
-                else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
+                    }}
+                    </script>
+                    """, height=50)
+            else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")

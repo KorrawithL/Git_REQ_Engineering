@@ -5,6 +5,18 @@ from database import get_db_connection, hash_password
 from config import branch_dict
 
 def render_admin_user_management():
+    # 🎯 เพิ่ม CSS ชุดนี้เพื่อบังคับซ่อนแถบ Header ด้านบน (พื้นที่สีแดง)
+    st.markdown("""
+        <style>
+        /* ซ่อนแถบ Header หลักของ Streamlit */
+        header[data-testid="stHeader"] { display: none !important; }
+        header { visibility: hidden !important; }
+        #MainMenu { visibility: hidden !important; }
+        
+        /* ขยับคอนเทนต์ (พื้นที่สีน้ำเงิน) ขึ้นไปชิดขอบบนสุดแทน */
+        .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
+        </style>
+    """, unsafe_allow_html=True)
     st.header("👥 ระบบบริหารสิทธิ์และจัดการผู้ใช้งานระบบ")
     
     # 🎯 1. ดึงข้อมูลตำแหน่งจากตาราง departments เพื่อนำมาสร้างตัวเลือก Dropdown

@@ -244,152 +244,150 @@ if not st.session_state.get('logged_in'):
                 st.rerun()
 
 # -----------------------------------------------------------------------------
-# 🎯 4. หน้าจอหลักของระบบ (Main Layout & UI)
+# 🎯 4. หน้าจอหลักของระบบ (Main Layout & UI - Nested Hierarchy Fixed Text)
 # -----------------------------------------------------------------------------
 else:
     st.markdown("""<style>
-    .main .block-container { padding-top: 1rem !important; padding-bottom: 2rem !important; padding-left: 1.5rem !important; padding-right: 1.5rem !important; max-width: 100% !important; }
-    
-    /* 🎯 ซ่อน Sidebar และปุ่มเปิด Sidebar ทั้งหมด */
+    /* 🎯 ซ่อน Header และตัวควบคุมมาตรฐานของ Streamlit */
+    header[data-testid="stHeader"] { display: none !important; }
+    header { visibility: hidden !important; }
+    #MainMenu { visibility: hidden !important; }
     [data-testid="collapsedControl"] { display: none !important; }
-    [data-testid="stSidebar"] { display: none !important; }
     
-    /* 🎯 แต่งกล่อง Top Bar */
-    .topbar-box {
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        padding-top: 2px;
-    }
-    .tb-lbl { font-size: 12px; color: #64748B; font-weight: 600; margin-bottom: 2px; }
-    .tb-val { font-size: 15px; color: #0F172A; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .tb-sub { font-size: 12.5px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .text-green { color: #10B981; }
-    .text-blue { color: #3B82F6; }
-
-    /* 🎯 1. สไตล์สำหรับเมนูหลัก (แนวตั้ง สีแดง) */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[data-testid="stRadio"] {
-        background-color: #FFFFFF;
-        border: 1px solid #EAEAEA;
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        margin-bottom: 20px;
+    /* 🎯 พื้นหลังหลักของแอปเป็นสีขาวนวล */
+    .stApp {
+        background-color: #FDFBF7 !important;
+        color: #2C2A29 !important;
     }
     
-    /* ส่วนหัวของเมนู (Header) สีแดงโดดเด่น */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[data-testid="stRadio"] > label {
-        background-color: #E4222C !important;
-        color: #FFFFFF !important;
-        padding: 15px 20px !important;
-        font-weight: 700 !important;
-        font-size: 17px !important;
+    /* 🎯 Sidebar เป็นสีครีมละมุน */
+    [data-testid="stSidebar"] {
         display: block !important;
-        margin-bottom: 0 !important;
-        border-bottom: none !important;
-    }
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[data-testid="stRadio"] > label p {
-        color: #FFFFFF !important;
-        font-weight: 700 !important;
-        font-size: 17px !important;
-    }
-
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] {
-        display: flex !important;
-        flex-direction: column !important;
-        gap: 0 !important;
-        padding: 0 !important;
+        width: 290px !important;
+        background-color: #F4EFEA !important;
+        border-right: 1px solid #E6DFD5 !important;
     }
     
-    /* กล่องปุ่มเมนูย่อย */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label {
+    .main .block-container { 
+        padding-top: 1.5rem !important; 
+        padding-left: 2rem !important; 
+        padding-right: 2rem !important; 
+        max-width: 100% !important; 
+        background-color: #FDFBF7 !important;
+    }
+    
+    div[data-testid="stHorizontalBlock"]:first-of-type button {
+        background-color: #FFFFFF !important; border: 1px solid #E6DFD5 !important; border-radius: 8px !important; padding: 2px 0px !important; font-size: 14px !important; transition: all 0.2s ease !important; color: #2C2A29 !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+    }
+    div[data-testid="stHorizontalBlock"]:first-of-type button:hover { transform: translateY(-1px) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important; }
+
+    /* =========================================================
+       🌟 1. ทำให้เมนูหลักโดดเด่น (Prominent Main Menu)
+       ========================================================= */
+    [data-testid="stSidebar"] div.stButton > button {
         background-color: #FFFFFF !important;
-        border: none !important;
-        border-bottom: 1px solid #F0F0F0 !important;
-        border-radius: 0 !important;
-        padding: 15px 20px !important;
-        cursor: pointer !important;
-        transition: all 0.2s ease !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: flex-start !important;
-        box-shadow: none !important;
-        margin: 0 !important;
-    }
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label:last-child {
-        border-bottom: none !important;
-    }
-    
-    /* เอฟเฟกต์เมื่อเอาเมาส์ชี้ (Hover) */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label:hover {
-        background-color: #FAFAFA !important;
-    }
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label > div:first-child {
-        display: none !important; /* ซ่อนจุดวงกลมของ Radio ทิ้ง */
-    }
-    
-    /* สีของตัวอักษรตอนปกติ (สีเทาเข้ม) */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label div[data-testid="stMarkdownContainer"] p {
-        font-size: 14.5px !important;
-        font-weight: 600 !important;
-        color: #555555 !important;
-        margin: 0 !important;
-        transition: color 0.2s ease !important;
-    }
-    
-    /* สถานะ Active (ปุ่มที่ถูกเลือกอยู่ - สีแดงและมีแถบด้านซ้าย) */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label:has(input:checked) {
-        background: #FAFAFA !important;
-        border-left: 5px solid #E4222C !important;
-        padding-left: 15px !important;
-    }
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label:has(input:checked) div[data-testid="stMarkdownContainer"] p {
-        color: #E4222C !important;
+        border: 1px solid #E6DFD5 !important;
+        color: #1C1917 !important;
+        padding: 12px 14px !important;
+        border-radius: 10px !important;
+        font-size: 15px !important;
         font-weight: 700 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+        text-align: left !important;
+        justify-content: flex-start !important;
+        width: 100% !important;
+        margin-bottom: 2px !important;
+        transition: all 0.2s ease !important;
     }
     
-    /* ตัวหนังสือสีแดงเมื่อ Hover */
-    div[data-testid="stElementContainer"]:has(.main-menu-marker) + div[data-testid="stElementContainer"] div[role="radiogroup"] > label:hover div[data-testid="stMarkdownContainer"] p {
-        color: #E4222C !important;
+    [data-testid="stSidebar"] div.stButton > button:hover {
+        background-color: #FAFAFA !important;
+        border-color: #D97706 !important;
+        color: #D97706 !important;
+    }
+    
+    /* เมนูหลักที่กำลังเลือก (Active) */
+    [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {
+        background-color: #D97706 !important; 
+        color: #FFFFFF !important;
+        border: 1px solid #D97706 !important;
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important;
     }
 
-    /* 🎯 2. สไตล์สำหรับ Tabs (แท็บย่อยในหน้ารายงาน) ให้เป็นปุ่ม Pills สวยงาม */
-    div[data-baseweb="tab-list"] {
-        gap: 12px;
-        padding-bottom: 10px;
-        border-bottom: none !important;
+    /* =========================================================
+       🌟 2. จัดระเบียบเมนูย่อย (Sub-menu) ให้ตัวหนังสือกลับมา!
+       ========================================================= */
+    /* จัดการกรอบและเส้นสายตาของเมนูย่อย */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] {
+        border-left: 2px solid #D1D5DB !important; /* เส้นสีเทานำสายตาด้านซ้าย */
+        margin-left: 20px !important; /* เยื้องเข้าไปอยู่ใต้เมนูหลัก */
+        padding-left: 5px !important;
+        margin-top: 5px !important;
+        margin-bottom: 15px !important;
     }
-    div[data-baseweb="tab-highlight"] {
+    
+    /* 🌟 ซ่อนวงกลม Radio อย่างปลอดภัย (ไม่กระทบข้อความ) */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] {
         display: none !important;
     }
-    button[data-baseweb="tab"] {
-        background-color: #FFFFFF !important;
-        border: 2px solid #E2E8F0 !important;
-        border-radius: 12px !important;
-        padding: 10px 20px !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important;
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div {
+        display: none !important;
+    }
+    
+    /* ระยะห่างระหว่างหัวข้อย่อย */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] {
+        gap: 2px !important;
+    }
+    
+    /* พื้นหลังเมนูย่อย (แบบใส) */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label {
+        background-color: transparent !important;
+        border: 1px solid transparent !important;
+        padding: 8px 10px !important;
         margin: 0 !important;
+        border-radius: 8px !important;
+        transition: all 0.2s ease !important;
+        display: block !important;
+        width: 100% !important;
+        cursor: pointer !important;
     }
-    button[data-baseweb="tab"] > div {
-        font-size: 15px !important;
-        font-weight: 600 !important;
-        color: #475569 !important;
+    
+    /* บังคับให้กล่องข้อความแสดงผลแน่นอน */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label div[data-testid="stMarkdownContainer"] {
+        display: block !important;
+        width: 100% !important;
     }
-    button[data-baseweb="tab"]:hover {
-        border-color: #3B82F6 !important;
-        background-color: #F8FAFC !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 12px rgba(59, 130, 246, 0.12) !important;
+    
+    /* จัดข้อความเมนูย่อยให้สวยงาม */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label p {
+        color: #57534E !important;
+        font-size: 13.5px !important;
+        font-weight: 500 !important;
+        margin: 0 !important;
+        line-height: 1.5 !important;
+        white-space: normal !important;
+        /* เทคนิคดันไอคอน: ย่อหน้าลบแล้วดันกลับ */
+        text-indent: -22px !important;
+        padding-left: 22px !important;
     }
-    button[data-baseweb="tab"][aria-selected="true"] {
-        background: linear-gradient(135deg, #1E40AF 0%, #3B82F6 100%) !important;
-        border-color: transparent !important;
-        box-shadow: 0 6px 15px rgba(37, 99, 235, 0.35) !important;
-        transform: translateY(-2px) !important;
+    
+    /* เอฟเฟกต์ตอนชี้เมาส์ (Hover) */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover {
+        background-color: #EFECE6 !important;
     }
-    button[data-baseweb="tab"][aria-selected="true"] > div {
-        color: #FFFFFF !important;
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover p {
+        color: #1C1917 !important;
+    }
+    
+    /* เอฟเฟกต์ตอนถูกเลือก (Active) */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) {
+        background-color: #FFFFFF !important;
+        border-color: #E6DFD5 !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p {
+        color: #D97706 !important;
+        font-weight: 700 !important;
     }
     </style>""", unsafe_allow_html=True)
     
@@ -397,92 +395,140 @@ else:
     st.query_params["auth_user"] = st.session_state['username']
     st.query_params["auth_time"] = str(st.session_state['last_activity'])
 
-    current_role = st.session_state.get('role_tab')
-
     # =========================================================================
-    # 🎯 แถบ Top Bar แนวนอนด้านบนสุด (ถูกเลื่อนขึ้นมาแสดงก่อนเสมอ)
+    # 🎯 แถบ Top Bar แนวนอนด้านบนสุด (Global Navbar)
     # =========================================================================
     disp_name = st.session_state.get('full_name') or st.session_state.get('username')
-    disp_pos = st.session_state.get('position') or "-"
+    current_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
+    current_branch = st.session_state.get('branch_name', '-')
     
+    role_th = "พนักงานทั่วไป"
+    if current_role == "admin":
+        role_th = "ผู้ดูแลระบบ"
+        current_access = "ADMIN"
+        access_desc = "🌟 เข้าถึงได้ทุกสาขา (Full Access)"
+        access_color = "#10B981"
+    elif current_role in ["manager", "reporter"]:
+        role_th = "ผู้จัดการ / รีพอร์ตเตอร์"
+        current_access = current_role.upper()
+        access_desc = "✨ เข้าถึงได้หลายสาขา"
+        access_color = "#3B82F6"
+    else:
+        current_access = "USER"
+        access_desc = "📍 เข้าถึงได้เฉพาะสาขา"
+        access_color = "#64748B"
+
     with st.container(border=True):
-        tc_logo, tc1, tc2, tc3, tc4, tc5, tc6 = st.columns([1.2, 1.5, 1.5, 1.2, 2.2, 1.2, 1.2], vertical_alignment="center")
+        c_logo, c_user, c_role, c_branch, c_access, c_pw, c_out = st.columns([1.2, 2.2, 2.0, 1.2, 2.8, 1.5, 1.2], gap="small", vertical_alignment="center")
         
-        with tc_logo:
-            if os.path.exists("Logo.png"):
-                st.image("Logo.png", use_container_width=True)
-            elif os.path.exists("logo.png"):
-                st.image("logo.png", use_container_width=True)
-            else:
-                st.markdown("<div style='color:#E4222C; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
+        with c_logo:
+            if os.path.exists("Logo.png"): st.image("Logo.png", use_container_width=True)
+            elif os.path.exists("logo.png"): st.image("logo.png", use_container_width=True)
+            else: st.markdown("<div style='color:#E4222C; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
             
-        with tc1: 
-            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👤 ผู้ใช้งาน</div><div class='tb-val'>{disp_name}</div></div>", unsafe_allow_html=True)
-        with tc2: 
-            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>💼 ตำแหน่ง</div><div class='tb-val'>{disp_pos}</div></div>", unsafe_allow_html=True)
-        with tc3: 
-            st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>🏢 สังกัดปัจจุบัน</div><div class='tb-val'>{st.session_state.get('branch_name')}</div></div>", unsafe_allow_html=True)
-        with tc4:
-            if current_role == 'admin':
-                st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์: {current_role.upper()}</div><div class='tb-sub text-green'>🌟 เข้าถึงได้ทุกสาขา (Full Access)</div></div>", unsafe_allow_html=True)
-            else:
-                user_all_branches = st.session_state.get('allowed_branches', [])
-                if len(user_all_branches) > 1:
-                    extra_b_names = [k.split(" ")[1] for k, v in branch_dict.items() if str(v) in user_all_branches]
-                    b_str = ", ".join(extra_b_names)
-                    st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์: {current_role.upper()}</div><div class='tb-sub text-blue'>📍 เข้าถึงได้: {b_str}</div></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"<div class='topbar-box'><div class='tb-lbl'>👑 ระดับสิทธิ์</div><div class='tb-val'>{current_role.upper()}</div></div>", unsafe_allow_html=True)
+        with c_user: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>👤 ผู้ใช้งาน</div><div style='font-size:14px; font-weight:700; color:#1C1917;'>{disp_name}</div>", unsafe_allow_html=True)
+        with c_role: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>💼 ตำแหน่ง</div><div style='font-size:14px; font-weight:700; color:#1C1917;'>{role_th}</div>", unsafe_allow_html=True)
+        with c_branch: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>🏢 สังกัดปัจจุบัน</div><div style='font-size:14px; font-weight:700; color:#1C1917;'>{current_branch}</div>", unsafe_allow_html=True)
+        with c_access: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>👑 ระดับสิทธิ์: {current_access}</div><div style='font-size:13px; font-weight:700; color:{access_color};'>{access_desc}</div>", unsafe_allow_html=True)
         
-        with tc5:
-            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-            if st.button("🔑 เปลี่ยนรหัสผ่าน Password", use_container_width=True): change_password_dialog()
-        with tc6:
-            st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-            if st.button("🚪 ออกจากระบบ", use_container_width=True): perform_logout(); st.rerun()
+        with c_pw:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🔑 เปลี่ยนรหัสผ่าน", use_container_width=True, key="app_btn_pw"): change_password_dialog()
+                
+        with c_out:
+            st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
+            if st.button("🚪 ออกจากระบบ", use_container_width=True, key="app_btn_out"):
+                perform_logout()
+                st.rerun()
 
     st.write("") 
 
     # =========================================================================
-    # 🎯 แยกระบบจัดหน้า Layout ใหม่ออกเป็น 2 คอลัมน์ (เมนูซ้าย - เนื้อหาขวา)
+    # 🎯 โครงสร้าง Sidebar (Nested Accordion สำหรับบันทึกข้อมูล และ รายงาน)
     # =========================================================================
+    all_tabs_config = {
+        "1": "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์", 
+        "2": "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)",
+        "3": "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์", 
+        "4": "🔥 4. การใช้เชื้อเพลิง บอยเลอร์"
+    }
+    
+    report_names_map = {
+        "1": "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์", 
+        "2": "🚚 2. รายงานสรุปการใช้เชื้อเพลิงรถ", 
+        "3": "💨 3. รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
+        "4": "🔥 4. รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์"
+    }
+    
+    def get_sub_menu_options(role, allowed_tabs):
+        if role == "admin": return [all_tabs_config[k] for k in ["1", "2", "3", "4"]]
+        else: return [all_tabs_config[k] for k in allowed_tabs if k in all_tabs_config]
+
+    def get_report_sub_options(role, allowed_tabs):
+        if role in ["admin", "reporter"]: return [report_names_map[k] for k in ["1", "2", "3", "4"]]
+        else: return [report_names_map[k] for k in allowed_tabs if k in report_names_map]
+
+    sub_opts = get_sub_menu_options(current_role, st.session_state.get('allowed_tabs', []))
+    rep_opts = get_report_sub_options(current_role, st.session_state.get('allowed_tabs', []))
+
+    if 'sidebar_main' not in st.session_state:
+        st.session_state['sidebar_main'] = "📝 บันทึกข้อมูลประจำวัน"
+    if 'sidebar_sub_entry' not in st.session_state:
+        st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์"
+    if 'sidebar_sub_report' not in st.session_state:
+        st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
+
+    with st.sidebar:
+        st.markdown("<h3 style='color: #1C1917; margin-bottom: 20px; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;'>🧭 ScaleApp.</h3>", unsafe_allow_html=True)
+        
+        # กำหนดชื่อเมนูหลักของรายงานตามสิทธิ์
+        report_menu_label = "📑 รายงานรวม (All Report)"
+        if current_role == 'admin':
+            main_choices = ["⚙️ จัดการผู้ใช้และสิทธิ์", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
+        elif current_role == 'reporter':
+            main_choices = [report_menu_label]
+        else:
+            report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
+            main_choices = ["📝 บันทึกข้อมูลประจำวัน", report_menu_label]
+            if current_role == 'manager':
+                main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
+
+        # วนลูปสร้างปุ่มเมนูหลักและแทรกเมนูย่อย
+        for choice in main_choices:
+            is_main_active = (st.session_state['sidebar_main'] == choice)
+            btn_type = "primary" if is_main_active else "secondary"
+            
+            if st.button(choice, key=f"sb_main_{choice}", use_container_width=True, type=btn_type):
+                st.session_state['sidebar_main'] = choice
+                st.rerun()
+                
+            # 🎯 แสดงเมนูย่อย สำหรับ "บันทึกข้อมูลประจำวัน"
+            if choice == "📝 บันทึกข้อมูลประจำวัน" and is_main_active and sub_opts:
+                default_idx = sub_opts.index(st.session_state['sidebar_sub_entry']) if st.session_state['sidebar_sub_entry'] in sub_opts else 0
+                st.radio("เมนูย่อย", sub_opts, index=default_idx, key="sidebar_sub_entry", label_visibility="collapsed")
+                
+            # 🎯 แสดงเมนูย่อย สำหรับ "รายงาน"
+            if choice == report_menu_label and is_main_active and rep_opts:
+                default_idx_rep = rep_opts.index(st.session_state['sidebar_sub_report']) if st.session_state['sidebar_sub_report'] in rep_opts else 0
+                st.radio("เมนูย่อยรายงาน", rep_opts, index=default_idx_rep, key="sidebar_sub_report", label_visibility="collapsed")
+
+    # =========================================================================
+    # 🎯 เรนเดอร์หน้าจอตามเมนูหลักและเมนูย่อยที่ถูกเลือก
+    # =========================================================================
+    selected_main = st.session_state['sidebar_main']
+    sub_menu_entry = st.session_state['sidebar_sub_entry'] if selected_main == "📝 บันทึกข้อมูลประจำวัน" else None
+    sub_menu_report = st.session_state['sidebar_sub_report'] if selected_main == report_menu_label else None
+
     if current_role == 'admin':
-        col_menu, col_content = st.columns([2.5, 9.5], gap="large")
-        with col_menu:
-            st.markdown('<div class="main-menu-marker"></div>', unsafe_allow_html=True)
-            admin_menu = st.radio("หมวดหมู่เมนูหลัก", ["⚙️ ระบบจัดการผู้ใช้และสิทธิ์", "📝 หน้าจอบันทึกข้อมูลประจำวัน", "📑 รายงานรวมทุกระบบ (All Report)", "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ"])
-        with col_content:
-            if admin_menu == "⚙️ ระบบจัดการผู้ใช้และสิทธิ์": render_admin_user_management()
-            elif admin_menu == "📝 หน้าจอบันทึกข้อมูลประจำวัน": render_engineering_system_tabs(st.session_state.get('branch_name'))
-            elif admin_menu == "📑 รายงานรวมทุกระบบ (All Report)": render_all_reports_module(st.session_state.get('branch_name'))
-            elif admin_menu == "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ": render_add_new_equipment()
-    
+        if selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": render_admin_user_management()
+        elif selected_main == "📝 บันทึกข้อมูลประจำวัน": render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+        elif selected_main == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+        elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": render_add_new_equipment()
+
     elif current_role == 'reporter':
-        col_menu, col_content = st.columns([2.5, 9.5], gap="large")
-        with col_menu:
-            st.markdown('<div class="main-menu-marker"></div>', unsafe_allow_html=True)
-            reporter_menu = st.radio("หมวดหมู่เมนูหลัก", ["📑 รายงานรวมทุกระบบ (All Report)"])
-        with col_content:
-            if reporter_menu == "📑 รายงานรวมทุกระบบ (All Report)": render_all_reports_module(st.session_state.get('branch_name'))
-    
+        if selected_main == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+
     else:
-        report_names_map = {"1": "⚙️ รายงานสรุปเครื่องจักร & เบรกดาวน์", "2": "🚚 รายงานสรุปการใช้เชื้อเพลิงรถ", "3": "💨 รายงานสรุปแรงดันไอน้ำ บอยเลอร์", "4": "🔥 รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์"}
-        allowed_tabs_list = st.session_state.get('allowed_tabs', [])
-        user_tab_keys = [k for k in allowed_tabs_list if k in report_names_map]
-
-        if current_role == 'manager': 
-            report_menu_label = "📑 รายงานสรุปประจำสาขา"
-            menu_choices = ["📝 หน้าจอบันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ"]
-        else: 
-            if len(user_tab_keys) == 1: report_menu_label = report_names_map[user_tab_keys[0]]
-            else: report_menu_label = "📑 รายงานสรุปประจำบัญชี"
-            menu_choices = ["📝 หน้าจอบันทึกข้อมูลประจำวัน", report_menu_label]
-
-        col_menu, col_content = st.columns([2.5, 9.5], gap="large")
-        with col_menu:
-            st.markdown('<div class="main-menu-marker"></div>', unsafe_allow_html=True)
-            user_menu = st.radio("หมวดหมู่เมนูหลัก", menu_choices)
-        with col_content:
-            if user_menu == "📝 หน้าจอบันทึกข้อมูลประจำวัน": render_engineering_system_tabs(st.session_state.get('branch_name'))
-            elif user_menu == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'))
-            elif user_menu == "🛠️ จัดการข้อมูลอุปกรณ์ในระบบ": render_add_new_equipment()
+        if selected_main == "📝 บันทึกข้อมูลประจำวัน": render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+        elif selected_main == report_menu_label: render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+        elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": render_add_new_equipment()
