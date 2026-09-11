@@ -690,34 +690,105 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     wb.save(excel_buffer)
     excel_data = excel_buffer.getvalue()
 
-    header_row1 = "".join([f'<th colspan="3" style="background-color:#{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in active_machines_config])
-    header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in active_machines_config])
-
-    body_rows = ""
-    for day in range(1, 32):
-        body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
-        for m in active_machines_config:
-            item = matrix_data[day][m['name']]
-            if item['has_data']:
-                q_val, w_val, b_val = str(item['qty']) if item['qty'] > 0 else "-", f"{item['work']:,.2f}" if item['work'] > 0 else "-", f"{item['break']:,.2f}" if item['break'] > 0 else "-"
-            else:
-                q_val, w_val, b_val = "", "", ""
-            body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{q_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{w_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{b_val}</td>'
-        body_rows += '</tr>'
-
-    total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
-    for m in active_machines_config:
-        m_n = m['name']
-        tw_s, tb_s = f"{totals_work[m_n]:,.2f}" if totals_work[m_n] > 0 else '-', f"{totals_break[m_n]:,.2f}" if totals_break[m_n] > 0 else '-'
-        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
-    total_row_html += '</tr>'
+    # =========================================================
+    # 🎯 ส่วนสร้าง HTML สำหรับ Print (หั่นตารางแก้ปัญหาล้นหน้า A4)
+    # =========================================================
     
-    pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
-    for m in active_machines_config:
-        pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
-    pct_row_html += '</tr>'
+    # กำหนดจำนวนเครื่องจักรสูงสุดต่อ 1 หน้า A4 (แนวนอน)
+    # 1 เครื่องมี 3 คอลัมน์ย่อย (เครื่องจักร, ชม.ทำงาน, เบรกดาวน์) แนะนำที่ 5-6 เครื่องต่อหน้า
+    MACHINES_PER_PAGE = 10 
+    
+    # หั่นรายชื่อเครื่องจักรออกเป็นกลุ่มๆ กลุ่มละ MACHINES_PER_PAGE
+    machine_chunks = [active_machines_config[i:i + MACHINES_PER_PAGE] for i in range(0, len(active_machines_config), MACHINES_PER_PAGE)]
+    
+    all_tables_html = ""
+    
+    # วนลูปสร้างตารางตามกลุ่มที่หั่นไว้
+    for chunk_idx, chunk_machines in enumerate(machine_chunks):
+        
+        # 1. สร้าง Header สำหรับกลุ่มนี้
+        header_row1 = "".join([f'<th colspan="3" style="background-color:#{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in chunk_machines])
+        header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in chunk_machines])
 
-    table_full_html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} .banner {{ background-color: #F8CBAD; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body><div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class="banner">สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}</div><table><thead><tr><th rowspan="2" style="background-color:#E2EFDA;border:1px solid #000;padding:3px;font-size:10px;width:35px;color:#000000 !important;">วันที่</th>{header_row1}</tr><tr>{header_row2}</tr></thead><tbody>{body_rows}{total_row_html}{pct_row_html}</tbody></table></body></html>"""
+        # 2. สร้าง Body (วันที่ 1-31) สำหรับกลุ่มนี้
+        body_rows = ""
+        for day in range(1, 32):
+            body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
+            for m in chunk_machines:
+                item = matrix_data[day][m['name']]
+                if item['has_data']:
+                    q_val = str(item['qty']) if item['qty'] > 0 else "-"
+                    w_val = f"{item['work']:,.2f}" if item['work'] > 0 else "-"
+                    b_val = f"{item['break']:,.2f}" if item['break'] > 0 else "-"
+                else:
+                    q_val, w_val, b_val = "", "", ""
+                body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{q_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{w_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{b_val}</td>'
+            body_rows += '</tr>'
+
+        # 3. สร้างแถวรวม (Total) สำหรับกลุ่มนี้
+        total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
+        for m in chunk_machines:
+            m_n = m['name']
+            tw_s = f"{totals_work[m_n]:,.2f}" if totals_work[m_n] > 0 else '-'
+            tb_s = f"{totals_break[m_n]:,.2f}" if totals_break[m_n] > 0 else '-'
+            total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
+        total_row_html += '</tr>'
+        
+        # 4. สร้างแถวเปอร์เซ็นต์สำหรับกลุ่มนี้
+        pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
+        for m in chunk_machines:
+            pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
+        pct_row_html += '</tr>'
+
+        # 5. ประกอบร่างเป็น 1 ตาราง
+        page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(machine_chunks)}</div>" if len(machine_chunks) > 1 else ""
+        
+        single_table = f"""
+        <div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div>
+        <div class="banner">สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}</div>
+        {page_info}
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan="2" style="background-color:#E2EFDA;border:1px solid #000;padding:3px;font-size:10px;width:35px;color:#000000 !important;">วันที่</th>
+                    {header_row1}
+                </tr>
+                <tr>{header_row2}</tr>
+            </thead>
+            <tbody>
+                {body_rows}
+                {total_row_html}
+                {pct_row_html}
+            </tbody>
+        </table>
+        """
+        all_tables_html += single_table
+        
+        # ถ้ายกเว้นหน้าสุดท้าย ให้ใส่ตัวตัดขึ้นหน้าใหม่ (Page Break)
+        if chunk_idx < len(machine_chunks) - 1:
+            all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
+
+    # นำตารางทั้งหมดไปห่อด้วย HTML โครงร่างหลัก
+    table_full_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <title>Print</title>
+        <style>
+            @page {{ size: A4 landscape; margin: 5mm; }} 
+            body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
+            .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} 
+            .banner {{ background-color: #F8CBAD; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }} 
+            table {{ width: 100%; border-collapse: collapse; }} 
+            th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}
+        </style>
+    </head>
+    <body>
+        {all_tables_html}
+    </body>
+    </html>
+    """
     
     return raw_data, excel_data, json.dumps(table_full_html)
 
@@ -1009,42 +1080,123 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
 
-    header_row1 = "".join([f'<th colspan="3" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in engines_config]) + '<th colspan="3" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th><th colspan="3" style="background-color:#FFC000;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">TCK</th>'
-    header_row2 = "".join([f'<th colspan="3" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in engines_config])
-    header_row3 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>' for _ in range(len(engines_config) + 2)])
-
-    body_rows = ""
-    for day in range(1, 32):
-        body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
-        for e in engines_config:
-            item = matrix_data[day][e['key']]
-            h_val, l_val, r_val = (f"{item['hours']:,.2f}", f"{item['liters']:,.2f}", f"{(item['liters']/item['hours']):,.2f}") if item['has_data'] and item['hours']>0 else ("-", "-", "-")
-            body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{h_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
-        for grp_k in ['toyo', 'tck']:
-            grp_item = summary_matrix[day][grp_k]
-            th_s, tl_s, tr_s = (f"{grp_item['hours']:,.2f}", f"{grp_item['liters']:,.2f}", f"{(grp_item['liters']/grp_item['hours']):,.2f}") if grp_item['hours']>0 else ("-", "-", "-")
-            body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{th_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tl_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tr_s}</td>'
-        body_rows += '</tr>'
-
-    total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
-    for e in engines_config:
-        c_key = e['key']
-        t_h = f"{totals_hours[c_key]:,.2f}" if totals_hours[c_key] > 0 else "-"
-        t_l = f"{totals_liters[c_key]:,.2f}" if totals_liters[c_key] > 0 else "-"
-        t_r = avg_l_hr[c_key]
-        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_r}</td>'
+    # =========================================================
+    # 🎯 ส่วนสร้าง HTML สำหรับ Print (หั่นตารางแก้ปัญหาล้นหน้า A4)
+    # =========================================================
     
-    for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
-        th_s = f"{th:,.2f}" if th > 0 else "-"
-        tl_s = f"{tl:,.2f}" if tl > 0 else "-"
-        total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tr}</td>'
-    total_row_html += '</tr>'
+    # กำหนดจำนวนรถสูงสุดต่อ 1 หน้า A4 (แนวนอน) แนะนำที่ 5-6 คัน
+    ENGINES_PER_PAGE = 10 
+    
+    # หั่นรายชื่อรถออกเป็นกลุ่มๆ กลุ่มละ ENGINES_PER_PAGE
+    engine_chunks = [engines_config[i:i + ENGINES_PER_PAGE] for i in range(0, len(engines_config), ENGINES_PER_PAGE)]
+    
+    all_tables_html = ""
+    
+    # วนลูปสร้างตารางตามกลุ่มที่หั่นไว้
+    for chunk_idx, chunk_engines in enumerate(engine_chunks):
+        is_last_chunk = (chunk_idx == len(engine_chunks) - 1) # เช็คว่าเป็นหน้าสุดท้ายหรือไม่
 
-    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body><div class='header-title'>บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class='banner'>รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div><table><thead><tr><th rowspan='3' style='border:1px solid #000;padding:3px;font-size:10px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table></body></html>"
+        # 1. สร้าง Header Row 1 (ชื่อรถ)
+        header_row1 = "".join([f'<th colspan="3" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in chunk_engines])
+        # ถ้าเป็นหน้าสุดท้าย ให้ต่อท้ายด้วยคอลัมน์สรุป toyo และ TCK
+        if is_last_chunk:
+            header_row1 += '<th colspan="3" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th><th colspan="3" style="background-color:#FFC000;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">TCK</th>'
+
+        # 2. สร้าง Header Row 2 (ยี่ห้อรถ)
+        header_row2 = "".join([f'<th colspan="3" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in chunk_engines])
+
+        # 3. สร้าง Header Row 3 (ชม., ลิตร, ล/ชม.)
+        header_row3_cols = len(chunk_engines) + (2 if is_last_chunk else 0)
+        header_row3 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>' for _ in range(header_row3_cols)])
+
+        # 4. สร้าง Body (วันที่ 1-31)
+        body_rows = ""
+        for day in range(1, 32):
+            body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
+            
+            # ข้อมูลรายคัน
+            for e in chunk_engines:
+                item = matrix_data[day][e['key']]
+                h_val, l_val, r_val = (f"{item['hours']:,.2f}", f"{item['liters']:,.2f}", f"{(item['liters']/item['hours']):,.2f}") if item['has_data'] and item['hours']>0 else ("-", "-", "-")
+                body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{h_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
+            
+            # ถ้าเป็นหน้าสุดท้าย ให้โชว์ข้อมูลสรุป toyo/TCK ต่อท้ายแถว
+            if is_last_chunk:
+                for grp_k in ['toyo', 'tck']:
+                    grp_item = summary_matrix[day][grp_k]
+                    th_s, tl_s, tr_s = (f"{grp_item['hours']:,.2f}", f"{grp_item['liters']:,.2f}", f"{(grp_item['liters']/grp_item['hours']):,.2f}") if grp_item['hours']>0 else ("-", "-", "-")
+                    body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{th_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tl_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tr_s}</td>'
+            
+            body_rows += '</tr>'
+
+        # 5. สร้างแถวผลรวม (Total)
+        total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
+        for e in chunk_engines:
+            c_key = e['key']
+            t_h = f"{totals_hours[c_key]:,.2f}" if totals_hours[c_key] > 0 else "-"
+            t_l = f"{totals_liters[c_key]:,.2f}" if totals_liters[c_key] > 0 else "-"
+            t_r = avg_l_hr[c_key]
+            total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_r}</td>'
+        
+        # ถ้าเป็นหน้าสุดท้าย ให้โชว์ผลรวม toyo/TCK
+        if is_last_chunk:
+            for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
+                th_s = f"{th:,.2f}" if th > 0 else "-"
+                tl_s = f"{tl:,.2f}" if tl > 0 else "-"
+                total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tr}</td>'
+        total_row_html += '</tr>'
+
+        # 6. ประกอบเป็น HTML ย่อยสำหรับแผ่นนี้
+        page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(engine_chunks)}</div>" if len(engine_chunks) > 1 else ""
+        
+        single_table = f"""
+        <div class='header-title'>บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div>
+        <div class='banner'>รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div>
+        {page_info}
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan='3' style='border:1px solid #000;padding:3px;font-size:10px;width:35px;'>วันที่</th>
+                    {header_row1}
+                </tr>
+                <tr>{header_row2}</tr>
+                <tr>{header_row3}</tr>
+            </thead>
+            <tbody>
+                {body_rows}
+                {total_row_html}
+            </tbody>
+        </table>
+        """
+        all_tables_html += single_table
+
+        # ถ้ายกเว้นหน้าสุดท้าย ให้ใส่ตัวตัดขึ้นหน้าใหม่ (Page Break)
+        if not is_last_chunk:
+            all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
+
+    # นำตารางทั้งหมดไปห่อด้วย HTML โครงร่างหลัก
+    table_full_html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='utf-8'>
+        <title>Print</title>
+        <style>
+            @page {{ size: A4 landscape; margin: 4mm; }} 
+            body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
+            .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} 
+            .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }} 
+            table {{ width: 100%; border-collapse: collapse; }} 
+            th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}
+        </style>
+    </head>
+    <body>
+        {all_tables_html}
+    </body>
+    </html>
+    """
     
     return raw_data, excel_buffer.getvalue(), json.dumps(table_full_html), engine_lbl_list, engine_details_t2
-
-
 @st.cache_data(show_spinner=False)
 def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_branch_display):
     try:
@@ -1249,9 +1401,76 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         total_row_html += f'<td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:center;font-size:10px;font-weight:bold;">{t_cnt_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_drp_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_pm_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_npm_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#D32F2F;">{bt["p_tot"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#1E293B;">{bt["p_pm"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#1976D2;">{bt["p_npm"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:left;font-size:10px;"></td>'
     total_row_html += '</tr>'
 
-    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 10px; background-color: #FFFFFF; color: #1E293B; }} .header-banner1 {{ background-color: #1E293B; color: #FFFFFF; text-align: center; font-size: 18px; font-weight: bold; padding: 12px; border: 1px solid #CBD5E1; border-bottom: none; border-radius: 8px 8px 0 0; letter-spacing: 0.5px; }} .header-banner2 {{ background-color: #F8FAFC; color: #475569; text-align: center; font-size: 14px; font-weight: bold; padding: 8px; border: 1px solid #CBD5E1; border-top: none; margin-bottom: 12px; border-radius: 0 0 8px 8px; }} table {{ width: 100%; border-collapse: collapse; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #1E293B !important; border: 1px solid #CBD5E1; }} th {{ text-transform: uppercase; letter-spacing: 0.5px; }}</style></head><body><div class='header-banner1'>รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div><div class='header-banner2'>ประจำเดือน {month_str} {year_buddhist}</div><table><thead><tr><th rowspan='3' style='background-color:#E2E8F0;color:#1E293B;border:1px solid #CBD5E1;padding:6px;font-size:12px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table></body></html>"
+    # =========================================================
+    # 🎯 ส่วนสร้าง HTML สำหรับ Print (ดีไซน์เดิม + บีบลง 1 หน้า)
+    # =========================================================
+    table_full_html = f"""<!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='utf-8'>
+        <title>Print</title>
+        <style>
+            /* 🎯 1. ตั้งหน้ากระดาษและลดขอบ Margin เพื่อดึงพื้นที่ว่างกลับมา */
+            @page {{ size: A4 portrait; margin: 5mm 8mm; }} 
+            
+            body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 0; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
+            
+            /* 🎯 2. คงดีไซน์ดั้งเดิมของคุณเอาไว้ (Header สีดำ) */
+            .header-banner1 {{ 
+                text-align: center; 
+                font-size: 14px; 
+                font-weight: bold; 
+                margin-bottom: 2px; 
+                padding: 4px; 
+                background-color: #2D2D2D !important; /* สีดำแบบในรูป */
+                color: #FFFFFF !important; 
+            }} 
+            
+            /* 🎯 3. ดีไซน์ดั้งเดิมแถบรอง (Sub-header สีเทา) */
+            .header-banner2 {{ 
+                text-align: center; 
+                font-size: 12px; 
+                font-weight: bold; 
+                padding: 3px; 
+                margin-bottom: 4px; 
+                background-color: #F3F4F6 !important; /* สีเทาอ่อน */
+            }} 
+            
+            table {{ width: 100%; border-collapse: collapse; }} 
+            
+            /* 🎯 4. หัวใจสำคัญ: บีบความสูงตารางเพื่อไม่ให้ตกไปหน้า 2 */
+            th, td {{ 
+                font-family: 'Sarabun', Tahoma, sans-serif; 
+                color: #000000 !important; 
+                border: 1px solid #CBD5E1 !important; 
+                padding: 1.5px 2px !important;  /* 👈 บีบช่องว่างบน-ล่างให้เหลือแค่ 1.5px */
+                font-size: 8.5px !important;      /* 👈 ลดขนาดฟอนต์ลงนิดหน่อยให้อยู่ในหน้าเดียว */
+                line-height: 1.05 !important;   /* 👈 ลดระยะห่างระหว่างบรรทัด */
+                text-align: center;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class='header-banner1'>รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div>
+        <div class='header-banner2'>ประจำเดือน {month_str} {year_buddhist}</div>
+        <table>
+            <thead>
+                <tr>
+                    <th rowspan='3' style='background-color:#F1F5F9;color:#1E293B;padding:4px;font-size:10px;width:35px;'>วันที่</th>
+                    {header_row1}
+                </tr>
+                <tr>{header_row2}</tr>
+                <tr>{header_row3}</tr>
+            </thead>
+            <tbody>
+                {body_rows}
+                {total_row_html}
+            </tbody>
+        </table>
+    </body>
+    </html>"""
     
-    return raw_data, excel_buffer.getvalue(), json.dumps(table_full_html)
+    return raw_data, excel_data, json.dumps(table_full_html)
 
 @st.cache_data(show_spinner=False)
 def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_branch_display):
@@ -1461,7 +1680,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             if is_diff_col and val < 0: c.font = f_red
             else: c.font = f_n
             
-            # 🌟 สีเหลืองของ Master Tab 🌟
             if is_std_col: c.fill = fill_green; c.font = f_w
             elif idx in [2, 3, 23]: c.fill = fill_yellow 
             if isinstance(val, (int, float)): c.number_format = '#,##0.00'
@@ -1506,8 +1724,25 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     for i in range(1, 31): ws_m.column_dimensions[get_column_letter(i)].width = 10
     ws_m.column_dimensions['A'].width = 14
 
-    master_html = f"""<table style='margin-bottom: 30px; font-size:10px;'><thead><tr><th colspan='30' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}</th></tr>{html_headers_m}</thead><tbody>{body_html_m}{f_html_m}</tbody></table>"""
-    boilers_html_dict[f"🌟 รวมสาขา {selected_branch_display} (บอยเลอร์ 1+2)"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A3 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{master_html}</body></html>"
+    master_html = f"""<table style='margin-bottom: 30px;'><thead><tr><th colspan='30' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}</th></tr>{html_headers_m}</thead><tbody>{body_html_m}{f_html_m}</tbody></table>"""
+    
+    # 🌟 ปรับตาราง Master รวม (บอยเลอร์ 1+2) ให้ลง A4 แนวนอนได้ (ปรับฟอนต์และระยะให้เล็กที่สุด)
+    boilers_html_dict[f"🌟 รวมสาขา {selected_branch_display} (บอยเลอร์ 1+2)"] = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
+        @page {{ size: A4 landscape; margin: 4mm; }} 
+        * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
+        body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size: 8px; color: #000; margin: 0; padding: 2px; }} 
+        table {{ width: 100%; border-collapse: collapse; }} 
+        th, td {{ 
+            border: 1px solid #000; 
+            padding: 1.5px 2px !important;  
+            color: #000 !important; 
+            font-size: 7.5px !important; 
+            line-height: 1.05 !important; 
+            white-space: nowrap !important; /* 👈 บังคับไม่ให้ขึ้นบรรทัดใหม่ */
+        }} 
+        th {{ background-color: #F8F9FA; text-align: center; font-weight: bold; white-space: normal !important; }} 
+        .header-main {{ background-color: #0070C0; color: white !important; font-size: 12px; padding: 4px; }}
+    </style></head><body>{master_html}</body></html>"""
     html_tables += master_html
 
 
@@ -1567,7 +1802,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 c = ws.cell(row=cur_row, column=idx, value=val)
                 c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
                 
-                # 🌟 ดึงสีเหลืองของบอยเลอร์ 1 และ 2 กลับมา (คอลัมน์ 2,3,4,10) 🌟
                 if idx in [2, 3, 4, 10]: c.fill = fill_yellow
                 elif idx == 13: c.fill = fill_green; c.font = f_w
                 if isinstance(val, (int, float)): c.number_format = '#,##0.00'
@@ -1612,9 +1846,26 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         
         single_table_html = f"<table style='margin-bottom: 30px;'><thead><tr><th colspan='15' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}</th></tr>{html_headers}</thead><tbody>{body_html}{footer_html}</tbody></table>"
         html_tables += single_table_html
-        boilers_html_dict[f"🔥 ข้อมูล {boiler_name}"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:11px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{single_table_html}</body></html>"
+        
+        # 🌟 ปรับตารางรายบอยเลอร์ ให้ลง A4 แนวนอน ไม่บีบและไม่ล้นหน้า
+        boilers_html_dict[f"🔥 ข้อมูล {boiler_name}"] = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
+            @page {{ size: A4 landscape; margin: 8mm 5mm; }} 
+            * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
+            body {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000; margin: 0; padding: 0; }} 
+            table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }} 
+            th, td {{ 
+                border: 1px solid #000; 
+                padding: 2.5px 2px !important;  
+                color: #000 !important; 
+                font-size: 9px !important; 
+                line-height: 1.1 !important; 
+                white-space: nowrap !important; /* 👈 บังคับไม่ให้ขึ้นบรรทัดใหม่ */
+            }} 
+            th {{ background-color: #F8F9FA; text-align: center; font-weight: bold; white-space: normal !important; }} 
+            .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}
+        </style></head><body>{single_table_html}</body></html>"""
 
-    full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A3 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"
+    full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"
 
     final_json_data = {
         "full_print_html": full_html,
