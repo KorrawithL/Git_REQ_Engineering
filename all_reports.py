@@ -5,6 +5,7 @@ import io
 import time
 import json
 import math
+import calendar 
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
@@ -56,13 +57,16 @@ def delete_record_dialog_t2(row_data, pk_col):
                 with conn.cursor() as cur:
                     cur.execute(f"DELETE FROM fuel_records WHERE {pk_col}=%s", (rec_id,))
                     conn.commit()
-                
+
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 2", f"ลบข้อมูล ID: {rec_id}")
                 st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 3)")
 def delete_record_dialog_t3(row_data, pk_col):
@@ -106,13 +110,16 @@ def delete_record_dialog_t4(row_data, pk_col):
                 with conn.cursor() as cur:
                     cur.execute(f"DELETE FROM boiler_fuel_records WHERE {pk_col}=%s", (rec_id,))
                     conn.commit()
-                
+
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4", f"ลบข้อมูล ID: {rec_id}")
                 st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (ยอดรวมสาขา)")
 def delete_record_dialog_oven(row_data, pk_col):
@@ -523,7 +530,74 @@ def show_summary_report_dialog_t4(boiler_dict):
             st.components.v1.html(boiler_dict[b_name], height=600, scrolling=True)
 
 # ==========================================================
-# 🚀 3. ฟังก์ชัน CACHE ประมวลผลข้อมูล
+# 🚀 3. ฟังก์ชันกลางจัดการ Pagination ลดโค้ดซ้ำซ้อน
+# ==========================================================
+def render_custom_pagination(data_list, session_prefix, default_rows=15):
+    """ฟังก์ชันกลางจัดการ Pagination ลดโค้ดซ้ำซ้อนสำหรับตารางทั้งหมด"""
+    total_records = len(data_list)
+    rows_key = f"{session_prefix}_rows"
+    page_key = f"{session_prefix}_page"
+
+    if rows_key not in st.session_state:
+        st.session_state[rows_key] = default_rows
+    if page_key not in st.session_state:
+        st.session_state[page_key] = 1
+
+    rows_per_page = st.session_state[rows_key]
+    
+    if rows_per_page <= 0:
+        total_pages = 1
+    elif rows_per_page >= total_records:
+        total_pages = 1
+    else:
+        total_pages = max(1, math.ceil(total_records / rows_per_page))
+
+    if st.session_state[page_key] > total_pages:
+        st.session_state[page_key] = total_pages
+    if st.session_state[page_key] < 1:
+        st.session_state[page_key] = 1
+
+    pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+    with pc1: 
+        new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state[rows_key], step=5, key=f"inp_{rows_key}")
+        if new_rows != st.session_state[rows_key]:
+            st.session_state[rows_key] = new_rows
+            st.session_state[page_key] = 1
+            st.rerun()
+
+    with pc2: 
+        st.write("")
+        dyn_key = f"sel_pg_{session_prefix}_{st.session_state[page_key]}"
+        selected_page = st.selectbox("เลือกหน้า", range(1, total_pages + 1), index=st.session_state[page_key] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=dyn_key, label_visibility="collapsed")
+        if selected_page != st.session_state[page_key]:
+            st.session_state[page_key] = selected_page
+            st.rerun()
+
+        st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
+        c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+        with c_prev:
+            if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state[page_key] <= 1), key=f"btn_prev_{session_prefix}"):
+                st.session_state[page_key] -= 1
+                st.rerun()
+        with c_page: 
+            st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state[page_key]} / {total_pages}</div>", unsafe_allow_html=True)
+        with c_next:
+            if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state[page_key] >= total_pages), key=f"btn_next_{session_prefix}"):
+                st.session_state[page_key] += 1
+                st.rerun()
+
+    if rows_per_page <= 0:
+        return []
+    elif rows_per_page >= total_records:
+        return data_list
+    else:
+        start_idx = (st.session_state[page_key] - 1) * rows_per_page
+        end_idx = start_idx + rows_per_page
+        return data_list[start_idx:end_idx]
+
+
+# ==========================================================
+# 🚀 4. ฟังก์ชัน CACHE ประมวลผลข้อมูล
 # ==========================================================
 @st.cache_data(show_spinner=False)
 def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_branch_display):
@@ -542,7 +616,9 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, (b_id_t1, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
-    except Exception: return [], None, None
+    except Exception as e:
+        st.error(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
+        return [], None, None
 
     if not raw_data: return [], None, None
 
@@ -590,7 +666,10 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     if not machines_config:
         return [], None, None
 
-    matrix_data = {d: {m['name']: {'qty': 0, 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, 32)}
+    start_dt = pd.to_datetime(start_date_str)
+    days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
+
+    matrix_data = {d: {m['name']: {'qty': 0, 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, days_in_month + 1)}
     
     for row_m in raw_data:
         d_num = pd.to_datetime(row_m['record_date']).day
@@ -608,11 +687,11 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         matrix_data[d_num][mapped_name]['break'] += b_hr
         matrix_data[d_num][mapped_name]['has_data'] = True
 
-    active_machines_config = [m for m in machines_config if any([matrix_data[d][m['name']]['has_data'] for d in range(1, 32)])]
+    active_machines_config = [m for m in machines_config if any([matrix_data[d][m['name']]['has_data'] for d in range(1, days_in_month + 1)])]
     if not active_machines_config: active_machines_config = machines_config
         
-    totals_work = {m['name']: sum([matrix_data[d][m['name']]['work'] for d in range(1, 32)]) for m in active_machines_config}
-    totals_break = {m['name']: sum([matrix_data[d][m['name']]['break'] for d in range(1, 32)]) for m in active_machines_config}
+    totals_work = {m['name']: sum([matrix_data[d][m['name']]['work'] for d in range(1, days_in_month + 1)]) for m in active_machines_config}
+    totals_break = {m['name']: sum([matrix_data[d][m['name']]['break'] for d in range(1, days_in_month + 1)]) for m in active_machines_config}
     percentages = {m['name']: f"{(totals_break[m['name']] / totals_work[m['name']] * 100):.2f}%" if totals_work[m['name']] > 0 else "0.00%" for m in active_machines_config}
     
     start_dt = pd.to_datetime(start_date_str)
@@ -648,7 +727,7 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
 
     ws.row_dimensions[3].height, ws.row_dimensions[4].height = 20, 35
     current_row = 5
-    for day in range(1, 32):
+    for day in range(1, days_in_month + 1):
         ws[f"A{current_row}"] = day; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_header, align_center, thin_border
         c_idx = 2
         for m in active_machines_config:
@@ -694,25 +773,16 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     # 🎯 ส่วนสร้าง HTML สำหรับ Print (หั่นตารางแก้ปัญหาล้นหน้า A4)
     # =========================================================
     
-    # กำหนดจำนวนเครื่องจักรสูงสุดต่อ 1 หน้า A4 (แนวนอน)
-    # 1 เครื่องมี 3 คอลัมน์ย่อย (เครื่องจักร, ชม.ทำงาน, เบรกดาวน์) แนะนำที่ 5-6 เครื่องต่อหน้า
     MACHINES_PER_PAGE = 10 
-    
-    # หั่นรายชื่อเครื่องจักรออกเป็นกลุ่มๆ กลุ่มละ MACHINES_PER_PAGE
     machine_chunks = [active_machines_config[i:i + MACHINES_PER_PAGE] for i in range(0, len(active_machines_config), MACHINES_PER_PAGE)]
-    
     all_tables_html = ""
     
-    # วนลูปสร้างตารางตามกลุ่มที่หั่นไว้
     for chunk_idx, chunk_machines in enumerate(machine_chunks):
-        
-        # 1. สร้าง Header สำหรับกลุ่มนี้
         header_row1 = "".join([f'<th colspan="3" style="background-color:#{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in chunk_machines])
         header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in chunk_machines])
 
-        # 2. สร้าง Body (วันที่ 1-31) สำหรับกลุ่มนี้
         body_rows = ""
-        for day in range(1, 32):
+        for day in range(1, days_in_month + 1):
             body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
             for m in chunk_machines:
                 item = matrix_data[day][m['name']]
@@ -725,7 +795,6 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
                 body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{q_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{w_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{b_val}</td>'
             body_rows += '</tr>'
 
-        # 3. สร้างแถวรวม (Total) สำหรับกลุ่มนี้
         total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
         for m in chunk_machines:
             m_n = m['name']
@@ -734,13 +803,11 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
             total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
         total_row_html += '</tr>'
         
-        # 4. สร้างแถวเปอร์เซ็นต์สำหรับกลุ่มนี้
         pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
         for m in chunk_machines:
             pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
         pct_row_html += '</tr>'
 
-        # 5. ประกอบร่างเป็น 1 ตาราง
         page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(machine_chunks)}</div>" if len(machine_chunks) > 1 else ""
         
         single_table = f"""
@@ -764,11 +831,9 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         """
         all_tables_html += single_table
         
-        # ถ้ายกเว้นหน้าสุดท้าย ให้ใส่ตัวตัดขึ้นหน้าใหม่ (Page Break)
         if chunk_idx < len(machine_chunks) - 1:
             all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
 
-    # นำตารางทั้งหมดไปห่อด้วย HTML โครงร่างหลัก
     table_full_html = f"""
     <!DOCTYPE html>
     <html>
@@ -823,7 +888,8 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql_trans, (b_id_t2, start_date_str, end_date_str))
                 raw_data = cur.fetchall()
         conn.close()
-    except Exception:
+    except Exception as e:
+        st.error(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
         return [], None, None, [], {}
 
     engine_options_t2, engine_details_t2 = {}, {}
@@ -870,7 +936,10 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             hex_color = "FFC000" if "tck" in type_nm.lower() else "FF0000"
             all_engines_config.append({"key": eng_key, "code": code, "title": title_name, "brand": type_nm, "branch": b_name, "hex": hex_color})
 
-    matrix_data = {d: {e['key']: {'liters': 0.0, 'hours': 0.0, 'has_data': False} for e in all_engines_config} for d in range(1, 32)}
+    start_dt = pd.to_datetime(start_date_str)
+    days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
+
+    matrix_data = {d: {e['key']: {'liters': 0.0, 'hours': 0.0, 'has_data': False} for e in all_engines_config} for d in range(1, days_in_month + 1)}
     for r in raw_data:
         d_num = pd.to_datetime(r['record_date']).day
         e_code, b_name = str(r.get('engine_code') or '').strip(), str(r.get('branch_name') or '').strip()
@@ -889,7 +958,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 matrix_data[d_num][e['key']]['has_data'] = True
                 break
 
-    engines_config = [e for e in all_engines_config if any([matrix_data[d][e['key']]['has_data'] for d in range(1, 32)])]
+    engines_config = [e for e in all_engines_config if any([matrix_data[d][e['key']]['has_data'] for d in range(1, days_in_month + 1)])]
     if not engines_config: engines_config = all_engines_config
 
     start_dt = pd.to_datetime(start_date_str)
@@ -900,26 +969,26 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     totals_hours, totals_liters, avg_l_hr, std_target_hours = {}, {}, {}, {}
     for e in engines_config:
         c_key = e['key']
-        tot_h = sum([matrix_data[d][c_key]['hours'] for d in range(1, 32)])
-        tot_l = sum([matrix_data[d][c_key]['liters'] for d in range(1, 32)])
+        tot_h = sum([matrix_data[d][c_key]['hours'] for d in range(1, days_in_month + 1)])
+        tot_l = sum([matrix_data[d][c_key]['liters'] for d in range(1, days_in_month + 1)])
         totals_hours[c_key], totals_liters[c_key] = tot_h, tot_l
         avg_l_hr[c_key] = f"{(tot_l / tot_h):.2f}" if tot_h > 0 else "0.00"
         is_backup_car = "สำรอง" in e['title'] or "สำรอง" in e['code'] or "สำรอง" in e.get('brand', '')
         std_target_hours[c_key] = (4 if is_backup_car else 20) * days_in_current_month
 
     summary_matrix = {}
-    for d in range(1, 32):
+    for d in range(1, days_in_month + 1):
         summary_matrix[d] = {
             'toyo': {'hours': sum([matrix_data[d][k]['hours'] for k in toyo_keys]), 'liters': sum([matrix_data[d][k]['liters'] for k in toyo_keys])},
             'tck': {'hours': sum([matrix_data[d][k]['hours'] for k in tck_keys]), 'liters': sum([matrix_data[d][k]['liters'] for k in tck_keys])}
         }
 
-    tot_toyo_hours = sum([summary_matrix[d]['toyo']['hours'] for d in range(1, 32)])
-    tot_toyo_liters = sum([summary_matrix[d]['toyo']['liters'] for d in range(1, 32)])
+    tot_toyo_hours = sum([summary_matrix[d]['toyo']['hours'] for d in range(1, days_in_month + 1)])
+    tot_toyo_liters = sum([summary_matrix[d]['toyo']['liters'] for d in range(1, days_in_month + 1)])
     avg_toyo_rate = f"{(tot_toyo_liters / tot_toyo_hours):.2f}" if tot_toyo_hours > 0 else "0.00"
 
-    tot_tck_hours = sum([summary_matrix[d]['tck']['hours'] for d in range(1, 32)])
-    tot_tck_liters = sum([summary_matrix[d]['tck']['liters'] for d in range(1, 32)])
+    tot_tck_hours = sum([summary_matrix[d]['tck']['hours'] for d in range(1, days_in_month + 1)])
+    tot_tck_liters = sum([summary_matrix[d]['tck']['liters'] for d in range(1, days_in_month + 1)])
     avg_tck_rate = f"{(tot_tck_liters / tot_tck_hours):.2f}" if tot_tck_hours > 0 else "0.00"
 
     tot_target_toyo = sum([std_target_hours[k] for k in toyo_keys])
@@ -966,7 +1035,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     ws.row_dimensions[3].height, ws.row_dimensions[4].height, ws.row_dimensions[5].height = 22, 22, 20
 
     current_row = 6
-    for day in range(1, 32):
+    for day in range(1, days_in_month + 1):
         ws[f"A{current_row}"] = day; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_header, align_center, thin_border
         c_idx = 2
         for e in engines_config:
@@ -1084,43 +1153,31 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     # 🎯 ส่วนสร้าง HTML สำหรับ Print (หั่นตารางแก้ปัญหาล้นหน้า A4)
     # =========================================================
     
-    # กำหนดจำนวนรถสูงสุดต่อ 1 หน้า A4 (แนวนอน) แนะนำที่ 5-6 คัน
     ENGINES_PER_PAGE = 10 
-    
-    # หั่นรายชื่อรถออกเป็นกลุ่มๆ กลุ่มละ ENGINES_PER_PAGE
     engine_chunks = [engines_config[i:i + ENGINES_PER_PAGE] for i in range(0, len(engines_config), ENGINES_PER_PAGE)]
-    
     all_tables_html = ""
     
-    # วนลูปสร้างตารางตามกลุ่มที่หั่นไว้
     for chunk_idx, chunk_engines in enumerate(engine_chunks):
-        is_last_chunk = (chunk_idx == len(engine_chunks) - 1) # เช็คว่าเป็นหน้าสุดท้ายหรือไม่
+        is_last_chunk = (chunk_idx == len(engine_chunks) - 1) 
 
-        # 1. สร้าง Header Row 1 (ชื่อรถ)
         header_row1 = "".join([f'<th colspan="3" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in chunk_engines])
-        # ถ้าเป็นหน้าสุดท้าย ให้ต่อท้ายด้วยคอลัมน์สรุป toyo และ TCK
         if is_last_chunk:
             header_row1 += '<th colspan="3" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th><th colspan="3" style="background-color:#FFC000;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">TCK</th>'
 
-        # 2. สร้าง Header Row 2 (ยี่ห้อรถ)
         header_row2 = "".join([f'<th colspan="3" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in chunk_engines])
 
-        # 3. สร้าง Header Row 3 (ชม., ลิตร, ล/ชม.)
         header_row3_cols = len(chunk_engines) + (2 if is_last_chunk else 0)
         header_row3 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>' for _ in range(header_row3_cols)])
 
-        # 4. สร้าง Body (วันที่ 1-31)
         body_rows = ""
-        for day in range(1, 32):
+        for day in range(1, days_in_month + 1):
             body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
             
-            # ข้อมูลรายคัน
             for e in chunk_engines:
                 item = matrix_data[day][e['key']]
                 h_val, l_val, r_val = (f"{item['hours']:,.2f}", f"{item['liters']:,.2f}", f"{(item['liters']/item['hours']):,.2f}") if item['has_data'] and item['hours']>0 else ("-", "-", "-")
                 body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{h_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
             
-            # ถ้าเป็นหน้าสุดท้าย ให้โชว์ข้อมูลสรุป toyo/TCK ต่อท้ายแถว
             if is_last_chunk:
                 for grp_k in ['toyo', 'tck']:
                     grp_item = summary_matrix[day][grp_k]
@@ -1129,7 +1186,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             
             body_rows += '</tr>'
 
-        # 5. สร้างแถวผลรวม (Total)
         total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
         for e in chunk_engines:
             c_key = e['key']
@@ -1138,7 +1194,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             t_r = avg_l_hr[c_key]
             total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_r}</td>'
         
-        # ถ้าเป็นหน้าสุดท้าย ให้โชว์ผลรวม toyo/TCK
         if is_last_chunk:
             for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
                 th_s = f"{th:,.2f}" if th > 0 else "-"
@@ -1146,7 +1201,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tr}</td>'
         total_row_html += '</tr>'
 
-        # 6. ประกอบเป็น HTML ย่อยสำหรับแผ่นนี้
         page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(engine_chunks)}</div>" if len(engine_chunks) > 1 else ""
         
         single_table = f"""
@@ -1170,11 +1224,9 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
         """
         all_tables_html += single_table
 
-        # ถ้ายกเว้นหน้าสุดท้าย ให้ใส่ตัวตัดขึ้นหน้าใหม่ (Page Break)
         if not is_last_chunk:
             all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
 
-    # นำตารางทั้งหมดไปห่อด้วย HTML โครงร่างหลัก
     table_full_html = f"""
     <!DOCTYPE html>
     <html>
@@ -1197,6 +1249,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     """
     
     return raw_data, excel_buffer.getvalue(), json.dumps(table_full_html), engine_lbl_list, engine_details_t2
+
 @st.cache_data(show_spinner=False)
 def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_branch_display):
     try:
@@ -1214,7 +1267,8 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql, (b_id_t3, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
-    except Exception:
+    except Exception as e:
+        st.error(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
         return [], None, None
 
     if not raw_data: return [], None, None
@@ -1230,7 +1284,10 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
 
     if not branches_config: branches_config = [{"code": "WU", "full_name": selected_branch_display}]
 
-    matrix_data = {d: {b['code']: {'total': 0.0, 'drop': 0.0, 'pm': 0.0, 'non_pm': 0.0, 'remark': '', 'has_data': False} for b in branches_config} for d in range(1, 32)}
+    start_dt = pd.to_datetime(start_date_str)
+    days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
+
+    matrix_data = {d: {b['code']: {'total': 0.0, 'drop': 0.0, 'pm': 0.0, 'non_pm': 0.0, 'remark': '', 'has_data': False} for b in branches_config} for d in range(1, days_in_month + 1)}
     for r in raw_data:
         d_num = pd.to_datetime(r['record_date']).day
         b_name = str(r.get('branch_name') or '').strip()
@@ -1244,10 +1301,10 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
     branch_totals = {}
     for b in branches_config:
         b_code = b['code']
-        tot_c = sum([matrix_data[d][b_code]['total'] for d in range(1, 32)])
-        tot_d = sum([matrix_data[d][b_code]['drop'] for d in range(1, 32)])
-        pm_d = sum([matrix_data[d][b_code]['pm'] for d in range(1, 32)])
-        npm_d = sum([matrix_data[d][b_code]['non_pm'] for d in range(1, 32)])
+        tot_c = sum([matrix_data[d][b_code]['total'] for d in range(1, days_in_month + 1)])
+        tot_d = sum([matrix_data[d][b_code]['drop'] for d in range(1, days_in_month + 1)])
+        pm_d = sum([matrix_data[d][b_code]['pm'] for d in range(1, days_in_month + 1)])
+        npm_d = sum([matrix_data[d][b_code]['non_pm'] for d in range(1, days_in_month + 1)])
         branch_totals[b_code] = {'total': tot_c, 'drop': tot_d, 'pm': pm_d, 'non_pm': npm_d, 'p_tot': f"{(tot_d/tot_c*100):.2f}%" if tot_c>0 else "0.00%", 'p_pm': f"{(pm_d/tot_c*100):.2f}%" if tot_c>0 else "0.00%", 'p_npm': f"{(npm_d/tot_c*100):.2f}%" if tot_c>0 else "0.00%"}
 
     start_dt = pd.to_datetime(start_date_str)
@@ -1307,7 +1364,7 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
 
     # 🎨 3. สร้าง Body ของ Excel
     current_row = 6
-    for day in range(1, 32):
+    for day in range(1, days_in_month + 1):
         ws[f"A{current_row}"] = day; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_body_bold, align_center, thin_border
         c_idx = 2
         for b in branches_config:
@@ -1374,7 +1431,7 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
     header_row3 = "".join(['<th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">จำนวน<br>(ครั้ง)</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">ตกทั้งหมด</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">ตกทั้งหมด</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:100px;"></th>' for _ in branches_config])
 
     body_rows = ""
-    for day in range(1, 32):
+    for day in range(1, days_in_month + 1):
         body_rows += f'<tr><td style="background-color:#F8FAFC; border:1px solid #CBD5E1;padding:4px;text-align:center;font-size:10px;font-weight:bold;color:#1E293B;">{day}</td>'
         for b in branches_config:
             item = matrix_data[day][b['code']]
@@ -1516,7 +1573,9 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 cur.execute(sql_oven, (b_id_t4, start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
         conn.close()
-    except Exception: return [], [], None, None
+    except Exception as e:
+        st.error(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูล: {e}")
+        return [], [], None, None
     
     if not raw_data and not oven_raw: return [], [], None, None
 
@@ -1879,9 +1938,8 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
 
 
 # ==========================================================
-# 📊 4. ฟังก์ชันหลักสำหรับ Render Report Tabs
+# 📊 5. ฟังก์ชันหลักสำหรับ Render Report Tabs
 # ==========================================================
-# เพิ่ม parameter selected_sub_menu
 def render_all_reports_module(user_branch_name, selected_sub_menu=None):
     
     st.markdown("""
@@ -1898,7 +1956,6 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
     allowed_tabs_list = st.session_state.get('allowed_tabs', [])
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
 
-    # 📌 ใช้การค้นหาตัวเลข "1.", "2.", "3.", "4." ในข้อความ เพื่อจับคู่เปิดหน้าให้แม่นยำ
     key = "1"
     if selected_sub_menu:
         if "1." in selected_sub_menu: key = "1"
@@ -1906,7 +1963,6 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
         elif "3." in selected_sub_menu: key = "3"
         elif "4." in selected_sub_menu: key = "4"
 
-    # เช็คสิทธิ์ก่อนแสดงผล
     if current_role not in ["admin", "reporter"] and key not in allowed_tabs_list:
         st.error("## ⏳ คุณไม่ได้รับสิทธิ์เข้าถึงหัวข้อนี้")
         return
@@ -1942,88 +1998,9 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t1:
                 pk_col_t1 = list(raw_data_t1[0].keys())[0]
-                total_records = len(raw_data_t1)
                 
-                # 🌟 1. ตั้งค่า Session State สำหรับจำหน้าและจำนวนข้อมูล
-                if 'report1_rows_per_page' not in st.session_state:
-                    st.session_state['report1_rows_per_page'] = 15
-                if 'report1_current_page' not in st.session_state:
-                    st.session_state['report1_current_page'] = 1
-
-                # 🌟 2. ลอจิกการคำนวณจำนวนหน้าทั้งหมด (ต้องคำนวณก่อนสร้างปุ่ม)
-                rows_per_page = st.session_state['report1_rows_per_page']
-                if rows_per_page <= 0:
-                    total_pages_t1 = 1
-                elif rows_per_page >= total_records:
-                    total_pages_t1 = 1
-                else:
-                    total_pages_t1 = max(1, math.ceil(total_records / rows_per_page))
-
-                # ป้องกันกรณีหน้าปัจจุบันทะลุ
-                if st.session_state['report1_current_page'] > total_pages_t1:
-                    st.session_state['report1_current_page'] = total_pages_t1
-                if st.session_state['report1_current_page'] < 1:
-                    st.session_state['report1_current_page'] = 1
-
-                # 🌟 3. จัด Layout ด้านบน (ข้อมูลรวมตัวเลื่อนหน้าไว้ฝั่งขวา)
-                pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
-                
-                with pc1: 
-                    # 🟦 ช่องให้ผู้ใช้กรอกจำนวนข้อมูลต่อหน้า
-                    new_rows = st.number_input(
-                        f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", 
-                        value=st.session_state['report1_rows_per_page'], 
-                        step=5, 
-                        key=f"rows_t1"
-                    )
-                    if new_rows != st.session_state['report1_rows_per_page']:
-                        st.session_state['report1_rows_per_page'] = new_rows
-                        st.session_state['report1_current_page'] = 1
-                        # ลบโค้ด st.session_state['pg_t1'] ออกเพื่อแก้บั๊ก Error
-                        st.rerun()
-
-                with pc2: 
-                    st.write("") # ดันให้ตรงกับกล่อง input ฝั่งซ้าย
-                    
-                    # 🟩 Dropdown เลือกหน้า (✅ ใช้ Dynamic Key แทนเพื่อแก้ปัญหา State Conflict)
-                    dynamic_key = f"pg_t1_dynamic_{st.session_state['report1_current_page']}"
-                    selected_page = st.selectbox(
-                        "เลือกหน้า", 
-                        range(1, total_pages_t1 + 1), 
-                        index=st.session_state['report1_current_page'] - 1, 
-                        format_func=lambda x: f"📑 หน้า {x} / {total_pages_t1}", 
-                        key=dynamic_key, 
-                        label_visibility="collapsed"
-                    )
-                    if selected_page != st.session_state['report1_current_page']:
-                        st.session_state['report1_current_page'] = selected_page
-                        st.rerun()
-
-                    # 🟥 ชุดปุ่มเลื่อนหน้า (ย้ายมาไว้ใต้ Dropdown ทันที)
-                    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True) 
-                    c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
-                    with c_prev:
-                        if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report1_current_page'] <= 1), key="prev_t1"):
-                            st.session_state['report1_current_page'] -= 1
-                            # ลบโค้ดบังคับ State ออก
-                            st.rerun()
-                    with c_page:
-                        st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report1_current_page']} / {total_pages_t1}</div>", unsafe_allow_html=True)
-                    with c_next:
-                        if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report1_current_page'] >= total_pages_t1), key="next_t1"):
-                            st.session_state['report1_current_page'] += 1
-                            # ลบโค้ดบังคับ State ออก
-                            st.rerun()
-
-                # 🌟 4. หั่นข้อมูล (Slicing) ตามหน้าที่เลือก
-                if rows_per_page <= 0:
-                    paginated_t1 = []
-                elif rows_per_page >= total_records:
-                    paginated_t1 = raw_data_t1
-                else:
-                    start_idx = (st.session_state['report1_current_page'] - 1) * rows_per_page
-                    end_idx = start_idx + rows_per_page
-                    paginated_t1 = raw_data_t1[start_idx:end_idx]
+                # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
+                paginated_t1 = render_custom_pagination(raw_data_t1, session_prefix="rep1")
 
                 # =========================================================
                 # ส่วนแสดงผลตาราง
@@ -2040,7 +2017,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
                         cols[0].write(rec_id)
                         cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                        cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                        cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                         cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
                         
                         can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
@@ -2052,8 +2029,6 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
                 st.write("")
-                
-                # 🌟 5. จัด Layout ด้านล่าง (เหลือแค่ 3 ปุ่มหลัก)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
                 with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
                 with col_btn2: 
@@ -2090,55 +2065,9 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t2:
                 pk_col_t2 = list(raw_data_t2[0].keys())[0]
-                total_records = len(raw_data_t2)
                 
-                if 'report2_rows_per_page' not in st.session_state:
-                    st.session_state['report2_rows_per_page'] = 15
-                if 'report2_current_page' not in st.session_state:
-                    st.session_state['report2_current_page'] = 1
-
-                rows_per_page = st.session_state['report2_rows_per_page']
-                if rows_per_page <= 0: total_pages_t2 = 1
-                elif rows_per_page >= total_records: total_pages_t2 = 1
-                else: total_pages_t2 = max(1, math.ceil(total_records / rows_per_page))
-
-                if st.session_state['report2_current_page'] > total_pages_t2: st.session_state['report2_current_page'] = total_pages_t2
-                if st.session_state['report2_current_page'] < 1: st.session_state['report2_current_page'] = 1
-
-                pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
-                with pc1: 
-                    new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state['report2_rows_per_page'], step=5, key="rows_t2")
-                    if new_rows != st.session_state['report2_rows_per_page']:
-                        st.session_state['report2_rows_per_page'] = new_rows
-                        st.session_state['report2_current_page'] = 1
-                        st.rerun()
-
-                with pc2: 
-                    st.write("")
-                    dynamic_key = f"pg_t2_dyn_{st.session_state['report2_current_page']}"
-                    selected_page = st.selectbox("เลือกหน้า", range(1, total_pages_t2 + 1), index=st.session_state['report2_current_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages_t2}", key=dynamic_key, label_visibility="collapsed")
-                    if selected_page != st.session_state['report2_current_page']:
-                        st.session_state['report2_current_page'] = selected_page
-                        st.rerun()
-
-                    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-                    c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
-                    with c_prev:
-                        if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report2_current_page'] <= 1), key="prev_t2"):
-                            st.session_state['report2_current_page'] -= 1
-                            st.rerun()
-                    with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report2_current_page']} / {total_pages_t2}</div>", unsafe_allow_html=True)
-                    with c_next:
-                        if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report2_current_page'] >= total_pages_t2), key="next_t2"):
-                            st.session_state['report2_current_page'] += 1
-                            st.rerun()
-
-                if rows_per_page <= 0: paginated_t2 = []
-                elif rows_per_page >= total_records: paginated_t2 = raw_data_t2
-                else:
-                    start_idx = (st.session_state['report2_current_page'] - 1) * rows_per_page
-                    end_idx = start_idx + rows_per_page
-                    paginated_t2 = raw_data_t2[start_idx:end_idx]
+                # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
+                paginated_t2 = render_custom_pagination(raw_data_t2, session_prefix="rep2")
 
                 # =================== วาดตาราง Tab 2 ===================
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -2201,55 +2130,9 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t3:
                 pk_col_t3 = list(raw_data_t3[0].keys())[0]
-                total_records = len(raw_data_t3)
                 
-                if 'report3_rows_per_page' not in st.session_state:
-                    st.session_state['report3_rows_per_page'] = 15
-                if 'report3_current_page' not in st.session_state:
-                    st.session_state['report3_current_page'] = 1
-
-                rows_per_page = st.session_state['report3_rows_per_page']
-                if rows_per_page <= 0: total_pages_t3 = 1
-                elif rows_per_page >= total_records: total_pages_t3 = 1
-                else: total_pages_t3 = max(1, math.ceil(total_records / rows_per_page))
-
-                if st.session_state['report3_current_page'] > total_pages_t3: st.session_state['report3_current_page'] = total_pages_t3
-                if st.session_state['report3_current_page'] < 1: st.session_state['report3_current_page'] = 1
-
-                pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
-                with pc1: 
-                    new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state['report3_rows_per_page'], step=5, key="rows_t3")
-                    if new_rows != st.session_state['report3_rows_per_page']:
-                        st.session_state['report3_rows_per_page'] = new_rows
-                        st.session_state['report3_current_page'] = 1
-                        st.rerun()
-
-                with pc2: 
-                    st.write("")
-                    dynamic_key = f"pg_t3_dyn_{st.session_state['report3_current_page']}"
-                    selected_page = st.selectbox("เลือกหน้า", range(1, total_pages_t3 + 1), index=st.session_state['report3_current_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages_t3}", key=dynamic_key, label_visibility="collapsed")
-                    if selected_page != st.session_state['report3_current_page']:
-                        st.session_state['report3_current_page'] = selected_page
-                        st.rerun()
-
-                    st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-                    c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
-                    with c_prev:
-                        if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report3_current_page'] <= 1), key="prev_t3"):
-                            st.session_state['report3_current_page'] -= 1
-                            st.rerun()
-                    with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report3_current_page']} / {total_pages_t3}</div>", unsafe_allow_html=True)
-                    with c_next:
-                        if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report3_current_page'] >= total_pages_t3), key="next_t3"):
-                            st.session_state['report3_current_page'] += 1
-                            st.rerun()
-
-                if rows_per_page <= 0: paginated_t3 = []
-                elif rows_per_page >= total_records: paginated_t3 = raw_data_t3
-                else:
-                    start_idx = (st.session_state['report3_current_page'] - 1) * rows_per_page
-                    end_idx = start_idx + rows_per_page
-                    paginated_t3 = raw_data_t3[start_idx:end_idx]
+                # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
+                paginated_t3 = render_custom_pagination(raw_data_t3, session_prefix="rep3")
 
                 # =================== วาดตาราง Tab 3 ===================
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -2264,7 +2147,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
                         cols[0].write(rec_id)
                         cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                        cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                        cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                         cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
                         
                         can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
@@ -2326,55 +2209,8 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # ==========================================
                 with tabs_list[0]:
                     if oven_raw_t4:
-                        total_records = len(oven_raw_t4)
-                        
-                        if 'report4_ov_rows' not in st.session_state:
-                            st.session_state['report4_ov_rows'] = 15
-                        if 'report4_ov_page' not in st.session_state:
-                            st.session_state['report4_ov_page'] = 1
-
-                        rows_per_page = st.session_state['report4_ov_rows']
-                        if rows_per_page <= 0: total_pages = 1
-                        elif rows_per_page >= total_records: total_pages = 1
-                        else: total_pages = max(1, math.ceil(total_records / rows_per_page))
-
-                        if st.session_state['report4_ov_page'] > total_pages: st.session_state['report4_ov_page'] = total_pages
-                        if st.session_state['report4_ov_page'] < 1: st.session_state['report4_ov_page'] = 1
-
-                        pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
-                        with pc1: 
-                            new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state['report4_ov_rows'], step=5, key="rows_t4_ov")
-                            if new_rows != st.session_state['report4_ov_rows']:
-                                st.session_state['report4_ov_rows'] = new_rows
-                                st.session_state['report4_ov_page'] = 1
-                                st.rerun()
-
-                        with pc2: 
-                            st.write("")
-                            dynamic_key = f"pg_t4_ov_dyn_{st.session_state['report4_ov_page']}"
-                            selected_page = st.selectbox("เลือกหน้า", range(1, total_pages + 1), index=st.session_state['report4_ov_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=dynamic_key, label_visibility="collapsed")
-                            if selected_page != st.session_state['report4_ov_page']:
-                                st.session_state['report4_ov_page'] = selected_page
-                                st.rerun()
-
-                            st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-                            c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
-                            with c_prev:
-                                if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state['report4_ov_page'] <= 1), key="prev_t4_ov"):
-                                    st.session_state['report4_ov_page'] -= 1
-                                    st.rerun()
-                            with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state['report4_ov_page']} / {total_pages}</div>", unsafe_allow_html=True)
-                            with c_next:
-                                if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state['report4_ov_page'] >= total_pages), key="next_t4_ov"):
-                                    st.session_state['report4_ov_page'] += 1
-                                    st.rerun()
-
-                        if rows_per_page <= 0: paginated_ov = []
-                        elif rows_per_page >= total_records: paginated_ov = oven_raw_t4
-                        else:
-                            start_idx = (st.session_state['report4_ov_page'] - 1) * rows_per_page
-                            end_idx = start_idx + rows_per_page
-                            paginated_ov = oven_raw_t4[start_idx:end_idx]
+                        # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
+                        paginated_ov = render_custom_pagination(oven_raw_t4, session_prefix="rep4_ov")
 
                         st.markdown("<br>", unsafe_allow_html=True)
                         header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
@@ -2388,7 +2224,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                                 cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
                                 cols[0].write(rec_id)
                                 cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                                cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                                cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                                 cols[3].write(r.get('oven_qty') or 0)
                                 cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
                                 cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
@@ -2411,56 +2247,8 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
                         return
 
-                    total_records = len(data_list)
-                    b_key = f"b_key_{boiler_label}"
-                    
-                    if f'{b_key}_rows' not in st.session_state:
-                        st.session_state[f'{b_key}_rows'] = 15
-                    if f'{b_key}_page' not in st.session_state:
-                        st.session_state[f'{b_key}_page'] = 1
-
-                    rows_per_page = st.session_state[f'{b_key}_rows']
-                    if rows_per_page <= 0: total_pages = 1
-                    elif rows_per_page >= total_records: total_pages = 1
-                    else: total_pages = max(1, math.ceil(total_records / rows_per_page))
-
-                    if st.session_state[f'{b_key}_page'] > total_pages: st.session_state[f'{b_key}_page'] = total_pages
-                    if st.session_state[f'{b_key}_page'] < 1: st.session_state[f'{b_key}_page'] = 1
-
-                    pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
-                    with pc1: 
-                        new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state[f'{b_key}_rows'], step=5, key=f"rows_t4_{boiler_label}")
-                        if new_rows != st.session_state[f'{b_key}_rows']:
-                            st.session_state[f'{b_key}_rows'] = new_rows
-                            st.session_state[f'{b_key}_page'] = 1
-                            st.rerun()
-
-                    with pc2: 
-                        st.write("")
-                        dynamic_key = f"pg_t4_dyn_{boiler_label}_{st.session_state[f'{b_key}_page']}"
-                        selected_page = st.selectbox("เลือกหน้า", range(1, total_pages + 1), index=st.session_state[f'{b_key}_page'] - 1, format_func=lambda x: f"📑 หน้า {x} / {total_pages}", key=dynamic_key, label_visibility="collapsed")
-                        if selected_page != st.session_state[f'{b_key}_page']:
-                            st.session_state[f'{b_key}_page'] = selected_page
-                            st.rerun()
-
-                        st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-                        c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
-                        with c_prev:
-                            if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state[f'{b_key}_page'] <= 1), key=f"prev_t4_{boiler_label}"):
-                                st.session_state[f'{b_key}_page'] -= 1
-                                st.rerun()
-                        with c_page: st.markdown(f"<div style='text-align:center; padding-top:8px; font-weight:bold; color:#57534E; font-size:14px;'>หน้า {st.session_state[f'{b_key}_page']} / {total_pages}</div>", unsafe_allow_html=True)
-                        with c_next:
-                            if st.button("ถัดไป ➡️", use_container_width=True, disabled=(st.session_state[f'{b_key}_page'] >= total_pages), key=f"next_t4_{boiler_label}"):
-                                st.session_state[f'{b_key}_page'] += 1
-                                st.rerun()
-
-                    if rows_per_page <= 0: paginated_t4 = []
-                    elif rows_per_page >= total_records: paginated_t4 = data_list
-                    else:
-                        start_idx = (st.session_state[f'{b_key}_page'] - 1) * rows_per_page
-                        end_idx = start_idx + rows_per_page
-                        paginated_t4 = data_list[start_idx:end_idx]
+                    # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
+                    paginated_t4 = render_custom_pagination(data_list, session_prefix=f"rep4_b_{boiler_label}")
 
                     st.markdown("<br>", unsafe_allow_html=True)
                     header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
@@ -2477,7 +2265,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
                             cols[0].write(rec_id)
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                            cols[2].markdown(f"<span style='background:#F1F5F9; padding:4px 8px; border-radius:4px; font-size:13px; color:#0F172A;'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                            cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                             cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)

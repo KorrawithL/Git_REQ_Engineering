@@ -182,7 +182,8 @@ if not st.session_state.get('logged_in'):
         div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
         div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
         div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
-        div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #FFFFFF !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
+        /* 🌟 เปลี่ยนสีกล่อง Login ให้เป็น #CCCCCC */
+        div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
         div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
         div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
         div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
@@ -263,6 +264,20 @@ else:
         btn_bg = "#1E293B"        # สีปุ่มปกติ
         btn_hover = "#334155"     # สีปุ่มตอนชี้
         box_bg = "#1E293B"        # สีกล่อง Topbar
+        
+        # 💡 สีช่องกรอกข้อมูลและ Dropdown ทั้งหมด (ตามที่ผู้ใช้ต้องการ: พื้นเทา #CCCCCC ตัวหนังสือดำ)
+        input_bg = "#E5E7EB"
+        input_text = "#000000"    # สีดำเข้มเพื่อให้อ่านบนพื้นเทาได้ชัดเจน
+        
+        dd_bg = "#E5E7EB"         
+        dd_text = "#000000"       
+        dd_hover_bg = "#A3A3A3"   # เทาเข้มขึ้นตอน Hover Dropdown
+        dd_hover_text = "#000000" 
+        
+        # 💡 สีป้ายสาขา Dark Mode
+        badge_bg = "#1E293B"
+        badge_text = "#38BDF8"
+        badge_border = "#334155"
     else:
         # ☀️ โหมดกลางวัน (Light Mode)
         bg_main = "#FDFBF7"
@@ -273,6 +288,20 @@ else:
         btn_bg = "#FFFFFF"
         btn_hover = "#FAFAFA"
         box_bg = "#FFFFFF"
+        
+        # 💡 สีช่องกรอกข้อมูลและ Dropdown ทั้งหมด (ตามที่ผู้ใช้ต้องการ: พื้นเทา #CCCCCC ตัวหนังสือดำ)
+        input_bg = "#FFFFFF"
+        input_text = "#000000"    
+        
+        dd_bg = "#FFFFFF"
+        dd_text = "#000000"
+        dd_hover_bg = "#A3A3A3"   
+        dd_hover_text = "#000000"
+        
+        # 💡 สีป้ายสาขา Light Mode
+        badge_bg = "#E2E8F0"
+        badge_text = "#1E293B"
+        badge_border = "#CBD5E1"
 
     # แทรก CSS แบบ Dynamic (เปลี่ยนสีตามโหมดแบบ Real-time)
     st.markdown(f"""<style>
@@ -291,7 +320,7 @@ else:
     /* 🌙 จัดการสีพื้นหลังหลักของแอป และ Sidebar */
     .stApp {{ background-color: {bg_main} !important; color: {text_color} !important; transition: all 0.3s ease; }}
     [data-testid="stSidebar"] {{ background-color: {bg_sidebar} !important; border-right: 1px solid {border_color} !important; transition: all 0.3s ease; }}
-    .main .block-container {{ background-color: {bg_main} !important; }}
+    .main .block-container {{ background-color: {bg_main} !important; padding-top: 1.5rem !important; }}
     
     /* เปลี่ยนสีตัวอักษรทั่วไป */
     p, span, h1, h2, h3, h4, h5, h6, label, li {{ color: {text_color} !important; transition: all 0.3s ease; }}
@@ -300,15 +329,69 @@ else:
     /* สีกล่อง Top bar และเส้นขอบ Container */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {{ background-color: {box_bg} !important; border-color: {border_color} !important; transition: all 0.3s ease; }}
     
-    /* ปรับสีช่องกรอกข้อมูลและตารางให้กลืนกับโหมด */
-    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea, .stSelectbox div[data-baseweb="select"] {{
-        background-color: {box_bg} !important; color: {text_color} !important; border-color: {border_color} !important;
+    /* =========================================================
+       🌟 บังคับช่องกรอกข้อมูลให้เป็น #CCCCCC ตามที่กำหนด
+       ========================================================= */
+    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {{
+        background-color: {input_bg} !important; 
+        color: {input_text} !important; 
+        border-color: {border_color} !important;
     }}
+    
     table th, table td {{ color: {text_color} !important; border-color: {border_color} !important; background-color: {bg_main} !important; }}
     
     /* สีปุ่ม Navbar ด้านบน */
     div[data-testid="stHorizontalBlock"]:first-of-type button {{ background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important; border-radius: 8px !important; padding: 2px 0px !important; font-size: 14px !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; }}
     div[data-testid="stHorizontalBlock"]:first-of-type button:hover {{ background-color: {btn_hover} !important; transform: translateY(-1px) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important; }}
+
+    /* =========================================================
+       🌟 แก้ไขปัญหา Selectbox (Dropdown) ให้มีพื้นหลัง #CCCCCC
+       ========================================================= */
+    /* 1. กล่อง Selectbox ตอนยังไม่กด */
+    div[data-baseweb="select"] > div, 
+    div[data-baseweb="select"] > div:hover {{
+        background-color: {input_bg} !important;
+        color: {input_text} !important;
+        border-color: {border_color} !important;
+    }}
+    div[data-baseweb="select"] span {{
+        color: {input_text} !important;
+    }}
+    div[data-baseweb="select"] svg {{
+        fill: {input_text} !important;
+        color: {input_text} !important;
+    }}
+    
+    /* 2. บังคับเปลี่ยนสีทุกอย่างที่อยู่ใน Popover (เมนูที่กางออกมา) */
+    div[data-baseweb="popover"], 
+    div[data-baseweb="popover"] * {{
+        background-color: {dd_bg} !important;
+        color: {dd_text} !important;
+    }}
+    
+    /* 3. สีเวลา Hover หรือเลือกแล้ว (เจาะจงทับลงไปอีกชั้น) */
+    div[data-baseweb="popover"] [role="option"]:hover,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+    div[data-baseweb="popover"] [role="option"]:hover *,
+    div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{
+        background-color: {dd_hover_bg} !important;
+        color: {dd_hover_text} !important;
+    }}
+
+    /* =========================================================
+       🌟 ป้ายแสดงชื่อสาขาในตาราง (แก้ไขให้สีเปลี่ยนตามโหมด)
+       ========================================================= */
+    .branch-badge {{
+        background-color: {badge_bg} !important;
+        color: {badge_text} !important;
+        padding: 4px 8px !important;
+        border-radius: 6px !important;
+        font-size: 12.5px !important;
+        font-weight: bold !important;
+        border: 1px solid {badge_border} !important;
+        display: inline-block !important;
+        line-height: 1.2 !important;
+    }}
 
     /* =========================================================
        🌟 เมนูหลัก (Main Menu)
@@ -429,7 +512,7 @@ else:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
 
     with st.sidebar:
-        # 🎯 แบ่งคอลัมน์เพื่อแทรกปุ่มโหมดกลางคืน (วงสีแดง) ให้เนียนตา
+        # 🎯 แบ่งคอลัมน์เพื่อแทรกปุ่มโหมดกลางคืนให้เนียนตา
         c_title, c_toggle = st.columns([7, 3])
         with c_title:
             st.markdown(f"<h3 style='color: {text_color}; margin-top: 5px; margin-bottom: 0px; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;'>WORK WOOD</h3>", unsafe_allow_html=True)
@@ -440,7 +523,7 @@ else:
             if is_dark != st.session_state['dark_mode']:
                 st.session_state['dark_mode'] = is_dark
                 st.rerun()
-                
+
         st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
         # กำหนดชื่อเมนูหลักของรายงานตามสิทธิ์
