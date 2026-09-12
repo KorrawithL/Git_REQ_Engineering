@@ -5,13 +5,21 @@ from datetime import datetime
 from database import get_db_connection, log_activity
 from config import branch_dict
 
+# 🎯 1. นำเข้าฟังก์ชันดึงรายงาน เพื่อเอามาล้างแคชเฉพาะจุด (Targeted Cache Clearing)
+from all_reports import process_t1, process_t2, process_t3, process_t4
+
 # 📌 เพิ่มรับค่า parameter 'selected_sub_menu=None' เข้ามา
 def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
+
+    # 🎯 เพิ่ม CSS ชุดนี้เพื่อบังคับซ่อนแถบ Header ด้านบน (พื้นที่สีแดง)
     st.markdown("""
         <style>
+        /* ซ่อนแถบ Header หลักของ Streamlit */
         header[data-testid="stHeader"] { display: none !important; }
         header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
+        
+        /* ขยับคอนเทนต์ (พื้นที่สีน้ำเงิน) ขึ้นไปชิดขอบบนสุดแทน */
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
         </style>
     """, unsafe_allow_html=True)
@@ -68,6 +76,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     m_date = st.date_input("วันที่", value=datetime.now(), key="m_date", disabled=t1_branch_invalid)
 
                 machine_dict = {}
+                conn = None # ✅ กำหนด conn ไว้ล่วงหน้า
                 if not t1_branch_invalid:
                     try:
                         conn = get_db_connection()
@@ -88,10 +97,10 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             db_machines = cur.fetchall()
                             if db_machines: 
                                 machine_dict = {m['machine_name']: m['id'] for m in db_machines}
-                    except Exception: 
-                        pass
+                    except Exception as e: 
+                        st.warning(f"ไม่สามารถโหลดข้อมูลเครื่องจักรได้: {e}") # ✅ แจ้งเตือนแทนการปล่อยผ่าน
                     finally:
-                        if 'conn' in locals() and conn.open: conn.close()
+                        if conn and conn.open: conn.close() # ✅ ปิดเสมอ
 
                 if machine_dict:
                     machine_select_options = ["-- กรุณาเลือกเครื่องจักร --"] + list(machine_dict.keys())
@@ -122,24 +131,27 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     if m_qty is None or m_work_hours is None or m_break_hours is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                     else:
+                        conn_insert = None # ✅ จัดการ connection สำหรับการ Insert
                         try:
                             m_select_id = machine_dict[m_label]
-                            conn = get_db_connection()
-                            with conn.cursor() as cur:
+                            conn_insert = get_db_connection()
+                            with conn_insert.cursor() as cur:
                                 sql = """INSERT INTO machine_trans (branch_id, record_date, machine_id, machine_qty, working_hours, breakdown_hours, remarks, created_by, created_at, updated_at, status) 
                                             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), 'active')"""
                                 cur.execute(sql, (target_branch_id, m_date, int(m_select_id), int(m_qty), float(m_work_hours), float(m_break_hours), m_remark, int(st.session_state.user_id)))
-                            conn.commit()
-                            conn.close()
+                            conn_insert.commit()
                             
-                            st.cache_data.clear()
+                            process_t1.clear() # ✅ ล้างแคชเฉพาะ Tab 1
                             log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 1 Data Entry", f"บันทึกเครื่องจักร {m_label} วันที่ {m_date}")
                             st.success(f"✅ บันทึกข้อมูล {m_label} วันที่ {m_date} สำเร็จเรียบร้อยแล้ว!")
                             
                             st.session_state.reset_t1 += 1
                             time.sleep(1)
                             st.rerun()
-                        except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                        except Exception as e: 
+                            st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                        finally:
+                            if conn_insert and conn_insert.open: conn_insert.close() # ✅ ปิดเสมอ
 
     # =========================================================================
     # 🚚 TAB 2: บันทึกการใช้เชื้อเพลิงรถยนต์ / รถยก
@@ -170,11 +182,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     f_date = st.date_input("วันที่", value=datetime.now(), key="f_date", disabled=t2_branch_invalid)
 
                 all_engines_filtered = []
+                conn = None
                 if not t2_branch_invalid:
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cur:
-                            # 🎯 ปรับปรุง SQL ให้เช็คเป็นคู่ (ชื่อรถ + ประเภทรถ) ด้วย NOT EXISTS
                             sql_eng = """
                                 SELECT CONVERT(m.machine_name USING utf8mb4) AS engine_code, 
                                         CONVERT(et.type_name USING utf8mb4) AS type_name
@@ -194,9 +206,10 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             """
                             cur.execute(sql_eng, (target_branch_id_t2, target_branch_id_t2, f_date))
                             all_engines_filtered = cur.fetchall()
-                    except Exception: pass
+                    except Exception as e: 
+                        st.warning(f"ไม่สามารถโหลดข้อมูลรถได้: {e}")
                     finally:
-                        if 'conn' in locals() and conn.open: conn.close()
+                        if conn and conn.open: conn.close() # ✅ ปิดเสมอ
 
                 c_sel1, c_sel2 = st.columns(2)
                 
@@ -240,23 +253,26 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     if inputs_disabled or f_liters is None or f_hours is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                     else:
+                        conn_insert = None
                         try:
-                            conn = get_db_connection()
-                            with conn.cursor() as cur:
+                            conn_insert = get_db_connection()
+                            with conn_insert.cursor() as cur:
                                 sql = """INSERT INTO fuel_records (branch_id, record_date, engine_code, type_name, fuel_liters, working_hours, remark) 
                                             VALUES (%s, %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, CONVERT(%s USING utf8mb4))"""
                                 cur.execute(sql, (target_branch_id_t2, f_date, f2_code, f2_type, float(f_liters), float(f_hours), f_remark))
-                            conn.commit()
-                            conn.close()
+                            conn_insert.commit()
                             
-                            st.cache_data.clear()
+                            process_t2.clear() # ✅ ล้างแคชเฉพาะ Tab 2
                             log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 2 Data Entry", f"บันทึกเชื้อเพลิงรถ {f2_code} จำนวน {f_liters} ลิตร")
                             st.success(f"✅ บันทึกสำเร็จ! (ทะเบียน: {f2_code} | ประเภท: {f2_type})")
                             
                             st.session_state.reset_t2 += 1
                             time.sleep(1)
                             st.rerun()
-                        except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                        except Exception as e: 
+                            st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                        finally:
+                            if conn_insert and conn_insert.open: conn_insert.close() # ✅ ปิดเสมอ
 
     # =========================================================================
     # 💨 TAB 3: บันทึกแรงดันไอน้ำ บอยเลอร์ 
@@ -283,17 +299,18 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 with c_top2:
                     p_date = st.date_input("วันที่", value=datetime.now(), key="p_date", disabled=t3_branch_invalid)
 
-                # 🎯 เช็คว่าวันนั้นถูกบันทึกไปหรือยัง (เปลี่ยนมาใช้ SELECT 1 ป้องกัน Error ชื่อคอลัมน์)
                 has_t3_record = False
+                conn = None
                 if not t3_branch_invalid:
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cur:
                             cur.execute("SELECT 1 FROM boiler_pressure_records WHERE branch_id=%s AND record_date=%s", (target_branch_id, p_date))
                             if cur.fetchone(): has_t3_record = True
-                    except Exception as e: pass
+                    except Exception as e: 
+                        pass
                     finally:
-                        if 'conn' in locals() and conn.open: conn.close()
+                        if conn and conn.open: conn.close() # ✅ ปิดเสมอ
                         
                 is_t3_disabled = t3_branch_invalid or has_t3_record
 
@@ -317,23 +334,26 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     if total_count is None or pm_drop is None or non_pm_drop is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                     else:
+                        conn_insert = None
                         try:
-                            conn = get_db_connection()
-                            with conn.cursor() as cur:
+                            conn_insert = get_db_connection()
+                            with conn_insert.cursor() as cur:
                                 sql = """INSERT INTO boiler_pressure_records (branch_id, record_date, total_count, total_drop, pm_drop, non_pm_drop, remark, created_by) 
                                             VALUES (%s, %s, %s, %s, %s, %s, CONVERT(%s USING utf8mb4), %s)"""
                                 cur.execute(sql, (target_branch_id, p_date, int(total_count), (int(pm_drop) + int(non_pm_drop)), int(pm_drop), int(non_pm_drop), p_remark, int(st.session_state.user_id)))
-                            conn.commit()
-                            conn.close()
+                            conn_insert.commit()
                             
-                            st.cache_data.clear()
+                            process_t3.clear() # ✅ ล้างแคชเฉพาะ Tab 3
                             log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 3 Data Entry", f"บันทึกแรงดันไอน้ำตก วันที่ {p_date}")
                             st.success("✅ บันทึกข้อมูลแรงดันไอน้ำเรียบร้อยแล้ว!")
                             
                             st.session_state.reset_t3 += 1
                             time.sleep(1)
                             st.rerun()
-                        except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                        except Exception as e: 
+                            st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                        finally:
+                            if conn_insert and conn_insert.open: conn_insert.close() # ✅ ปิดเสมอ
 
     # =========================================================================
     # 🔥 TAB 4: การใช้เชื้อเพลิง บอยเลอร์
@@ -369,8 +389,8 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     with c_top2:
                         bf_date_1 = st.date_input("วันที่", value=datetime.now(), key="bf_dt1", disabled=t4_ov_invalid)
 
-                    # 🎯 เช็คว่าวันนั้นถูกบันทึกยอดรวมไปหรือยัง
                     has_t4_ov_record = False
+                    conn = None
                     if not t4_ov_invalid:
                         try:
                             conn = get_db_connection()
@@ -379,7 +399,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                 if cur.fetchone(): has_t4_ov_record = True
                         except Exception: pass
                         finally:
-                            if 'conn' in locals() and conn.open: conn.close()
+                            if conn and conn.open: conn.close() # ✅ ปิดเสมอ
                             
                     is_t4_ov_disabled = t4_ov_invalid or has_t4_ov_record
                     
@@ -401,22 +421,25 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         if any(x is None for x in inputs_ov):
                             st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                         else:
+                            conn_insert = None
                             try:
-                                conn = get_db_connection()
-                                with conn.cursor() as cur:
+                                conn_insert = get_db_connection()
+                                with conn_insert.cursor() as cur:
                                     sql_oven = """INSERT INTO daily_wood_oven_records (branch_id, record_date, oven_qty, wood_out_cubft, avg_terminal_pressure, created_by)
                                                     VALUES (%s, %s, %s, %s, %s, %s)"""
                                     cur.execute(sql_oven, (target_branch_id_1, bf_date_1, int(oven_qty), float(wood_out), float(avg_pressure), int(st.session_state.user_id)))
-                                conn.commit()
-                                conn.close()
+                                conn_insert.commit()
                                 
-                                st.cache_data.clear()
+                                process_t4.clear() # ✅ ล้างแคชเฉพาะ Tab 4
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Oven Entry", f"บันทึกยอดรวมสาขา วันที่ {bf_date_1}")
                                 st.success(f"✅ บันทึกข้อมูลยอดรวมสาขาสำเร็จแล้ว!")
                                 st.session_state.reset_t4 += 1
                                 time.sleep(1)
                                 st.rerun()
-                            except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                            except Exception as e: 
+                                st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                            finally:
+                                if conn_insert and conn_insert.open: conn_insert.close() # ✅ ปิดเสมอ
 
             # ==========================================
             # แท็บย่อยที่ 2: บันทึกปริมาณเชื้อเพลิงบอยเลอร์
@@ -441,6 +464,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         bf_date_2 = st.date_input("วันที่", value=datetime.now(), key="bf_dt2", disabled=t4_bf_invalid)
 
                     boiler_options = []
+                    conn = None
                     if not t4_bf_invalid:
                         try:
                             conn = get_db_connection()
@@ -462,9 +486,10 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                 cur.execute(sql, (target_branch_id_2, target_branch_id_2, bf_date_2))
                                 for r in cur.fetchall():
                                     if r['b_name']: boiler_options.append(r['b_name'])
-                        except Exception: pass
+                        except Exception as e: 
+                            st.warning(f"ไม่สามารถโหลดข้อมูลบอยเลอร์ได้: {e}")
                         finally:
-                            if 'conn' in locals() and conn.open: conn.close()
+                            if conn and conn.open: conn.close() # ✅ ปิดเสมอ
                     
                     if not t4_bf_invalid:
                         if boiler_options:
@@ -503,19 +528,22 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         if any(x is None for x in inputs_bf):
                             st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                         else:
+                            conn_insert = None
                             try:
-                                conn = get_db_connection()
-                                with conn.cursor() as cur:
+                                conn_insert = get_db_connection()
+                                with conn_insert.cursor() as cur:
                                     sql_fuel = """INSERT INTO boiler_fuel_records (branch_id, record_date, boiler_name, sawdust_weight, wood_weight, waste_wood_weight, sawdust_price, wood_price, waste_wood_price, steam_production, working_hours, created_by) 
                                                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
                                     cur.execute(sql_fuel, (target_branch_id_2, bf_date_2, boiler_name_input, float(saw_w), float(wood_w), float(waste_wood_w), float(saw_p), float(wood_p), float(waste_wood_p), float(prod_val), float(work_hours), int(st.session_state.user_id)))
-                                conn.commit()
-                                conn.close()
+                                conn_insert.commit()
                                 
-                                st.cache_data.clear()
+                                process_t4.clear() # ✅ ล้างแคชเฉพาะ Tab 4
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Boiler Entry", f"บันทึกเชื้อเพลิง {boiler_name_input} วันที่ {bf_date_2}")
                                 st.success(f"✅ บันทึกข้อมูลเชื้อเพลิงบอยเลอร์ {boiler_name_input} สำเร็จแล้ว!")
                                 st.session_state.reset_t4 += 1
                                 time.sleep(1)
                                 st.rerun()
-                            except Exception as e: st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                            except Exception as e: 
+                                st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+                            finally:
+                                if conn_insert and conn_insert.open: conn_insert.close() # ✅ ปิดเสมอ
