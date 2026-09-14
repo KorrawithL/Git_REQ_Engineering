@@ -3,14 +3,33 @@ import streamlit.components.v1 as components
 import time
 import os
 from database import get_db_connection, hash_password
-from config import branch_dict
 from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
 from all_reports import render_all_reports_module
 from addMachines import render_add_new_equipment
 
+# =============================================================================
+# 🚀 ฟังก์ชันดึงข้อมูลสาขาจาก Database
+# =============================================================================
+@st.cache_data(ttl=300) 
+def get_branch_dict_from_db():
+    b_dict = {}
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("SELECT id, CONVERT(branch_name USING utf8mb4) AS branch_name FROM branches WHERE is_active = 1 ORDER BY id ASC")
+            for r in cur.fetchall():
+                b_dict[r['branch_name']] = r['id']
+    except Exception as e:
+        print(f"Error fetching branches: {e}")
+    finally:
+        if conn:
+            conn.close()
+    return b_dict
+
 # -----------------------------------------------------------------------------
-# 🎯 1. ตั้งค่าหน้าเว็บ Streamlit (ปิด Sidebar ทิ้งตั้งแต่เริ่มต้น)
+# 🎯 1. ตั้งค่าหน้าเว็บ Streamlit
 # -----------------------------------------------------------------------------
 st.set_page_config(
     page_title="Woodwork Engineering Records System",
@@ -146,6 +165,7 @@ if not st.session_state.get('logged_in'):
             with col_c2: reg_phone = st.text_input("เบอร์โทรศัพท์")
             
             st.markdown("#### 🏢 ข้อมูลสังกัด")
+            branch_dict = get_branch_dict_from_db()
             reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ *", options=list(branch_dict.keys()))
             reg_branch_id = branch_dict[reg_branch_label]
             
@@ -182,7 +202,6 @@ if not st.session_state.get('logged_in'):
         div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
         div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
         div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
-        /* 🌟 เปลี่ยนสีกล่อง Login ให้เป็น #CCCCCC */
         div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
         div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
         div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
@@ -248,45 +267,33 @@ if not st.session_state.get('logged_in'):
 # 🎯 4. หน้าจอหลักของระบบ (Main Layout & UI - Dynamic Theme)
 # -----------------------------------------------------------------------------
 else:
-    # ==========================================
-    # 🌙 จัดการสถานะโหมดกลางคืน (Dark Mode)
-    # ==========================================
     if 'dark_mode' not in st.session_state:
         st.session_state['dark_mode'] = False
 
     if st.session_state['dark_mode']:
-        # 🌑 โหมดกลางคืน (Dark Mode)
         bg_main = "#0F172A"       
         bg_sidebar = "#1E293B"    
         text_color = "#F8FAFC"    
         text_muted = "#94A3B8"    
-        border_color = "#334155"  
+        border_color = "#475569"  # 🌟 ปรับสีขอบให้สว่างขึ้นใน Dark Mode เพื่อให้มองเห็นชัดเจน
         btn_bg = "#1E293B"        
-        btn_hover = "#334155"     
+        btn_hover = "#FFFFFF"     
         box_bg = "#1E293B"        
-        
-        # 💡 สีช่องกรอกข้อมูลและ Dropdown
         input_bg = "#E5E7EB"
         input_text = "#000000"    
-        
         dd_bg = "#E5E7EB"         
         dd_text = "#000000"       
         dd_hover_bg = "#A3A3A3"   
         dd_hover_text = "#000000" 
-        
         svg_fill = "#CCCCCC"      
-        
-        # 💡 สีปุ่ม + / - ในหน้าหลัก
         num_btn_bg = "#334155"             
         num_btn_icon = "#FFFFFF"           
         num_btn_disabled_bg = "#1E293B"    
         num_btn_disabled_icon = "#94A3B8"  
-        
         badge_bg = "#1E293B"
         badge_text = "#38BDF8"
         badge_border = "#334155"
     else:
-        # ☀️ โหมดกลางวัน (Light Mode)
         bg_main = "#FDFBF7"
         bg_sidebar = "#F4EFEA"
         text_color = "#2C2A29"
@@ -295,176 +302,99 @@ else:
         btn_bg = "#FFFFFF"
         btn_hover = "#FAFAFA"
         box_bg = "#FFFFFF"
-        
         input_bg = "#FFFFFF"
         input_text = "#000000"    
-        
         dd_bg = "#FFFFFF"
         dd_text = "#000000"
         dd_hover_bg = "#A3A3A3"   
         dd_hover_text = "#000000"
-        
         svg_fill = "#0F172A"      
-        
         num_btn_bg = "#F8FAFC"
         num_btn_icon = "#0F172A"
         num_btn_disabled_bg = "#F1F5F9"
         num_btn_disabled_icon = "#94A3B8"
-        
         badge_bg = "#E2E8F0"
         badge_text = "#1E293B"
         badge_border = "#CBD5E1"
 
-    # แทรก CSS แบบ Dynamic
     st.markdown(f"""<style>
-    /* 🎯 ซ่อนส่วนขวาบน (Deploy & 3 จุด) ให้เกลี้ยง */
     .stAppDeployButton {{ display: none !important; }}
     [data-testid="stHeaderActionElements"] {{ display: none !important; }}
     #MainMenu {{ display: none !important; }}
     header[data-testid="stHeader"] {{ background: transparent !important; box-shadow: none !important; }}
     [data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
     [data-testid="collapsedControl"] {{ display: none !important; }}
-    
     .stApp {{ background-color: {bg_main} !important; color: {text_color} !important; transition: all 0.3s ease; }}
     [data-testid="stSidebar"] {{ background-color: {bg_sidebar} !important; border-right: 1px solid {border_color} !important; transition: all 0.3s ease; }}
     .main .block-container {{ background-color: {bg_main} !important; padding-top: 1.5rem !important; }}
     
-    /* =========================================================
-       🌟 สีตัวอักษรเฉพาะในหน้าหลัก ไม่แตะต้อง Popup
-       ========================================================= */
-    .main p, .main span, .main h1, .main h2, .main h3, .main h4, .main h5, .main h6, .main label, .main li,
-    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] h4, [data-testid="stSidebar"] h5, [data-testid="stSidebar"] h6, [data-testid="stSidebar"] label, [data-testid="stSidebar"] li {{
-        color: {text_color} !important; 
+    /* 🌟 แก้ไขปัญหา Label และตัวหนังสือทั่วไป ไม่ยอมสว่างตาม Dark Mode */
+    .main p, .main span, .main h1, .main h2, .main h3, .main h4, .main h5, .main h6, .main li,
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] h4, [data-testid="stSidebar"] h5, [data-testid="stSidebar"] h6, [data-testid="stSidebar"] li {{
+        color: {text_color} !important; transition: all 0.3s ease; 
+    }}
+    
+    /* 🌟 เจาะจงแก้ปัญหา ป้ายกำกับ (Label) บนกล่องกรอกข้อมูล และ แท็บ (Tabs) */
+    .stTextInput label p, .stNumberInput label p, .stDateInput label p, .stSelectbox label p, .stTextArea label p,
+    div[data-baseweb="tab"] p, div[data-baseweb="tab"] span, label, label p, label span {{
+        color: {text_color} !important;
+    }}
+    /* แท็บ (Tab) ที่ไม่ได้ถูกเลือก ให้สีดรอปลงนิดนึง แต่ยังต้องมองเห็นชัด */
+    div[data-baseweb="tab"][aria-selected="false"] p, div[data-baseweb="tab"][aria-selected="false"] span {{
+        color: {text_muted} !important;
+    }}
+
+    .main div[data-testid="stMarkdownContainer"] > p, [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] > p {{ color: {text_color} !important; }}
+    
+    /* 🌟 แก้ไขกรอบและพื้นหลังของ Top Bar (Container) ให้ตัดเส้นขอบชัดเจนใน Dark Mode */
+    div[data-testid="stVerticalBlockBorderWrapper"],
+    div[data-testid="stVerticalBlock"] > div[style*="border"] {{ 
+        background-color: {box_bg} !important; 
+        border: 1px solid {border_color} !important; 
+        border-radius: 8px !important;
         transition: all 0.3s ease; 
     }}
-    .main div[data-testid="stMarkdownContainer"] > p,
-    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] > p {{
-        color: {text_color} !important; 
-    }}
     
-    div[data-testid="stVerticalBlock"] > div[style*="border"] {{ background-color: {box_bg} !important; border-color: {border_color} !important; transition: all 0.3s ease; }}
-    
-    /* 🌟 ช่องกรอกข้อมูลหน้าหลัก */
-    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {{
-        background-color: {input_bg} !important; 
-        color: {input_text} !important; 
-        border-color: {border_color} !important;
-    }}
+    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {{ background-color: {input_bg} !important; color: {input_text} !important; border-color: {border_color} !important; }}
     table th, table td {{ color: {text_color} !important; border-color: {border_color} !important; background-color: {bg_main} !important; }}
-    
     div[data-testid="stHorizontalBlock"]:first-of-type button {{ background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important; border-radius: 8px !important; padding: 2px 0px !important; font-size: 14px !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; }}
     div[data-testid="stHorizontalBlock"]:first-of-type button:hover {{ background-color: {btn_hover} !important; transform: translateY(-1px) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important; }}
-
-    /* =========================================================
-       🌟 แก้ไขปัญหา Selectbox (Dropdown) ในหน้าหลัก
-       ========================================================= */
     div[data-baseweb="select"] > div, div[data-baseweb="select"] > div:hover {{ background-color: {input_bg} !important; color: {input_text} !important; border-color: {border_color} !important; }}
     div[data-baseweb="select"] span {{ color: {input_text} !important; }}
     div[data-baseweb="select"] svg, div[data-testid="stDateInput"] svg, div[data-testid="stTimeInput"] svg {{ fill: {svg_fill} !important; color: {svg_fill} !important; }}
     div[data-baseweb="popover"], div[data-baseweb="popover"] * {{ background-color: {dd_bg} !important; color: {dd_text} !important; }}
     div[data-baseweb="popover"] [role="option"]:hover, div[data-baseweb="popover"] [role="option"][aria-selected="true"],
     div[data-baseweb="popover"] [role="option"]:hover *, div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{ background-color: {dd_hover_bg} !important; color: {dd_hover_text} !important; }}
-    
-    /* Tooltip */
     div[data-testid="stTooltipContent"], div[data-baseweb="tooltip"] {{ background-color: {input_bg} !important; border: 1px solid {border_color} !important; border-radius: 6px !important; }}
     div[data-testid="stTooltipContent"] *, div[data-baseweb="tooltip"] * {{ color: {input_text} !important; background-color: transparent !important; }}
-
-    /* =========================================================
-       🚨 THE ULTIMATE POPUP (DIALOG & MODAL) FIX
-       รับประกันความเหมือน Light Mode 100% ไม่มีเพี้ยน
-       ========================================================= */
-    /* 1. บังคับพื้นหลัง Dialog ให้เป็นสีขาวเสมอ */
-    div[role="dialog"], 
-    [data-testid="stDialog"], 
-    div[data-testid="stModal"] > div {{
-        background-color: #FFFFFF !important;
-    }}
-
-    /* 2. บังคับตัวหนังสือทุกชนิดให้เป็นสีดำเสมอ */
+    
+    div[role="dialog"], [data-testid="stDialog"], div[data-testid="stModal"] > div {{ background-color: #FFFFFF !important; }}
     div[role="dialog"] p, div[role="dialog"] span, div[role="dialog"] label, div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, div[role="dialog"] h4, div[role="dialog"] h5, div[role="dialog"] h6, div[role="dialog"] div[data-testid="stMarkdownContainer"] * {{
-        color: #0F172A !important;
-        -webkit-text-fill-color: #0F172A !important;
+        color: #0F172A !important; -webkit-text-fill-color: #0F172A !important;
     }}
-
-    /* 3. ยกเว้นปุ่มกดยืนยัน (Primary) ให้คงความเป็นตัวหนังสือสีขาว */
-    div[role="dialog"] button[data-testid="baseButton-primary"] *,
-    [data-testid="stDialog"] button[data-testid="baseButton-primary"] * {{
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
+    div[role="dialog"] button[data-testid="baseButton-primary"] *, [data-testid="stDialog"] button[data-testid="baseButton-primary"] * {{
+        color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important;
     }}
-
-    /* 4. สีช่องกรอกข้อมูลใน Popup ให้เป็นสีเทาสว่าง */
-    div[role="dialog"] div[data-baseweb="input"],
-    div[role="dialog"] div[data-baseweb="select"] > div:first-child,
-    div[role="dialog"] div[data-testid="stNumberInputContainer"],
-    div[role="dialog"] textarea {{
-        background-color: #F8FAFC !important;
-        border: 1px solid #CBD5E1 !important;
+    div[role="dialog"] div[data-baseweb="input"], div[role="dialog"] div[data-baseweb="select"] > div:first-child, div[role="dialog"] div[data-testid="stNumberInputContainer"], div[role="dialog"] textarea {{
+        background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important;
     }}
-
-    /* ป้องกันสีดำแอบซ่อนอยู่หลังข้อความ */
-    div[role="dialog"] input, 
-    div[role="dialog"] textarea, 
-    div[role="dialog"] div[data-baseweb="select"] span {{
-        background-color: transparent !important;
-    }}
-
-    /* 🚀 5. บังคับลูกศรใน Dropdown ให้เป็นสีดำ (และแก้บั๊กลูกศรหายในคอลัมน์ขวาสุด) */
-    div[role="dialog"] div[data-baseweb="select"] svg,
-    [data-testid="stDialog"] div[data-baseweb="select"] svg {{
-        fill: #0F172A !important;
-        color: #0F172A !important;
-        opacity: 1 !important;
-    }}
-
-    /* 6. เปลี่ยนกากบาทปิดหน้าต่าง และไอคอนดวงตาเป็นสีดำเสมอ */
-    div[role="dialog"] button[aria-label="Close"] svg, 
-    [data-testid="stDialog"] button[aria-label="Close"] svg,
-    div[role="dialog"] div[data-baseweb="input"] svg {{
-        fill: #0F172A !important;
-        color: #0F172A !important;
-    }}
-
-    /* 7. กล่องแจ้งเตือน Alert (สีเหลืองอ่อน) */
-    div[role="dialog"] div[data-testid="stAlert"] {{
-        background-color: #FFFBEB !important; 
-        border: 1px solid #FDE047 !important;
-    }}
-    div[role="dialog"] div[data-testid="stAlert"] svg {{
-        fill: #D97706 !important; 
-    }}
-
-    /* =========================================================
-       🌟 แผงกรองข้อมูล (Expander)
-       ========================================================= */
+    div[role="dialog"] input, div[role="dialog"] textarea, div[role="dialog"] div[data-baseweb="select"] span {{ background-color: transparent !important; }}
+    div[role="dialog"] div[data-baseweb="select"] svg, [data-testid="stDialog"] div[data-baseweb="select"] svg {{ fill: #0F172A !important; color: #0F172A !important; opacity: 1 !important; }}
+    div[role="dialog"] button[aria-label="Close"] svg, [data-testid="stDialog"] button[aria-label="Close"] svg, div[role="dialog"] div[data-baseweb="input"] svg {{ fill: #0F172A !important; color: #0F172A !important; }}
+    div[role="dialog"] div[data-testid="stAlert"] {{ background-color: #FFFBEB !important; border: 1px solid #FDE047 !important; }}
+    div[role="dialog"] div[data-testid="stAlert"] svg {{ fill: #D97706 !important; }}
     div[data-testid="stExpander"] details summary {{ background-color: {input_bg} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; padding: 10px !important; }}
     div[data-testid="stExpander"] details summary p, div[data-testid="stExpander"] details summary span {{ color: {input_text} !important; font-weight: 700 !important; font-size: 15px !important; }}
     div[data-testid="stExpander"] details summary svg {{ fill: {input_text} !important; color: {input_text} !important; }}
     div[data-testid="stExpander"] details summary:hover {{ background-color: {dd_hover_bg} !important; }}
-
-    /* =========================================================
-       🌟 ปุ่ม + / - ใน Number Input (โค้ดดั้งเดิมที่คุณชอบ)
-       ========================================================= */
     div[data-testid="stNumberInput"] button {{ background-color: {num_btn_bg} !important; border: none !important; }}
     div[data-testid="stNumberInput"] button svg {{ fill: {num_btn_icon} !important; color: {num_btn_icon} !important; }}
     div[data-testid="stNumberInput"] button:disabled {{ background-color: {num_btn_disabled_bg} !important; opacity: 1 !important; }}
     div[data-testid="stNumberInput"] button:disabled svg {{ fill: {num_btn_disabled_icon} !important; color: {num_btn_disabled_icon} !important; }}
-
-    /* =========================================================
-       🌟 ป้ายแสดงชื่อสาขาในตาราง
-       ========================================================= */
     .branch-badge {{ background-color: {badge_bg} !important; color: {badge_text} !important; padding: 4px 8px !important; border-radius: 6px !important; font-size: 12.5px !important; font-weight: bold !important; border: 1px solid {badge_border} !important; display: inline-block !important; line-height: 1.2 !important; }}
-
-    /* =========================================================
-       🌟 เมนูหลัก (Main Menu)
-       ========================================================= */
     [data-testid="stSidebar"] div.stButton > button {{ background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important; padding: 12px 14px !important; border-radius: 10px !important; font-size: 15px !important; font-weight: 700 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left !important; justify-content: flex-start !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; }}
     [data-testid="stSidebar"] div.stButton > button:hover {{ background-color: {btn_hover} !important; border: 1px solid #D97706 !important; color: #D97706 !important; }}
     [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {{ background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; }}
-
-    /* =========================================================
-       🌟 เมนูย่อย (Sub-menu)
-       ========================================================= */
     [data-testid="stSidebar"] div[data-testid="stRadio"] {{ border-left: 2px solid {border_color} !important; margin-left: 20px !important; padding-left: 5px !important; margin-top: 5px !important; margin-bottom: 15px !important; }}
     [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] {{ display: none !important; }}
     [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div {{ display: none !important; }}
@@ -482,9 +412,6 @@ else:
     st.query_params["auth_user"] = st.session_state['username']
     st.query_params["auth_time"] = str(st.session_state['last_activity'])
 
-    # =========================================================================
-    # 🎯 แถบ Top Bar แนวนอนด้านบนสุด (Global Navbar)
-    # =========================================================================
     disp_name = st.session_state.get('full_name') or st.session_state.get('username')
     current_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
     current_branch = st.session_state.get('branch_name', '-')
@@ -505,18 +432,19 @@ else:
         access_desc = "📍 เข้าถึงได้เฉพาะสาขา"
         access_color = "#64748B"
 
+    # 🌟 แก้ไข: นำรหัสสีที่ตายตัวออก แล้วใส่ตัวแปรสี {text_color} และ {text_muted} แทน เพื่อให้เปลี่ยนตามโหมด
     with st.container(border=True):
         c_logo, c_user, c_role, c_branch, c_access, c_pw, c_out = st.columns([1.2, 2.2, 2.0, 1.2, 2.8, 1.5, 1.2], gap="small", vertical_alignment="center")
         
         with c_logo:
             if os.path.exists("Logo.png"): st.image("Logo.png", use_container_width=True)
             elif os.path.exists("logo.png"): st.image("logo.png", use_container_width=True)
-            else: st.markdown("<div style='color:#E4222C; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
+            else: st.markdown(f"<div style='color:{text_color}; font-weight:bold; text-align:center; padding-top:10px;'>[WOODWORK LOGO]</div>", unsafe_allow_html=True)
             
-        with c_user: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>👤 ผู้ใช้งาน</div><div style='font-size:14px; font-weight:700; color:#1C1917;'>{disp_name}</div>", unsafe_allow_html=True)
-        with c_role: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>💼 ตำแหน่ง</div><div style='font-size:14px; font-weight:700; color:#1C1917;'>{role_th}</div>", unsafe_allow_html=True)
-        with c_branch: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>🏢 สังกัดปัจจุบัน</div><div style='font-size:14px; font-weight:700; color:#1C1917;'>{current_branch}</div>", unsafe_allow_html=True)
-        with c_access: st.markdown(f"<div style='font-size:12px; color:#78716C; margin-bottom:2px;'>👑 ระดับสิทธิ์: {current_access}</div><div style='font-size:13px; font-weight:700; color:{access_color};'>{access_desc}</div>", unsafe_allow_html=True)
+        with c_user: st.markdown(f"<div style='font-size:12px; color:{text_muted}; margin-bottom:2px;'>👤 ผู้ใช้งาน</div><div style='font-size:14px; font-weight:700; color:{text_color};'>{disp_name}</div>", unsafe_allow_html=True)
+        with c_role: st.markdown(f"<div style='font-size:12px; color:{text_muted}; margin-bottom:2px;'>💼 ตำแหน่ง</div><div style='font-size:14px; font-weight:700; color:{text_color};'>{role_th}</div>", unsafe_allow_html=True)
+        with c_branch: st.markdown(f"<div style='font-size:12px; color:{text_muted}; margin-bottom:2px;'>🏢 สังกัดปัจจุบัน</div><div style='font-size:14px; font-weight:700; color:{text_color};'>{current_branch}</div>", unsafe_allow_html=True)
+        with c_access: st.markdown(f"<div style='font-size:12px; color:{text_muted}; margin-bottom:2px;'>👑 ระดับสิทธิ์: {current_access}</div><div style='font-size:13px; font-weight:700; color:{access_color};'>{access_desc}</div>", unsafe_allow_html=True)
         
         with c_pw:
             st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
@@ -530,16 +458,12 @@ else:
 
     st.write("") 
 
-    # =========================================================================
-    # 🎯 โครงสร้าง Sidebar (Nested Accordion สำหรับบันทึกข้อมูล และ รายงาน)
-    # =========================================================================
     all_tabs_config = {
         "1": "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์", 
         "2": "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)",
         "3": "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์", 
         "4": "🔥 4. การใช้เชื้อเพลิง บอยเลอร์"
     }
-    
     report_names_map = {
         "1": "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์", 
         "2": "🚚 2. รายงานสรุปการใช้เชื้อเพลิงรถ", 
@@ -566,13 +490,11 @@ else:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
 
     with st.sidebar:
-        # 🎯 แบ่งคอลัมน์เพื่อแทรกปุ่มโหมดกลางคืนให้เนียนตา
         c_title, c_toggle = st.columns([7, 3])
         with c_title:
             st.markdown(f"<h3 style='color: {text_color}; margin-top: 5px; margin-bottom: 0px; font-size: 18px; font-weight: 800; letter-spacing: 0.5px;'>WORK WOOD</h3>", unsafe_allow_html=True)
         with c_toggle:
             st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
-            # ปุ่มสวิตซ์เปิด-ปิดโหมด
             is_dark = st.toggle("🌙", value=st.session_state['dark_mode'], label_visibility="collapsed")
             if is_dark != st.session_state['dark_mode']:
                 st.session_state['dark_mode'] = is_dark
@@ -580,7 +502,6 @@ else:
 
         st.markdown("<div style='margin-bottom: 20px;'></div>", unsafe_allow_html=True)
 
-        # กำหนดชื่อเมนูหลักของรายงานตามสิทธิ์
         report_menu_label = "📑 รายงานรวม (All Report)"
         if current_role == 'admin':
             main_choices = ["⚙️ จัดการผู้ใช้และสิทธิ์", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
@@ -592,7 +513,6 @@ else:
             if current_role == 'manager':
                 main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
 
-        # วนลูปสร้างปุ่มเมนูหลักและแทรกเมนูย่อย
         for choice in main_choices:
             is_main_active = (st.session_state['sidebar_main'] == choice)
             btn_type = "primary" if is_main_active else "secondary"
@@ -601,19 +521,14 @@ else:
                 st.session_state['sidebar_main'] = choice
                 st.rerun()
                 
-            # 🎯 แสดงเมนูย่อย สำหรับ "บันทึกข้อมูลประจำวัน"
             if choice == "📝 บันทึกข้อมูลประจำวัน" and is_main_active and sub_opts:
                 default_idx = sub_opts.index(st.session_state['sidebar_sub_entry']) if st.session_state['sidebar_sub_entry'] in sub_opts else 0
                 st.radio("เมนูย่อย", sub_opts, index=default_idx, key="sidebar_sub_entry", label_visibility="collapsed")
                 
-            # 🎯 แสดงเมนูย่อย สำหรับ "รายงาน"
             if choice == report_menu_label and is_main_active and rep_opts:
                 default_idx_rep = rep_opts.index(st.session_state['sidebar_sub_report']) if st.session_state['sidebar_sub_report'] in rep_opts else 0
                 st.radio("เมนูย่อยรายงาน", rep_opts, index=default_idx_rep, key="sidebar_sub_report", label_visibility="collapsed")
 
-    # =========================================================================
-    # 🎯 เรนเดอร์หน้าจอตามเมนูหลักและเมนูย่อยที่ถูกเลือก
-    # =========================================================================
     selected_main = st.session_state['sidebar_main']
     sub_menu_entry = st.session_state['sidebar_sub_entry'] if selected_main == "📝 บันทึกข้อมูลประจำวัน" else None
     sub_menu_report = st.session_state['sidebar_sub_report'] if selected_main == report_menu_label else None

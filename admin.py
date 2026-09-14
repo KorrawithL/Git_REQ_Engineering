@@ -92,7 +92,7 @@ def render_admin_user_management():
 
     st.write("### 🗂️ รายชื่อผู้ใช้งานทั้งหมดในระบบ")
     if all_users:
-        reverse_branch_dict = {str(v): k.split(" ")[1] for k, v in branch_dict.items()}
+        reverse_branch_dict = {str(v): k for k, v in branch_dict.items()}
         def get_extra_branches_display(ids_str):
             if not ids_str: return ""
             return ", ".join([reverse_branch_dict.get(str(i).strip(), str(i).strip()) for i in str(ids_str).split(',') if i.strip()])
