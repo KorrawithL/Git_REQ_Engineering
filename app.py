@@ -256,25 +256,32 @@ else:
 
     if st.session_state['dark_mode']:
         # 🌑 โหมดกลางคืน (Dark Mode)
-        bg_main = "#0F172A"       # สีพื้นหลังหลัก (Slate 900)
-        bg_sidebar = "#1E293B"    # สี Sidebar (Slate 800)
-        text_color = "#F8FAFC"    # สีตัวอักษร (Slate 50)
-        text_muted = "#94A3B8"    # สีตัวอักษรรอง (Slate 400)
-        border_color = "#334155"  # สีเส้นขอบ (Slate 700)
-        btn_bg = "#1E293B"        # สีปุ่มปกติ
-        btn_hover = "#334155"     # สีปุ่มตอนชี้
-        box_bg = "#1E293B"        # สีกล่อง Topbar
+        bg_main = "#0F172A"       
+        bg_sidebar = "#1E293B"    
+        text_color = "#F8FAFC"    
+        text_muted = "#94A3B8"    
+        border_color = "#334155"  
+        btn_bg = "#1E293B"        
+        btn_hover = "#334155"     
+        box_bg = "#1E293B"        
         
-        # 💡 สีช่องกรอกข้อมูลและ Dropdown ทั้งหมด (ตามที่ผู้ใช้ต้องการ: พื้นเทา #CCCCCC ตัวหนังสือดำ)
+        # 💡 สีช่องกรอกข้อมูลและ Dropdown
         input_bg = "#E5E7EB"
-        input_text = "#000000"    # สีดำเข้มเพื่อให้อ่านบนพื้นเทาได้ชัดเจน
+        input_text = "#000000"    
         
         dd_bg = "#E5E7EB"         
         dd_text = "#000000"       
-        dd_hover_bg = "#A3A3A3"   # เทาเข้มขึ้นตอน Hover Dropdown
+        dd_hover_bg = "#A3A3A3"   
         dd_hover_text = "#000000" 
         
-        # 💡 สีป้ายสาขา Dark Mode
+        svg_fill = "#CCCCCC"      
+        
+        # 💡 สีปุ่ม + / - ในหน้าหลัก
+        num_btn_bg = "#334155"             
+        num_btn_icon = "#FFFFFF"           
+        num_btn_disabled_bg = "#1E293B"    
+        num_btn_disabled_icon = "#94A3B8"  
+        
         badge_bg = "#1E293B"
         badge_text = "#38BDF8"
         badge_border = "#334155"
@@ -289,7 +296,6 @@ else:
         btn_hover = "#FAFAFA"
         box_bg = "#FFFFFF"
         
-        # 💡 สีช่องกรอกข้อมูลและ Dropdown ทั้งหมด (ตามที่ผู้ใช้ต้องการ: พื้นเทา #CCCCCC ตัวหนังสือดำ)
         input_bg = "#FFFFFF"
         input_text = "#000000"    
         
@@ -298,115 +304,163 @@ else:
         dd_hover_bg = "#A3A3A3"   
         dd_hover_text = "#000000"
         
-        # 💡 สีป้ายสาขา Light Mode
+        svg_fill = "#0F172A"      
+        
+        num_btn_bg = "#F8FAFC"
+        num_btn_icon = "#0F172A"
+        num_btn_disabled_bg = "#F1F5F9"
+        num_btn_disabled_icon = "#94A3B8"
+        
         badge_bg = "#E2E8F0"
         badge_text = "#1E293B"
         badge_border = "#CBD5E1"
 
-    # แทรก CSS แบบ Dynamic (เปลี่ยนสีตามโหมดแบบ Real-time)
+    # แทรก CSS แบบ Dynamic
     st.markdown(f"""<style>
     /* 🎯 ซ่อนส่วนขวาบน (Deploy & 3 จุด) ให้เกลี้ยง */
     .stAppDeployButton {{ display: none !important; }}
     [data-testid="stHeaderActionElements"] {{ display: none !important; }}
     #MainMenu {{ display: none !important; }}
-    
-    /* 🎯 ล่องหนแถบด้านบน (Header) ให้โปร่งใส ไม่มีขอบ */
     header[data-testid="stHeader"] {{ background: transparent !important; box-shadow: none !important; }}
-    
-    /* 🎯 ซ่อนปุ่มพับ Sidebar ถาวร */
     [data-testid="stSidebarCollapseButton"] {{ display: none !important; }}
     [data-testid="collapsedControl"] {{ display: none !important; }}
     
-    /* 🌙 จัดการสีพื้นหลังหลักของแอป และ Sidebar */
     .stApp {{ background-color: {bg_main} !important; color: {text_color} !important; transition: all 0.3s ease; }}
     [data-testid="stSidebar"] {{ background-color: {bg_sidebar} !important; border-right: 1px solid {border_color} !important; transition: all 0.3s ease; }}
     .main .block-container {{ background-color: {bg_main} !important; padding-top: 1.5rem !important; }}
     
-    /* เปลี่ยนสีตัวอักษรทั่วไป */
-    p, span, h1, h2, h3, h4, h5, h6, label, li {{ color: {text_color} !important; transition: all 0.3s ease; }}
-    .stMarkdown div {{ color: {text_color} !important; }}
+    /* =========================================================
+       🌟 สีตัวอักษรเฉพาะในหน้าหลัก ไม่แตะต้อง Popup
+       ========================================================= */
+    .main p, .main span, .main h1, .main h2, .main h3, .main h4, .main h5, .main h6, .main label, .main li,
+    [data-testid="stSidebar"] p, [data-testid="stSidebar"] span, [data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2, [data-testid="stSidebar"] h3, [data-testid="stSidebar"] h4, [data-testid="stSidebar"] h5, [data-testid="stSidebar"] h6, [data-testid="stSidebar"] label, [data-testid="stSidebar"] li {{
+        color: {text_color} !important; 
+        transition: all 0.3s ease; 
+    }}
+    .main div[data-testid="stMarkdownContainer"] > p,
+    [data-testid="stSidebar"] div[data-testid="stMarkdownContainer"] > p {{
+        color: {text_color} !important; 
+    }}
     
-    /* สีกล่อง Top bar และเส้นขอบ Container */
     div[data-testid="stVerticalBlock"] > div[style*="border"] {{ background-color: {box_bg} !important; border-color: {border_color} !important; transition: all 0.3s ease; }}
     
-    /* =========================================================
-       🌟 บังคับช่องกรอกข้อมูลให้เป็น #CCCCCC ตามที่กำหนด
-       ========================================================= */
+    /* 🌟 ช่องกรอกข้อมูลหน้าหลัก */
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea {{
         background-color: {input_bg} !important; 
         color: {input_text} !important; 
         border-color: {border_color} !important;
     }}
-    
     table th, table td {{ color: {text_color} !important; border-color: {border_color} !important; background-color: {bg_main} !important; }}
     
-    /* สีปุ่ม Navbar ด้านบน */
     div[data-testid="stHorizontalBlock"]:first-of-type button {{ background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important; border-radius: 8px !important; padding: 2px 0px !important; font-size: 14px !important; transition: all 0.2s ease !important; box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important; }}
     div[data-testid="stHorizontalBlock"]:first-of-type button:hover {{ background-color: {btn_hover} !important; transform: translateY(-1px) !important; box-shadow: 0 4px 6px rgba(0,0,0,0.05) !important; }}
 
     /* =========================================================
-       🌟 แก้ไขปัญหา Selectbox (Dropdown) ให้มีพื้นหลัง #CCCCCC
+       🌟 แก้ไขปัญหา Selectbox (Dropdown) ในหน้าหลัก
        ========================================================= */
-    /* 1. กล่อง Selectbox ตอนยังไม่กด */
-    div[data-baseweb="select"] > div, 
-    div[data-baseweb="select"] > div:hover {{
-        background-color: {input_bg} !important;
-        color: {input_text} !important;
-        border-color: {border_color} !important;
-    }}
-    div[data-baseweb="select"] span {{
-        color: {input_text} !important;
-    }}
-    div[data-baseweb="select"] svg {{
-        fill: {input_text} !important;
-        color: {input_text} !important;
-    }}
+    div[data-baseweb="select"] > div, div[data-baseweb="select"] > div:hover {{ background-color: {input_bg} !important; color: {input_text} !important; border-color: {border_color} !important; }}
+    div[data-baseweb="select"] span {{ color: {input_text} !important; }}
+    div[data-baseweb="select"] svg, div[data-testid="stDateInput"] svg, div[data-testid="stTimeInput"] svg {{ fill: {svg_fill} !important; color: {svg_fill} !important; }}
+    div[data-baseweb="popover"], div[data-baseweb="popover"] * {{ background-color: {dd_bg} !important; color: {dd_text} !important; }}
+    div[data-baseweb="popover"] [role="option"]:hover, div[data-baseweb="popover"] [role="option"][aria-selected="true"],
+    div[data-baseweb="popover"] [role="option"]:hover *, div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{ background-color: {dd_hover_bg} !important; color: {dd_hover_text} !important; }}
     
-    /* 2. บังคับเปลี่ยนสีทุกอย่างที่อยู่ใน Popover (เมนูที่กางออกมา) */
-    div[data-baseweb="popover"], 
-    div[data-baseweb="popover"] * {{
-        background-color: {dd_bg} !important;
-        color: {dd_text} !important;
+    /* Tooltip */
+    div[data-testid="stTooltipContent"], div[data-baseweb="tooltip"] {{ background-color: {input_bg} !important; border: 1px solid {border_color} !important; border-radius: 6px !important; }}
+    div[data-testid="stTooltipContent"] *, div[data-baseweb="tooltip"] * {{ color: {input_text} !important; background-color: transparent !important; }}
+
+    /* =========================================================
+       🚨 THE ULTIMATE POPUP (DIALOG & MODAL) FIX
+       รับประกันความเหมือน Light Mode 100% ไม่มีเพี้ยน
+       ========================================================= */
+    /* 1. บังคับพื้นหลัง Dialog ให้เป็นสีขาวเสมอ */
+    div[role="dialog"], 
+    [data-testid="stDialog"], 
+    div[data-testid="stModal"] > div {{
+        background-color: #FFFFFF !important;
     }}
-    
-    /* 3. สีเวลา Hover หรือเลือกแล้ว (เจาะจงทับลงไปอีกชั้น) */
-    div[data-baseweb="popover"] [role="option"]:hover,
-    div[data-baseweb="popover"] [role="option"][aria-selected="true"],
-    div[data-baseweb="popover"] [role="option"]:hover *,
-    div[data-baseweb="popover"] [role="option"][aria-selected="true"] * {{
-        background-color: {dd_hover_bg} !important;
-        color: {dd_hover_text} !important;
+
+    /* 2. บังคับตัวหนังสือทุกชนิดให้เป็นสีดำเสมอ */
+    div[role="dialog"] p, div[role="dialog"] span, div[role="dialog"] label, div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, div[role="dialog"] h4, div[role="dialog"] h5, div[role="dialog"] h6, div[role="dialog"] div[data-testid="stMarkdownContainer"] * {{
+        color: #0F172A !important;
+        -webkit-text-fill-color: #0F172A !important;
+    }}
+
+    /* 3. ยกเว้นปุ่มกดยืนยัน (Primary) ให้คงความเป็นตัวหนังสือสีขาว */
+    div[role="dialog"] button[data-testid="baseButton-primary"] *,
+    [data-testid="stDialog"] button[data-testid="baseButton-primary"] * {{
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }}
+
+    /* 4. สีช่องกรอกข้อมูลใน Popup ให้เป็นสีเทาสว่าง */
+    div[role="dialog"] div[data-baseweb="input"],
+    div[role="dialog"] div[data-baseweb="select"] > div:first-child,
+    div[role="dialog"] div[data-testid="stNumberInputContainer"],
+    div[role="dialog"] textarea {{
+        background-color: #F8FAFC !important;
+        border: 1px solid #CBD5E1 !important;
+    }}
+
+    /* ป้องกันสีดำแอบซ่อนอยู่หลังข้อความ */
+    div[role="dialog"] input, 
+    div[role="dialog"] textarea, 
+    div[role="dialog"] div[data-baseweb="select"] span {{
+        background-color: transparent !important;
+    }}
+
+    /* 🚀 5. บังคับลูกศรใน Dropdown ให้เป็นสีดำ (และแก้บั๊กลูกศรหายในคอลัมน์ขวาสุด) */
+    div[role="dialog"] div[data-baseweb="select"] svg,
+    [data-testid="stDialog"] div[data-baseweb="select"] svg {{
+        fill: #0F172A !important;
+        color: #0F172A !important;
+        opacity: 1 !important;
+    }}
+
+    /* 6. เปลี่ยนกากบาทปิดหน้าต่าง และไอคอนดวงตาเป็นสีดำเสมอ */
+    div[role="dialog"] button[aria-label="Close"] svg, 
+    [data-testid="stDialog"] button[aria-label="Close"] svg,
+    div[role="dialog"] div[data-baseweb="input"] svg {{
+        fill: #0F172A !important;
+        color: #0F172A !important;
+    }}
+
+    /* 7. กล่องแจ้งเตือน Alert (สีเหลืองอ่อน) */
+    div[role="dialog"] div[data-testid="stAlert"] {{
+        background-color: #FFFBEB !important; 
+        border: 1px solid #FDE047 !important;
+    }}
+    div[role="dialog"] div[data-testid="stAlert"] svg {{
+        fill: #D97706 !important; 
     }}
 
     /* =========================================================
-       🌟 ป้ายแสดงชื่อสาขาในตาราง (แก้ไขให้สีเปลี่ยนตามโหมด)
+       🌟 แผงกรองข้อมูล (Expander)
        ========================================================= */
-    .branch-badge {{
-        background-color: {badge_bg} !important;
-        color: {badge_text} !important;
-        padding: 4px 8px !important;
-        border-radius: 6px !important;
-        font-size: 12.5px !important;
-        font-weight: bold !important;
-        border: 1px solid {badge_border} !important;
-        display: inline-block !important;
-        line-height: 1.2 !important;
-    }}
+    div[data-testid="stExpander"] details summary {{ background-color: {input_bg} !important; border: 1px solid {border_color} !important; border-radius: 8px !important; padding: 10px !important; }}
+    div[data-testid="stExpander"] details summary p, div[data-testid="stExpander"] details summary span {{ color: {input_text} !important; font-weight: 700 !important; font-size: 15px !important; }}
+    div[data-testid="stExpander"] details summary svg {{ fill: {input_text} !important; color: {input_text} !important; }}
+    div[data-testid="stExpander"] details summary:hover {{ background-color: {dd_hover_bg} !important; }}
+
+    /* =========================================================
+       🌟 ปุ่ม + / - ใน Number Input (โค้ดดั้งเดิมที่คุณชอบ)
+       ========================================================= */
+    div[data-testid="stNumberInput"] button {{ background-color: {num_btn_bg} !important; border: none !important; }}
+    div[data-testid="stNumberInput"] button svg {{ fill: {num_btn_icon} !important; color: {num_btn_icon} !important; }}
+    div[data-testid="stNumberInput"] button:disabled {{ background-color: {num_btn_disabled_bg} !important; opacity: 1 !important; }}
+    div[data-testid="stNumberInput"] button:disabled svg {{ fill: {num_btn_disabled_icon} !important; color: {num_btn_disabled_icon} !important; }}
+
+    /* =========================================================
+       🌟 ป้ายแสดงชื่อสาขาในตาราง
+       ========================================================= */
+    .branch-badge {{ background-color: {badge_bg} !important; color: {badge_text} !important; padding: 4px 8px !important; border-radius: 6px !important; font-size: 12.5px !important; font-weight: bold !important; border: 1px solid {badge_border} !important; display: inline-block !important; line-height: 1.2 !important; }}
 
     /* =========================================================
        🌟 เมนูหลัก (Main Menu)
        ========================================================= */
-    [data-testid="stSidebar"] div.stButton > button {{
-        background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important;
-        padding: 12px 14px !important; border-radius: 10px !important; font-size: 15px !important; font-weight: 700 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left !important; justify-content: flex-start !important;
-        width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important;
-    }}
-    [data-testid="stSidebar"] div.stButton > button:hover {{ background-color: {btn_hover} !important; border-color: #D97706 !important; color: #D97706 !important; }}
-    
-    [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {{
-        background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important;
-    }}
+    [data-testid="stSidebar"] div.stButton > button {{ background-color: {btn_bg} !important; border: 1px solid {border_color} !important; color: {text_color} !important; padding: 12px 14px !important; border-radius: 10px !important; font-size: 15px !important; font-weight: 700 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.02) !important; text-align: left !important; justify-content: flex-start !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; }}
+    [data-testid="stSidebar"] div.stButton > button:hover {{ background-color: {btn_hover} !important; border: 1px solid #D97706 !important; color: #D97706 !important; }}
+    [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] {{ background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; }}
 
     /* =========================================================
        🌟 เมนูย่อย (Sub-menu)
