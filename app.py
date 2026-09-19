@@ -309,7 +309,8 @@ if not st.session_state.get('logged_in'):
         try:
             conn = get_db_connection()
             with conn.cursor() as cur:
-                cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY position ASC")
+                # เปลี่ยน ORDER BY position ASC เป็น ORDER BY pos ASC
+                cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY pos ASC")
                 for r in cur.fetchall():
                     if r['pos']: position_list.append(r['pos'].strip())
             conn.close()
