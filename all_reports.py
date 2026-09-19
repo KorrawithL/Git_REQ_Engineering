@@ -157,7 +157,7 @@ def update_record_dialog_t1(row_data, pk_col):
     curr_branch_id = row_data.get('branch_id')
     curr_m_id = row_data.get('machine_id')
     
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่องเดิม: {curr_m} ({curr_branch})")
+    st.info(f"ID: {rec_id} | เครื่องเดิม: {curr_m} ({curr_branch})")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
@@ -190,44 +190,48 @@ def update_record_dialog_t1(row_data, pk_col):
         if not m_options: m_options = ["-- ไม่พบเครื่องจักร --"]
         
         def_m_idx = 0
-        if new_branch_id == curr_branch_id and curr_m in m_options:
-            def_m_idx = m_options.index(curr_m)
-        
+        if new_branch_id == curr_branch_id and curr_m in m_options: def_m_idx = m_options.index(curr_m)
         with c_top2:
             e_machine_lbl = st.selectbox("⚙️ 2. แก้ไขเครื่องจักร *", m_options, index=def_m_idx, key=f"e1_m_{rec_id}")
-            if e_machine_lbl != "-- ไม่พบเครื่องจักร --":
-                new_m_id = m_dict.get(e_machine_lbl, curr_m_id)
-            else:
-                btn_disabled = True
+            if e_machine_lbl != "-- ไม่พบเครื่องจักร --": new_m_id = m_dict.get(e_machine_lbl, curr_m_id)
+            else: btn_disabled = True
     else:
         with c_top1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e1_br_{rec_id}")
         with c_top2: st.text_input("⚙️ 2. เครื่องจักร (ไม่อนุญาตให้แก้ไข)", value=curr_m, disabled=True, key=f"e1_m_{rec_id}")
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+        # 🌟 ล็อคปฏิทิน ห้ามเลือกวันที่ในอนาคต
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
         e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
     with col2:
-        e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), format="%.2f")
-        e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), format="%.2f")
+        # 🌟 ล็อคค่าห้ามติดลบ (min_value=0.0)
+        e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), min_value=0.0, format="%.2f")
+        e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), min_value=0.0, format="%.2f")
     e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
     
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
-        try:
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                cur.execute(f"UPDATE machine_trans SET branch_id=%s, machine_id=%s, record_date=%s, machine_qty=%s, working_hours=%s, breakdown_hours=%s, remarks=%s, updated_at=NOW() WHERE {pk_col}=%s",
-                            (new_branch_id, new_m_id, e_date, e_qty, e_work, e_break, e_rem, rec_id))
-                conn.commit()
-            conn.close()
-            st.cache_data.clear()
-            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 1", f"แก้ไข ID: {rec_id}")
-            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e: st.error(f"Error: {e}")
+        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
+        if (e_work + e_break) > 24.0:
+            st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ต้องไม่เกิน 24 ชั่วโมงต่อวันครับ")
+            return
+
+        # ⏳ แสดง Spinner โหลดข้อมูลกันคนกดย้ำ
+        with st.spinner("กำลังบันทึกข้อมูล..."):
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    cur.execute(f"UPDATE machine_trans SET branch_id=%s, machine_id=%s, record_date=%s, machine_qty=%s, working_hours=%s, breakdown_hours=%s, remarks=%s, updated_at=NOW() WHERE {pk_col}=%s",
+                                (new_branch_id, new_m_id, e_date, e_qty, e_work, e_break, e_rem, rec_id))
+                    conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 1", f"แก้ไข ID: {rec_id}")
+                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="🎉") # 🌟 เปลี่ยนมาใช้ Toast แจ้งเตือนมุมจอ
+                time.sleep(1.2)
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 2)", width="large")
 def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2):
@@ -237,7 +241,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     curr_code = str(row_data.get('engine_code') or '')
     curr_branch_id = row_data.get('branch_id')
 
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียนเดิม: {curr_code} ({curr_branch})")
+    st.info(f"ID: {rec_id} | ทะเบียนเดิม: {curr_code} ({curr_branch})")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
@@ -250,11 +254,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         try:
             conn = get_db_connection()
             with conn.cursor() as cur:
-                sql = """SELECT CONVERT(e.machine_name USING utf8mb4) AS engine_code, 
-                                CONVERT(et.type_name USING utf8mb4) AS type_name, 
-                                CONVERT(b.branch_name USING utf8mb4) AS branch_name 
-                         FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id 
-                         LEFT JOIN branches b ON e.branch_id = b.id WHERE e.machine_type = 'engine' AND e.is_active = 1"""
+                sql = """SELECT CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.machine_type = 'engine' AND e.is_active = 1"""
                 cur.execute(sql)
                 all_engines = cur.fetchall()
             conn.close()
@@ -268,8 +268,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         if not f2_type_disabled:
             filtered_by_branch = [e for e in all_engines if e['branch_name'] == e_branch]
             available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
-        else:
-            available_types, filtered_by_branch = [], []
+        else: available_types, filtered_by_branch = [], []
             
         def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
         e_type = c_sel2.selectbox("🚜 2. แก้ไขชนิดรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
@@ -278,8 +277,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         if not f2_code_disabled:
             filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == e_type]
             available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
-        else:
-            available_codes, filtered_by_type = [], []
+        else: available_codes, filtered_by_type = [], []
             
         def_code_idx = available_codes.index(curr_code) + 1 if (curr_code in available_codes and e_type == curr_type and e_branch == curr_branch) else 0
         e_code = c_sel3.selectbox("🏷️ 3. แก้ไขทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled)
@@ -288,64 +286,64 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         if not inputs_disabled: new_type, new_code = e_type, e_code
     else:
         with c_sel1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e2_br_{rec_id}")
-        with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ (ไม่อนุญาตให้แก้ไข)", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}")
-        with c_sel3: st.text_input("🏷️ 3. รหัสงาน / ทะเบียนรถ (ไม่อนุญาตให้แก้ไข)", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}")
+        with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}")
+        with c_sel3: st.text_input("🏷️ 3. ทะเบียนรถ", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}")
 
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), format="DD/MM/YYYY", key=f"e2_dt_{rec_id}")
+        e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), format="DD/MM/YYYY", max_value=pd.to_datetime("today"), key=f"e2_dt_{rec_id}")
         e_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
     with col2:
         e_work = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
         e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}")
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
-        try:
-            u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
-            new_branch_id = curr_branch_id
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                if current_role == "admin":
-                    cur.execute("SELECT id FROM branches WHERE branch_name = %s", (e_branch,))
-                    b_res = cur.fetchone()
-                    if b_res: new_branch_id = b_res['id']
-
-                cur.execute(f"""UPDATE fuel_records SET branch_id=%s, record_date=%s, engine_code=CONVERT(%s USING utf8mb4), type_name=CONVERT(%s USING utf8mb4), 
-                               fuel_liters=%s, working_hours=%s, liter_hr=%s, remark=CONVERT(%s USING utf8mb4) WHERE {pk_col}=%s""",
-                            (new_branch_id, e_date, new_code, new_type, e_liters, e_work, u_liter_hr, e_rem, rec_id))
-                conn.commit()
-            conn.close()
+        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
+        if e_work > 24.0:
+            st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรถยนต์ต้องไม่เกิน 24 ชั่วโมงต่อวัน")
+            return
             
-            st.cache_data.clear()
-            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 2", f"แก้ไข ID: {rec_id} ({new_code})")
-            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e: st.error(f"Error: {e}")
+        with st.spinner("กำลังบันทึกข้อมูล..."):
+            try:
+                u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
+                new_branch_id = curr_branch_id
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    if current_role == "admin":
+                        cur.execute("SELECT id FROM branches WHERE branch_name = %s", (e_branch,))
+                        b_res = cur.fetchone()
+                        if b_res: new_branch_id = b_res['id']
+                    cur.execute(f"""UPDATE fuel_records SET branch_id=%s, record_date=%s, engine_code=CONVERT(%s USING utf8mb4), type_name=CONVERT(%s USING utf8mb4), fuel_liters=%s, working_hours=%s, liter_hr=%s, remark=CONVERT(%s USING utf8mb4) WHERE {pk_col}=%s""",
+                                (new_branch_id, e_date, new_code, new_type, e_liters, e_work, u_liter_hr, e_rem, rec_id))
+                    conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 2", f"แก้ไข ID: {rec_id} ({new_code})")
+                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="🚚")
+                time.sleep(1.2)
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 3)", width="large")
 def update_record_dialog_t3(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
+    st.info(f"ID: {rec_id} | สาขาเดิม: {row_data.get('branch_name')}")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
-    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
-        edit_branch_options = list(branch_dict.keys())
-    else: 
-        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: edit_branch_options = list(branch_dict.keys())
+    else: edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
     
     curr_branch = str(row_data.get('branch_name') or '')
     def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
-    
     e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e3_br_{rec_id}")
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
         e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0))
     with col2:
         e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0))
@@ -353,31 +351,35 @@ def update_record_dialog_t3(row_data, pk_col):
     e_rem = st.text_input("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''))
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary"):
-        try:
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                cur.execute(f"UPDATE boiler_pressure_records SET branch_id=%s, record_date=%s, total_count=%s, total_drop=%s, pm_drop=%s, non_pm_drop=%s, remark=%s WHERE {pk_col}=%s",
-                            (new_branch_id, e_date, e_tot, (e_pm + e_npm), e_pm, e_npm, e_rem, rec_id))
-                conn.commit()
-            conn.close()
-            st.cache_data.clear()
-            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 3", f"แก้ไข ID: {rec_id}")
-            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e: st.error(f"Error: {e}")
+        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
+        if (e_pm + e_npm) > e_tot:
+            st.error("⚠️ ไม่สามารถบันทึกได้: จำนวนครั้งที่ 'แรงดันตก' (PM + นอก PM) ต้องไม่มากกว่า 'จำนวนครั้งที่ตรวจเช็คทั้งหมด'")
+            return
+            
+        with st.spinner("กำลังบันทึกข้อมูล..."):
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    cur.execute(f"UPDATE boiler_pressure_records SET branch_id=%s, record_date=%s, total_count=%s, total_drop=%s, pm_drop=%s, non_pm_drop=%s, remark=%s WHERE {pk_col}=%s",
+                                (new_branch_id, e_date, e_tot, (e_pm + e_npm), e_pm, e_npm, e_rem, rec_id))
+                    conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 3", f"แก้ไข ID: {rec_id}")
+                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="💨")
+                time.sleep(1.2)
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 4)", width="large")
 def update_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
+    st.info(f"ID: {rec_id} | สาขาเดิม: {row_data.get('branch_name')}")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
-    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
-        edit_branch_options = list(branch_dict.keys())
-    else: 
-        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: edit_branch_options = list(branch_dict.keys())
+    else: edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
     
     curr_branch = str(row_data.get('branch_name') or '')
     def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
@@ -403,7 +405,7 @@ def update_record_dialog_t4(row_data, pk_col):
     with c_top2: e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
     c1, c2, c3 = st.columns(3)
     with c1:
         st.write(" ")
@@ -417,30 +419,36 @@ def update_record_dialog_t4(row_data, pk_col):
         e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
     with c3:
         st.write(" ")
-        e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.1, value=float(row_data.get('steam_production') or 1.0))
-        e_hrs = st.number_input("ชม.ทำงาน", min_value=0.1, value=float(row_data.get('working_hours') or 1.0))
+        e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.0, value=float(row_data.get('steam_production') or 1.0))
+        e_hrs = st.number_input("ชม.ทำงาน", min_value=0.0, value=float(row_data.get('working_hours') or 1.0))
 
     btn_disabled = (e_boiler == "-- ไม่มีข้อมูลบอยเลอร์ --")
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
-        try:
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                cur.execute(f"""UPDATE boiler_fuel_records SET branch_id=%s, record_date=%s, boiler_name=%s, sawdust_weight=%s, wood_weight=%s, waste_wood_weight=%s, 
-                               sawdust_price=%s, wood_price=%s, waste_wood_price=%s, steam_production=%s, working_hours=%s WHERE {pk_col}=%s""",
-                            (new_branch_id, e_date, e_boiler, e_saw_w, e_wood_w, e_waste_w, e_saw_p, e_wood_p, e_waste_p, e_prod, e_hrs, rec_id))
-                conn.commit()
-            conn.close()
-            st.cache_data.clear()
-            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4", f"แก้ไข ID: {rec_id}")
-            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e: st.error(f"Error: {e}")
+        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
+        if e_hrs > 24.0:
+            st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานต้องไม่เกิน 24 ชั่วโมงต่อวัน")
+            return
+            
+        with st.spinner("กำลังบันทึกข้อมูล..."):
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    cur.execute(f"""UPDATE boiler_fuel_records SET branch_id=%s, record_date=%s, boiler_name=%s, sawdust_weight=%s, wood_weight=%s, waste_wood_weight=%s, 
+                                   sawdust_price=%s, wood_price=%s, waste_wood_price=%s, steam_production=%s, working_hours=%s WHERE {pk_col}=%s""",
+                                (new_branch_id, e_date, e_boiler, e_saw_w, e_wood_w, e_waste_w, e_saw_p, e_wood_p, e_waste_p, e_prod, e_hrs, rec_id))
+                    conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4", f"แก้ไข ID: {rec_id}")
+                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="🔥")
+                time.sleep(1.2)
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("🛠️ แก้ไขข้อมูล (ยอดรวมสาขา)", width="large")
 def update_record_dialog_oven(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | สาขาเดิม: {row_data.get('branch_name')}")
+    st.info(f"ID: {rec_id} | สาขาเดิม: {row_data.get('branch_name')}")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
@@ -454,7 +462,7 @@ def update_record_dialog_oven(row_data, pk_col):
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), key=f"e_ov_dt_{rec_id}")
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"), key=f"e_ov_dt_{rec_id}")
     
     c1, c2, c3 = st.columns(3)
     with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}")
@@ -462,19 +470,20 @@ def update_record_dialog_oven(row_data, pk_col):
     with c3: e_pr = st.number_input("แก้ไข แรงดันปลายทางเฉลี่ย", min_value=0.0, value=float(row_data.get('avg_terminal_pressure') or 0.0), key=f"e_ov_p_{rec_id}")
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", key=f"e_ov_save_{rec_id}"):
-        try:
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                cur.execute(f"UPDATE daily_wood_oven_records SET branch_id=%s, record_date=%s, oven_qty=%s, wood_out_cubft=%s, avg_terminal_pressure=%s WHERE {pk_col}=%s",
-                            (new_branch_id, e_date, e_ov, e_wd, e_pr, rec_id))
-                conn.commit()
-            conn.close()
-            st.cache_data.clear()
-            log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4 Oven", f"แก้ไข ID: {rec_id}")
-            st.success("✅ อัปเดตข้อมูลสำเร็จ!")
-            time.sleep(1)
-            st.rerun()
-        except Exception as e: st.error(f"Error: {e}")
+        with st.spinner("กำลังบันทึกข้อมูล..."):
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    cur.execute(f"UPDATE daily_wood_oven_records SET branch_id=%s, record_date=%s, oven_qty=%s, wood_out_cubft=%s, avg_terminal_pressure=%s WHERE {pk_col}=%s",
+                                (new_branch_id, e_date, e_ov, e_wd, e_pr, rec_id))
+                    conn.commit()
+                conn.close()
+                st.cache_data.clear()
+                log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 4 Oven", f"แก้ไข ID: {rec_id}")
+                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="📁")
+                time.sleep(1.2)
+                st.rerun()
+            except Exception as e: st.error(f"Error: {e}")
 
 @st.dialog("📊 หน้าต่างดูสรุปรายงาน", width="large")
 def show_summary_report_dialog(html_content):
