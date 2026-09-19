@@ -32,6 +32,74 @@ def get_branch_dict_from_db():
     return b_dict
 
 # =============================================================================
+# 🚀 ฟังก์ชันเสก PWA (Progressive Web App) ให้ติดตั้งลงมือถือได้
+# =============================================================================
+def setup_pwa():
+    pwa_script = """
+    <script>
+        // ป้องกันการแอดโค้ดซ้ำ
+        if (!window.parent.document.getElementById('pwa-manifest')) {
+            // 1. สร้าง Manifest ปลอมขึ้นมา (บอกชื่อแอป สี และไอคอน)
+            const manifest = {
+                "name": "Woodwork Engineering Records System",
+                "short_name": "Work Wood",
+                "theme_color": "#D97706",
+                "background_color": "#F2EFEA",
+                "display": "standalone", // คำสั่งบังคับให้เปิดแบบเต็มจอ (ซ่อนแถบ URL)
+                "orientation": "portrait", // ล็อคหน้าจอแนวตั้ง
+                "scope": "/",
+                "start_url": "/",
+                "icons": [
+                    {
+                        "src": "https://cdn-icons-png.flaticon.com/512/3206/3206016.png", // ลิงก์รูปไอคอนแอป (เปลี่ยนได้)
+                        "sizes": "192x192",
+                        "type": "image/png"
+                    },
+                    {
+                        "src": "https://cdn-icons-png.flaticon.com/512/3206/3206016.png",
+                        "sizes": "512x512",
+                        "type": "image/png"
+                    }
+                ]
+            };
+            
+            // แปลง Manifest ให้เป็น Data URL แล้วฝังใน Header
+            const manifestString = JSON.stringify(manifest);
+            const manifestUrl = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(manifestString);
+            
+            const link = window.parent.document.createElement('link');
+            link.id = 'pwa-manifest';
+            link.rel = 'manifest';
+            link.href = manifestUrl;
+            window.parent.document.head.appendChild(link);
+            
+            // 2. ตั้งค่า Meta Tags บังคับให้ iOS (iPhone/iPad) มองว่าเป็น App
+            const metaTags = [
+                {name: "apple-mobile-web-app-capable", content: "yes"},
+                {name: "apple-mobile-web-app-status-bar-style", content: "black-translucent"},
+                {name: "apple-mobile-web-app-title", content: "Work Wood"},
+                {name: "theme-color", content: "#D97706"}
+            ];
+            
+            metaTags.forEach(tag => {
+                const meta = window.parent.document.createElement('meta');
+                meta.name = tag.name;
+                meta.content = tag.content;
+                window.parent.document.head.appendChild(meta);
+            });
+
+            // 3. กำหนดไอคอนสำหรับ iOS
+            const appleIcon = window.parent.document.createElement('link');
+            appleIcon.rel = "apple-touch-icon";
+            appleIcon.href = "https://cdn-icons-png.flaticon.com/512/3206/3206016.png";
+            window.parent.document.head.appendChild(appleIcon);
+        }
+    </script>
+    """
+    # ซ่อนกล่อง html ไม่ให้แสดงบนหน้าจอ
+    components.html(pwa_script, height=0, width=0)
+
+# =============================================================================
 # 🚀 2. ฟังก์ชันดึงข้อมูลจริงทำหน้า Dashboard
 # =============================================================================
 def get_dashboard_data(user_branch_id):
@@ -137,6 +205,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded" 
 )
+
+setup_pwa()
 
 SESSION_TIMEOUT_SECONDS = 1800  
 
@@ -616,7 +686,7 @@ else:
 
 
     # =========================================================================
-    # 🚀 🌟 CSS ที่คลีนแล้ว: ไม่มีโค้ดงัดตารางเก่าหลงเหลืออยู่ 🌟 🚀
+    # 🚀 🌟 CSS ท่าไม้ตาย: ย้ายมาไว้ก้นสุดของไฟล์ (ล้างโค้ดงัดตารางเก่าทิ้งแล้ว) 🌟 🚀
     # =========================================================================
     st.markdown("""
     <style>
@@ -775,10 +845,10 @@ else:
         border-radius: 8px !important;
     }
     
-    /* 🌟 บังคับฟอนต์ให้ตาราง DataFrame (st.data_editor) สวยงามเข้ากับเว็บ */
+    /* 🌟 บังคับฟอนต์ให้ตาราง DataFrame สวยงามเข้ากับเว็บ */
     [data-testid="stDataFrame"], [data-testid="stDataFrame"] * {
         font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-        font-size: 16px !important;
+        font-size: 14px !important;
     }
     </style>
     """, unsafe_allow_html=True)

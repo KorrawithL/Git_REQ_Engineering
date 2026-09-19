@@ -152,8 +152,6 @@ def delete_record_dialog_oven(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 1)", width="large")
 def update_record_dialog_t1(row_data, pk_col):
     rec_id = row_data[pk_col]
-    
-    # 🎯 ดึงข้อมูลเดิมมาเก็บไว้
     curr_m = str(row_data.get('machine_name') or 'ไม่ทราบชื่อเครื่องจักร')
     curr_branch = str(row_data.get('branch_name') or '')
     curr_branch_id = row_data.get('branch_id')
@@ -161,7 +159,6 @@ def update_record_dialog_t1(row_data, pk_col):
     
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | เครื่องเดิม: {curr_m} ({curr_branch})")
     
-    # 🎯 ตรวจสอบสิทธิ์ผู้ใช้งาน
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
     
@@ -171,11 +168,8 @@ def update_record_dialog_t1(row_data, pk_col):
     
     c_top1, c_top2 = st.columns([1.5, 1.5])
     
-    # 🌟 ถ้าเป็นแอดมิน: ให้แสดง Dropdown เลือกสาขาและเครื่องจักรได้
     if current_role == "admin":
         edit_branch_options = list(branch_dict.keys())
-        
-        # 🎯 ค้นหาค่า Default ของสาขาโดยเทียบจาก ID ของสาขา (แม่นยำ 100%)
         def_branch_lbl = next((k for k, v in branch_dict.items() if v == curr_branch_id), edit_branch_options[0] if edit_branch_options else None)
         def_branch_idx = edit_branch_options.index(def_branch_lbl) if def_branch_lbl in edit_branch_options else 0
         
@@ -195,7 +189,6 @@ def update_record_dialog_t1(row_data, pk_col):
         m_options = list(m_dict.keys())
         if not m_options: m_options = ["-- ไม่พบเครื่องจักร --"]
         
-        # 🎯 ค้นหาค่า Default ของเครื่องจักร โดยเช็คว่า ID สาขายังเป็นอันเดิมหรือไม่
         def_m_idx = 0
         if new_branch_id == curr_branch_id and curr_m in m_options:
             def_m_idx = m_options.index(curr_m)
@@ -206,17 +199,12 @@ def update_record_dialog_t1(row_data, pk_col):
                 new_m_id = m_dict.get(e_machine_lbl, curr_m_id)
             else:
                 btn_disabled = True
-    
-    # 🚫 ถ้าเป็น User / Manager: ล็อคช่องสาขาและเครื่องจักร
     else:
-        with c_top1:
-            st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e1_br_{rec_id}")
-        with c_top2:
-            st.text_input("⚙️ 2. เครื่องจักร (ไม่อนุญาตให้แก้ไข)", value=curr_m, disabled=True, key=f"e1_m_{rec_id}")
+        with c_top1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e1_br_{rec_id}")
+        with c_top2: st.text_input("⚙️ 2. เครื่องจักร (ไม่อนุญาตให้แก้ไข)", value=curr_m, disabled=True, key=f"e1_m_{rec_id}")
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
-    # 🎯 ฟอร์มกรอกข้อมูลตัวเลขและวันที่ (แก้ไขได้ทุกคน)
     col1, col2 = st.columns(2)
     with col1:
         e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
@@ -230,7 +218,6 @@ def update_record_dialog_t1(row_data, pk_col):
         try:
             conn = get_db_connection()
             with conn.cursor() as cur:
-                # อัปเดตข้อมูลรวมถึง branch_id และ machine_id (ถ้าไม่ใช่แอดมินค่าจะคงเดิม)
                 cur.execute(f"UPDATE machine_trans SET branch_id=%s, machine_id=%s, record_date=%s, machine_qty=%s, working_hours=%s, breakdown_hours=%s, remarks=%s, updated_at=NOW() WHERE {pk_col}=%s",
                             (new_branch_id, new_m_id, e_date, e_qty, e_work, e_break, e_rem, rec_id))
                 conn.commit()
@@ -245,7 +232,6 @@ def update_record_dialog_t1(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 2)", width="large")
 def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2):
     rec_id = row_data[pk_col]
-    
     curr_branch = str(row_data.get('branch_name') or '')
     curr_type = str(row_data.get('type_name') or '')
     curr_code = str(row_data.get('engine_code') or '')
@@ -253,18 +239,12 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
 
     st.info(f"ID: {rec_id} | วันที่: {row_data.get('record_date')} | ทะเบียนเดิม: {curr_code} ({curr_branch})")
     
-    # 🎯 ตรวจสอบสิทธิ์ผู้ใช้งาน
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
-    
     c_sel1, c_sel2, c_sel3 = st.columns(3)
     
-    new_type = curr_type
-    new_code = curr_code
-    inputs_disabled = False
-    e_branch = curr_branch # สำรองไว้หา ID กรณีแอดมินแก้สาขา
+    new_type, new_code, inputs_disabled, e_branch = curr_type, curr_code, False, curr_branch 
 
-    # 🌟 ถ้าเป็นแอดมิน: ให้แสดง Dropdown เลือกข้อมูลรถได้
     if current_role == "admin":
         all_engines = []
         try:
@@ -273,10 +253,8 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
                 sql = """SELECT CONVERT(e.machine_name USING utf8mb4) AS engine_code, 
                                 CONVERT(et.type_name USING utf8mb4) AS type_name, 
                                 CONVERT(b.branch_name USING utf8mb4) AS branch_name 
-                         FROM machines_set e 
-                         LEFT JOIN engine_types et ON e.engine_type_id = et.id 
-                         LEFT JOIN branches b ON e.branch_id = b.id 
-                         WHERE e.machine_type = 'engine' AND e.is_active = 1"""
+                         FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id 
+                         LEFT JOIN branches b ON e.branch_id = b.id WHERE e.machine_type = 'engine' AND e.is_active = 1"""
                 cur.execute(sql)
                 all_engines = cur.fetchall()
             conn.close()
@@ -291,7 +269,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
             filtered_by_branch = [e for e in all_engines if e['branch_name'] == e_branch]
             available_types = sorted(list(set([e['type_name'] for e in filtered_by_branch if e['type_name']])))
         else:
-            available_types = []; filtered_by_branch = []
+            available_types, filtered_by_branch = [], []
             
         def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
         e_type = c_sel2.selectbox("🚜 2. แก้ไขชนิดรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
@@ -301,25 +279,19 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
             filtered_by_type = [e for e in filtered_by_branch if e['type_name'] == e_type]
             available_codes = sorted(list(set([e['engine_code'] for e in filtered_by_type if e['engine_code']])))
         else:
-            available_codes = []; filtered_by_type = []
+            available_codes, filtered_by_type = [], []
             
         def_code_idx = available_codes.index(curr_code) + 1 if (curr_code in available_codes and e_type == curr_type and e_branch == curr_branch) else 0
         e_code = c_sel3.selectbox("🏷️ 3. แก้ไขทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled)
         
         inputs_disabled = (e_code == "-- เลือกรถ --") or f2_code_disabled
-        if not inputs_disabled:
-            new_type = e_type
-            new_code = e_code
-
-    # 🚫 ถ้าเป็น User / Manager: ล็อคช่องสาขาและรถยนต์
+        if not inputs_disabled: new_type, new_code = e_type, e_code
     else:
         with c_sel1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e2_br_{rec_id}")
         with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ (ไม่อนุญาตให้แก้ไข)", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}")
         with c_sel3: st.text_input("🏷️ 3. รหัสงาน / ทะเบียนรถ (ไม่อนุญาตให้แก้ไข)", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}")
 
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    
-    # 🎯 ฟอร์มกรอกข้อมูลทั่วไป (แก้ไขได้ทุกคน)
     col1, col2 = st.columns(2)
     with col1:
         e_date = st.date_input("วันที่", value=pd.to_datetime(row_data.get('record_date')), format="DD/MM/YYYY", key=f"e2_dt_{rec_id}")
@@ -331,8 +303,6 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
         try:
             u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
-            
-            # ค้นหา Branch ID ถ้าแอดมินแก้ไขสาขาใหม่ (ถ้าไม่ใช่แอดมินจะใช้ ID เดิม)
             new_branch_id = curr_branch_id
             conn = get_db_connection()
             with conn.cursor() as cur:
@@ -341,7 +311,6 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
                     b_res = cur.fetchone()
                     if b_res: new_branch_id = b_res['id']
 
-                # เซฟข้อมูลทับไปเลย
                 cur.execute(f"""UPDATE fuel_records SET branch_id=%s, record_date=%s, engine_code=CONVERT(%s USING utf8mb4), type_name=CONVERT(%s USING utf8mb4), 
                                fuel_liters=%s, working_hours=%s, liter_hr=%s, remark=CONVERT(%s USING utf8mb4) WHERE {pk_col}=%s""",
                             (new_branch_id, e_date, new_code, new_type, e_liters, e_work, u_liter_hr, e_rem, rec_id))
@@ -374,7 +343,6 @@ def update_record_dialog_t3(row_data, pk_col):
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    
     col1, col2 = st.columns(2)
     with col1:
         e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
@@ -432,8 +400,7 @@ def update_record_dialog_t4(row_data, pk_col):
     curr_b = str(row_data.get('boiler_name') or '')
     b_idx = b_options.index(curr_b) if (curr_b in b_options and e_branch_lbl == curr_branch) else 0
 
-    with c_top2:
-        e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
+    with c_top2: e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
@@ -477,10 +444,8 @@ def update_record_dialog_oven(row_data, pk_col):
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
-    if str(raw_role).strip().lower() in ["admin", "reporter"]: 
-        edit_branch_options = list(branch_dict.keys())
-    else: 
-        edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
+    if str(raw_role).strip().lower() in ["admin", "reporter"]: edit_branch_options = list(branch_dict.keys())
+    else: edit_branch_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
     
     curr_branch = str(row_data.get('branch_name') or '')
     def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
@@ -530,32 +495,24 @@ def show_summary_report_dialog_t4(boiler_dict):
             st.components.v1.html(boiler_dict[b_name], height=600, scrolling=True)
 
 # ==========================================================
-# 🚀 3. ฟังก์ชันกลางจัดการ Pagination ลดโค้ดซ้ำซ้อน
+# 🚀 3. ฟังก์ชันกลางจัดการ Pagination
 # ==========================================================
 def render_custom_pagination(data_list, session_prefix, default_rows=15):
-    """ฟังก์ชันกลางจัดการ Pagination ลดโค้ดซ้ำซ้อนสำหรับตารางทั้งหมด"""
     total_records = len(data_list)
     rows_key = f"{session_prefix}_rows"
     page_key = f"{session_prefix}_page"
 
-    if rows_key not in st.session_state:
-        st.session_state[rows_key] = default_rows
-    if page_key not in st.session_state:
-        st.session_state[page_key] = 1
+    if rows_key not in st.session_state: st.session_state[rows_key] = default_rows
+    if page_key not in st.session_state: st.session_state[page_key] = 1
 
     rows_per_page = st.session_state[rows_key]
     
-    if rows_per_page <= 0:
-        total_pages = 1
-    elif rows_per_page >= total_records:
-        total_pages = 1
-    else:
-        total_pages = max(1, math.ceil(total_records / rows_per_page))
+    if rows_per_page <= 0: total_pages = 1
+    elif rows_per_page >= total_records: total_pages = 1
+    else: total_pages = max(1, math.ceil(total_records / rows_per_page))
 
-    if st.session_state[page_key] > total_pages:
-        st.session_state[page_key] = total_pages
-    if st.session_state[page_key] < 1:
-        st.session_state[page_key] = 1
+    if st.session_state[page_key] > total_pages: st.session_state[page_key] = total_pages
+    if st.session_state[page_key] < 1: st.session_state[page_key] = 1
 
     pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
     with pc1: 
@@ -586,10 +543,8 @@ def render_custom_pagination(data_list, session_prefix, default_rows=15):
                 st.session_state[page_key] += 1
                 st.rerun()
 
-    if rows_per_page <= 0:
-        return []
-    elif rows_per_page >= total_records:
-        return data_list
+    if rows_per_page <= 0: return []
+    elif rows_per_page >= total_records: return data_list
     else:
         start_idx = (st.session_state[page_key] - 1) * rows_per_page
         end_idx = start_idx + rows_per_page
@@ -643,10 +598,8 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     
     color_palette = ["D9E1F2", "E2EFDA", "FFF2CC", "FCE4D6", "F2F2F2", "EDEDED"]
     new_color_idx = 0
-    
     machines_config = []
     display_name_map = {} 
-    
     for m_name in sorted(list(unique_m_names)):
         disp_name = m_name
         assigned_hex = None
@@ -655,33 +608,26 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
                 disp_name = f"{m_name}{v['suffix']}"
                 assigned_hex = v["hex"]
                 break
-        
         if not assigned_hex:
             assigned_hex = color_palette[new_color_idx % len(color_palette)]
             new_color_idx += 1
-            
         machines_config.append({"name": disp_name, "hex": assigned_hex})
         display_name_map[m_name] = disp_name
         
-    if not machines_config:
-        return [], None, None
+    if not machines_config: return [], None, None
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
-
     matrix_data = {d: {m['name']: {'qty': 0, 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, days_in_month + 1)}
     
     for row_m in raw_data:
         d_num = pd.to_datetime(row_m['record_date']).day
         m_db_name = str(row_m.get('machine_name') or '').strip()
         if not m_db_name: continue
-        
         mapped_name = display_name_map[m_db_name]
-        
         w_hr = float(row_m.get('working_hours') or 0.0)
         b_hr = float(row_m.get('breakdown_hours') or 0.0)
         qty = int(row_m.get('machine_qty') or 0)
-        
         matrix_data[d_num][mapped_name]['qty'] += qty
         matrix_data[d_num][mapped_name]['work'] += w_hr
         matrix_data[d_num][mapped_name]['break'] += b_hr
@@ -706,7 +652,6 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     align_center, align_right = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center")
     thin_border = Border(left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"), top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000"))
     fill_banner, fill_green = PatternFill(start_color="F8CBAD", end_color="F8CBAD", fill_type="solid"), PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-    
     last_col_letter = get_column_letter(1 + len(active_machines_config) * 3)
 
     ws.merge_cells(f"A1:{last_col_letter}1"); ws["A1"] = f"บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}"; ws["A1"].font, ws["A1"].alignment = font_title, align_center
@@ -769,18 +714,12 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     wb.save(excel_buffer)
     excel_data = excel_buffer.getvalue()
 
-    # =========================================================
-    # 🎯 ส่วนสร้าง HTML สำหรับ Print (หั่นตารางแก้ปัญหาล้นหน้า A4)
-    # =========================================================
-    
     MACHINES_PER_PAGE = 10 
     machine_chunks = [active_machines_config[i:i + MACHINES_PER_PAGE] for i in range(0, len(active_machines_config), MACHINES_PER_PAGE)]
     all_tables_html = ""
-    
     for chunk_idx, chunk_machines in enumerate(machine_chunks):
         header_row1 = "".join([f'<th colspan="3" style="background-color:#{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in chunk_machines])
         header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in chunk_machines])
-
         body_rows = ""
         for day in range(1, days_in_month + 1):
             body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
@@ -790,11 +729,9 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
                     q_val = str(item['qty']) if item['qty'] > 0 else "-"
                     w_val = f"{item['work']:,.2f}" if item['work'] > 0 else "-"
                     b_val = f"{item['break']:,.2f}" if item['break'] > 0 else "-"
-                else:
-                    q_val, w_val, b_val = "", "", ""
+                else: q_val, w_val, b_val = "", "", ""
                 body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{q_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{w_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{b_val}</td>'
             body_rows += '</tr>'
-
         total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
         for m in chunk_machines:
             m_n = m['name']
@@ -802,58 +739,15 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
             tb_s = f"{totals_break[m_n]:,.2f}" if totals_break[m_n] > 0 else '-'
             total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
         total_row_html += '</tr>'
-        
         pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
-        for m in chunk_machines:
-            pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
+        for m in chunk_machines: pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
         pct_row_html += '</tr>'
-
         page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(machine_chunks)}</div>" if len(machine_chunks) > 1 else ""
-        
-        single_table = f"""
-        <div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div>
-        <div class="banner">สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}</div>
-        {page_info}
-        <table>
-            <thead>
-                <tr>
-                    <th rowspan="2" style="background-color:#E2EFDA;border:1px solid #000;padding:3px;font-size:10px;width:35px;color:#000000 !important;">วันที่</th>
-                    {header_row1}
-                </tr>
-                <tr>{header_row2}</tr>
-            </thead>
-            <tbody>
-                {body_rows}
-                {total_row_html}
-                {pct_row_html}
-            </tbody>
-        </table>
-        """
+        single_table = f"""<div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class="banner">สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}</div>{page_info}<table><thead><tr><th rowspan="2" style="background-color:#E2EFDA;border:1px solid #000;padding:3px;font-size:10px;width:35px;color:#000000 !important;">วันที่</th>{header_row1}</tr><tr>{header_row2}</tr></thead><tbody>{body_rows}{total_row_html}{pct_row_html}</tbody></table>"""
         all_tables_html += single_table
-        
-        if chunk_idx < len(machine_chunks) - 1:
-            all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
+        if chunk_idx < len(machine_chunks) - 1: all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
 
-    table_full_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <title>Print</title>
-        <style>
-            @page {{ size: A4 landscape; margin: 5mm; }} 
-            body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
-            .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} 
-            .banner {{ background-color: #F8CBAD; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }} 
-            table {{ width: 100%; border-collapse: collapse; }} 
-            th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}
-        </style>
-    </head>
-    <body>
-        {all_tables_html}
-    </body>
-    </html>
-    """
+    table_full_html = f"""<!DOCTYPE html><html><head><meta charset="utf-8"><title>Print</title><style>@page {{ size: A4 landscape; margin: 5mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} .banner {{ background-color: #F8CBAD; text-align: center; font-size: 14px; font-weight: bold; padding: 5px; border: 1px solid #000; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body>{all_tables_html}</body></html>"""
     
     return raw_data, excel_data, json.dumps(table_full_html)
 
@@ -866,7 +760,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.machine_type = 'engine' AND e.is_active = 1 ORDER BY b.id ASC, e.machine_name ASC"
                 cur.execute(sql_eng)
                 engines_list = cur.fetchall()
-
                 sql_trans = "SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql_trans, (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
@@ -875,7 +768,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql_eng = f"SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id IN ({placeholders}) AND e.machine_type = 'engine' AND e.is_active = 1 ORDER BY e.machine_name ASC"
                 cur.execute(sql_eng, allowed_tuple)
                 engines_list = cur.fetchall()
-
                 sql_trans = f"SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql_trans, allowed_tuple + (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
@@ -883,7 +775,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id = %s AND e.machine_type = 'engine' AND e.is_active = 1 ORDER BY e.id ASC"
                 cur.execute(sql_eng, (b_id_t2,))
                 engines_list = cur.fetchall()
-
                 sql_trans = "SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql_trans, (b_id_t2, start_date_str, end_date_str))
                 raw_data = cur.fetchall()
@@ -905,8 +796,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             engine_details_t2[lbl] = {'code': code, 'type': t_name}
     engine_lbl_list = list(engine_options_t2.keys())
 
-    if not raw_data:
-        return [], None, None, engine_lbl_list, engine_details_t2
+    if not raw_data: return [], None, None, engine_lbl_list, engine_details_t2
 
     real_type_map = {}
     for r in raw_data:
@@ -915,8 +805,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             try: b_short = b_name.split("สาขา ")[1].split()[0]
             except: b_short = b_name
             k = f"{code}_{b_short}".lower()
-        else:
-            k = code.lower()
+        else: k = code.lower()
         if t_name: real_type_map[k] = t_name
 
     seen_keys, all_engines_config = set(), []
@@ -927,9 +816,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 try: b_short = b_name.split("สาขา ")[1].split()[0]
                 except: b_short = b_name
                 eng_key, title_name = f"{code}_{b_short}", f"{code} [{b_short}]"
-            else:
-                eng_key, title_name = code, code
-
+            else: eng_key, title_name = code, code
             if not code or eng_key.lower() in seen_keys: continue
             seen_keys.add(eng_key.lower())
             type_nm = real_type_map.get(eng_key.lower()) or str(eng.get('type_name') or 'TOYOTA')
@@ -938,19 +825,15 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
-
     matrix_data = {d: {e['key']: {'liters': 0.0, 'hours': 0.0, 'has_data': False} for e in all_engines_config} for d in range(1, days_in_month + 1)}
     for r in raw_data:
         d_num = pd.to_datetime(r['record_date']).day
         e_code, b_name = str(r.get('engine_code') or '').strip(), str(r.get('branch_name') or '').strip()
-        
         if b_id_t2 in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"] and b_name:
             try: b_short = b_name.split("สาขา ")[1].split()[0]
             except: b_short = b_name
             match_key = f"{e_code}_{b_short}"
-        else:
-            match_key = e_code
-        
+        else: match_key = e_code
         for e in all_engines_config:
             if e['key'].lower() == match_key.lower():
                 matrix_data[d_num][e['key']]['liters'] += float(r.get('fuel_liters') or 0.0)
@@ -1066,7 +949,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
         ws[f"A{current_row}"] = row_label
         ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_total, align_center, thin_border
         if bg_color: ws[f"A{current_row}"].fill = bg_color
-        
         c_i = 2
         for e in engines_config:
             val = target_data.get(e['key'], "-")
@@ -1075,7 +957,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             cell.font, cell.alignment, cell.border = (font_header_white if font_style == font_header_white else font_style), align_style, thin_border
             if bg_color: cell.fill = bg_color
             if isinstance(val, (int, float)) and font_style != font_header_white: cell.number_format = '#,##0.00'
-            
             if bg_color and font_style != font_total:
                 ws.merge_cells(f"{get_column_letter(c_i)}{current_row}:{get_column_letter(c_i+2)}{current_row}")
                 for off in [1, 2]:
@@ -1087,13 +968,11 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 ws[f"{get_column_letter(c_i+2)}{current_row}"] = val if isinstance(val, str) else ""
                 for off in [1, 2]: ws[f"{get_column_letter(c_i+off)}{current_row}"].border = thin_border
             c_i += 3
-            
         for sum_val in [toyo_data, tck_data]:
             ws[f"{get_column_letter(c_i)}{current_row}"] = sum_val
             cell = ws[f"{get_column_letter(c_i)}{current_row}"]
             cell.font, cell.alignment, cell.border = (font_header_white if font_style == font_header_white else font_style), align_style, thin_border
             if bg_color: cell.fill = bg_color
-            
             if bg_color and font_style != font_total:
                 ws.merge_cells(f"{get_column_letter(c_i)}{current_row}:{get_column_letter(c_i+2)}{current_row}")
                 for off in [1, 2]:
@@ -1148,44 +1027,30 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
 
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
-
-    # =========================================================
-    # 🎯 ส่วนสร้าง HTML สำหรับ Print (หั่นตารางแก้ปัญหาล้นหน้า A4)
-    # =========================================================
     
     ENGINES_PER_PAGE = 10 
     engine_chunks = [engines_config[i:i + ENGINES_PER_PAGE] for i in range(0, len(engines_config), ENGINES_PER_PAGE)]
     all_tables_html = ""
-    
     for chunk_idx, chunk_engines in enumerate(engine_chunks):
         is_last_chunk = (chunk_idx == len(engine_chunks) - 1) 
-
         header_row1 = "".join([f'<th colspan="3" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in chunk_engines])
-        if is_last_chunk:
-            header_row1 += '<th colspan="3" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th><th colspan="3" style="background-color:#FFC000;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">TCK</th>'
-
+        if is_last_chunk: header_row1 += '<th colspan="3" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th><th colspan="3" style="background-color:#FFC000;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">TCK</th>'
         header_row2 = "".join([f'<th colspan="3" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in chunk_engines])
-
         header_row3_cols = len(chunk_engines) + (2 if is_last_chunk else 0)
         header_row3 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>' for _ in range(header_row3_cols)])
-
         body_rows = ""
         for day in range(1, days_in_month + 1):
             body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
-            
             for e in chunk_engines:
                 item = matrix_data[day][e['key']]
                 h_val, l_val, r_val = (f"{item['hours']:,.2f}", f"{item['liters']:,.2f}", f"{(item['liters']/item['hours']):,.2f}") if item['has_data'] and item['hours']>0 else ("-", "-", "-")
                 body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{h_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
-            
             if is_last_chunk:
                 for grp_k in ['toyo', 'tck']:
                     grp_item = summary_matrix[day][grp_k]
                     th_s, tl_s, tr_s = (f"{grp_item['hours']:,.2f}", f"{grp_item['liters']:,.2f}", f"{(grp_item['liters']/grp_item['hours']):,.2f}") if grp_item['hours']>0 else ("-", "-", "-")
                     body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{th_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tl_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tr_s}</td>'
-            
             body_rows += '</tr>'
-
         total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
         for e in chunk_engines:
             c_key = e['key']
@@ -1193,61 +1058,18 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             t_l = f"{totals_liters[c_key]:,.2f}" if totals_liters[c_key] > 0 else "-"
             t_r = avg_l_hr[c_key]
             total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_r}</td>'
-        
         if is_last_chunk:
             for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
                 th_s = f"{th:,.2f}" if th > 0 else "-"
                 tl_s = f"{tl:,.2f}" if tl > 0 else "-"
                 total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tr}</td>'
         total_row_html += '</tr>'
-
         page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(engine_chunks)}</div>" if len(engine_chunks) > 1 else ""
-        
-        single_table = f"""
-        <div class='header-title'>บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div>
-        <div class='banner'>รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div>
-        {page_info}
-        <table>
-            <thead>
-                <tr>
-                    <th rowspan='3' style='border:1px solid #000;padding:3px;font-size:10px;width:35px;'>วันที่</th>
-                    {header_row1}
-                </tr>
-                <tr>{header_row2}</tr>
-                <tr>{header_row3}</tr>
-            </thead>
-            <tbody>
-                {body_rows}
-                {total_row_html}
-            </tbody>
-        </table>
-        """
+        single_table = f"<div class='header-title'>บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class='banner'>รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div>{page_info}<table><thead><tr><th rowspan='3' style='border:1px solid #000;padding:3px;font-size:10px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table>"
         all_tables_html += single_table
+        if not is_last_chunk: all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
 
-        if not is_last_chunk:
-            all_tables_html += "<div style='page-break-after: always; margin-bottom: 30px;'></div>"
-
-    table_full_html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset='utf-8'>
-        <title>Print</title>
-        <style>
-            @page {{ size: A4 landscape; margin: 4mm; }} 
-            body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
-            .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} 
-            .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }} 
-            table {{ width: 100%; border-collapse: collapse; }} 
-            th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}
-        </style>
-    </head>
-    <body>
-        {all_tables_html}
-    </body>
-    </html>
-    """
-    
+    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body>{all_tables_html}</body></html>"
     return raw_data, excel_buffer.getvalue(), json.dumps(table_full_html), engine_lbl_list, engine_details_t2
 
 @st.cache_data(show_spinner=False)
@@ -1272,7 +1094,6 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         return [], None, None
 
     if not raw_data: return [], None, None
-
     seen_b_keys, branches_config = set(), []
     for r in raw_data:
         b_name = str(r.get('branch_name') or '').strip()
@@ -1281,12 +1102,10 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         if b_code.lower() not in seen_b_keys:
             seen_b_keys.add(b_code.lower())
             branches_config.append({"code": b_code, "full_name": b_name})
-
     if not branches_config: branches_config = [{"code": "WU", "full_name": selected_branch_display}]
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
-
     matrix_data = {d: {b['code']: {'total': 0.0, 'drop': 0.0, 'pm': 0.0, 'non_pm': 0.0, 'remark': '', 'has_data': False} for b in branches_config} for d in range(1, days_in_month + 1)}
     for r in raw_data:
         d_num = pd.to_datetime(r['record_date']).day
@@ -1297,7 +1116,6 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
             if b['code'].lower() == b_code.lower():
                 matrix_data[d_num][b['code']] = {'total': float(r.get('total_count') or 0.0), 'drop': float(r.get('total_drop') or 0.0), 'pm': float(r.get('pm_drop') or 0.0), 'non_pm': float(r.get('non_pm_drop') or 0.0), 'remark': str(r.get('remark') or '').strip(), 'has_data': True}
                 break
-
     branch_totals = {}
     for b in branches_config:
         b_code = b['code']
@@ -1315,32 +1133,13 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
     ws = wb.active
     ws.title = "Pressure Report Matrix"
     ws.views.sheetView[0].showGridLines = True
-    
-    # 🎨 1. ชุดสีและฟอนต์แบบ Minimalist (Slate & Soft Blue)
-    font_title = Font(name="Sarabun", size=14, bold=True, color="FFFFFF") # ตัวหนังสือขาว
-    font_banner = Font(name="Sarabun", size=12, bold=True, color="334155") # สีเทาเข้ม
-    font_header = Font(name="Sarabun", size=10, bold=True, color="1E293B") # สีกรมท่าเกือบดำ
-    font_body = Font(name="Sarabun", size=9, color="1E293B")
-    font_body_bold = Font(name="Sarabun", size=9, bold=True, color="1E293B")
-    font_total = Font(name="Sarabun", size=10, bold=True, color="1E293B")
-    font_total_red = Font(name="Sarabun", size=10, bold=True, color="D32F2F") # สีแดงแบบ Soft
-    font_total_blue = Font(name="Sarabun", size=10, bold=True, color="1976D2") # สีน้ำเงินแบบ Soft
-    
+    font_title, font_banner, font_header, font_body, font_body_bold, font_total, font_total_red, font_total_blue = Font(name="Sarabun", size=14, bold=True, color="FFFFFF"), Font(name="Sarabun", size=12, bold=True, color="334155"), Font(name="Sarabun", size=10, bold=True, color="1E293B"), Font(name="Sarabun", size=9, color="1E293B"), Font(name="Sarabun", size=9, bold=True, color="1E293B"), Font(name="Sarabun", size=10, bold=True, color="1E293B"), Font(name="Sarabun", size=10, bold=True, color="D32F2F"), Font(name="Sarabun", size=10, bold=True, color="1976D2")
     align_center, align_right, align_left = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center"), Alignment(horizontal="left", vertical="center")
-    
-    bd_color = "94A3B8" # สีเทาอ่อนสำหรับเส้นขอบ
+    bd_color = "94A3B8"
     thin_border = Border(left=Side(style="thin", color=bd_color), right=Side(style="thin", color=bd_color), top=Side(style="thin", color=bd_color), bottom=Side(style="thin", color=bd_color))
-    
-    fill_title = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid") # สีกรมท่า (Dark Slate)
-    fill_banner_bg = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid") # สีเทาขาว (Slate 50)
-    fill_header_1 = PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid") # สีเทาอ่อน (Slate 200)
-    fill_header_2 = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid") # สีเทาสว่าง (Slate 100)
-    fill_drop_bg = PatternFill(start_color="FFFBEB", end_color="FFFBEB", fill_type="solid") # สีเหลืองพาสเทลอ่อนๆ
-    fill_total_bg = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid") # สีเทาสว่าง
+    fill_title, fill_banner_bg, fill_header_1, fill_header_2, fill_drop_bg, fill_total_bg = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid"), PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid"), PatternFill(start_color="E2E8F0", end_color="E2E8F0", fill_type="solid"), PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid"), PatternFill(start_color="FFFBEB", end_color="FFFBEB", fill_type="solid"), PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
 
     last_col_letter = get_column_letter(1 + (len(branches_config) * 8))
-
-    # 🎨 2. สร้าง Header ของ Excel
     ws.merge_cells(f"A1:{last_col_letter}1"); ws["A1"] = "รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ"; ws["A1"].font, ws["A1"].alignment, ws["A1"].fill, ws["A1"].border = font_title, align_center, fill_title, thin_border
     ws.merge_cells(f"A2:{last_col_letter}2"); ws["A2"] = f"ประจำเดือน {month_str} {year_buddhist}"; ws["A2"].font, ws["A2"].alignment, ws["A2"].fill, ws["A2"].border = font_banner, align_center, fill_banner_bg, thin_border
     ws.merge_cells("A3:A5"); ws["A3"] = "วันที่"; ws["A3"].font, ws["A3"].alignment, ws["A3"].fill, ws["A3"].border = font_header, align_center, fill_header_1, thin_border
@@ -1351,18 +1150,13 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         st_c, en_c = get_column_letter(col_idx), get_column_letter(col_idx + 7)
         ws.merge_cells(f"{st_c}3:{en_c}3"); ws[f"{st_c}3"] = b["code"]; ws[f"{st_c}3"].font, ws[f"{st_c}3"].alignment, ws[f"{st_c}3"].fill, ws[f"{st_c}3"].border = font_header, align_center, fill_header_1, thin_border
         for c in range(col_idx, col_idx + 8): ws[f"{get_column_letter(c)}3"].border = thin_border
-        
         c_cnt, c_drp_st, c_drp_en, c_pct_st, c_pct_en, c_rem = get_column_letter(col_idx), get_column_letter(col_idx + 1), get_column_letter(col_idx + 3), get_column_letter(col_idx + 4), get_column_letter(col_idx + 6), get_column_letter(col_idx + 7)
         ws[f"{c_cnt}4"] = "นับทั้งหมด"; ws.merge_cells(f"{c_drp_st}4:{c_drp_en}4"); ws[f"{c_drp_st}4"] = "แรงดันตก (ครั้ง)"; ws.merge_cells(f"{c_pct_st}4:{c_pct_en}4"); ws[f"{c_pct_st}4"] = "แรงดันตก (%)"; ws[f"{c_rem}4"] = "หมายเหตุ"
-        for c_i in range(col_idx, col_idx + 8): 
-            cell_h = ws[f"{get_column_letter(c_i)}4"]; cell_h.font, cell_h.alignment, cell_h.fill, cell_h.border = font_header, align_center, fill_header_2, thin_border
-            
+        for c_i in range(col_idx, col_idx + 8): cell_h = ws[f"{get_column_letter(c_i)}4"]; cell_h.font, cell_h.alignment, cell_h.fill, cell_h.border = font_header, align_center, fill_header_2, thin_border
         sub_cols = ["จำนวน\n(ครั้ง)", "ตกทั้งหมด", "ตกตาม\nเงื่อนไขPM", "เกินนอกเหนือ\nจากการPM", "ตกทั้งหมด", "ตกตาม\nเงื่อนไขPM", "เกินนอกเหนือ\nจากการPM", ""]
-        for i, sh in enumerate(sub_cols): 
-            cell_ref = f"{get_column_letter(col_idx + i)}5"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].fill, ws[cell_ref].border = Font(name="Sarabun", size=9, bold=True, color="475569"), align_center, fill_banner_bg, thin_border
+        for i, sh in enumerate(sub_cols): cell_ref = f"{get_column_letter(col_idx + i)}5"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].fill, ws[cell_ref].border = Font(name="Sarabun", size=9, bold=True, color="475569"), align_center, fill_banner_bg, thin_border
         col_idx += 8
 
-    # 🎨 3. สร้าง Body ของ Excel
     current_row = 6
     for day in range(1, days_in_month + 1):
         ws[f"A{current_row}"] = day; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_body_bold, align_center, thin_border
@@ -1370,28 +1164,16 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         for b in branches_config:
             item = matrix_data[day][b['code']]
             if item['has_data']:
-                ws[f"{get_column_letter(c_idx)}{current_row}"].value = item['total']
-                ws[f"{get_column_letter(c_idx+1)}{current_row}"].value = item['drop']
-                ws[f"{get_column_letter(c_idx+2)}{current_row}"].value = item['pm']
-                ws[f"{get_column_letter(c_idx+3)}{current_row}"].value = item['non_pm']
-                ws[f"{get_column_letter(c_idx+4)}{current_row}"].value = f"{(item['drop']/item['total']*100):.2f}%" if item['total']>0 else "0.00%"
-                ws[f"{get_column_letter(c_idx+5)}{current_row}"].value = f"{(item['pm']/item['total']*100):.2f}%" if item['total']>0 else "0.00%"
-                ws[f"{get_column_letter(c_idx+6)}{current_row}"].value = f"{(item['non_pm']/item['total']*100):.2f}%" if item['total']>0 else "0.00%"
-                ws[f"{get_column_letter(c_idx+7)}{current_row}"].value = item['remark']
+                ws[f"{get_column_letter(c_idx)}{current_row}"].value = item['total']; ws[f"{get_column_letter(c_idx+1)}{current_row}"].value = item['drop']; ws[f"{get_column_letter(c_idx+2)}{current_row}"].value = item['pm']; ws[f"{get_column_letter(c_idx+3)}{current_row}"].value = item['non_pm']; ws[f"{get_column_letter(c_idx+4)}{current_row}"].value = f"{(item['drop']/item['total']*100):.2f}%" if item['total']>0 else "0.00%"; ws[f"{get_column_letter(c_idx+5)}{current_row}"].value = f"{(item['pm']/item['total']*100):.2f}%" if item['total']>0 else "0.00%"; ws[f"{get_column_letter(c_idx+6)}{current_row}"].value = f"{(item['non_pm']/item['total']*100):.2f}%" if item['total']>0 else "0.00%"; ws[f"{get_column_letter(c_idx+7)}{current_row}"].value = item['remark']
             for offset in range(8):
                 cell = ws[f"{get_column_letter(c_idx+offset)}{current_row}"]
                 cell.font, cell.border = font_body, thin_border
-                # สลับสีเฉพาะส่วนที่มีข้อมูล เพื่อให้ดูสบายตา ไม่เหลืองแสบตา
-                if offset < 4 and cell.value != "": 
-                    cell.alignment, cell.fill, cell.font = (align_center if offset==0 else align_right), fill_drop_bg, font_body_bold
-                elif offset >= 4 and offset < 7 and cell.value != "":
-                    cell.alignment = align_right
-                elif offset == 7:
-                    cell.alignment = align_left
+                if offset < 4 and cell.value != "": cell.alignment, cell.fill, cell.font = (align_center if offset==0 else align_right), fill_drop_bg, font_body_bold
+                elif offset >= 4 and offset < 7 and cell.value != "": cell.alignment = align_right
+                elif offset == 7: cell.alignment = align_left
             c_idx += 8
         current_row += 1
 
-    # 🎨 4. สร้าง Footer (ผลรวม) ของ Excel
     ws[f"A{current_row}"] = "รวม"; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].fill, ws[f"A{current_row}"].border = font_total, align_center, fill_total_bg, thin_border
     c_idx = 2
     for b in branches_config:
@@ -1400,32 +1182,20 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         ws[f"{get_column_letter(c_idx+1)}{current_row}"] = bt['drop'] if bt['drop'] > 0 else "-"
         ws[f"{get_column_letter(c_idx+2)}{current_row}"] = bt['pm'] if bt['pm'] > 0 else "-"
         ws[f"{get_column_letter(c_idx+3)}{current_row}"] = bt['non_pm'] if bt['non_pm'] > 0 else "-"
-        ws[f"{get_column_letter(c_idx+4)}{current_row}"] = bt['p_tot']
-        ws[f"{get_column_letter(c_idx+5)}{current_row}"] = bt['p_pm']
-        ws[f"{get_column_letter(c_idx+6)}{current_row}"] = bt['p_npm']
-
+        ws[f"{get_column_letter(c_idx+4)}{current_row}"] = bt['p_tot']; ws[f"{get_column_letter(c_idx+5)}{current_row}"] = bt['p_pm']; ws[f"{get_column_letter(c_idx+6)}{current_row}"] = bt['p_npm']
         for offset in range(8): 
-            cell = ws[f"{get_column_letter(c_idx+offset)}{current_row}"]
-            cell.fill, cell.border = fill_total_bg, thin_border
-            
+            cell = ws[f"{get_column_letter(c_idx+offset)}{current_row}"]; cell.fill, cell.border = fill_total_bg, thin_border
         ws[f"{get_column_letter(c_idx)}{current_row}"].font, ws[f"{get_column_letter(c_idx)}{current_row}"].alignment = font_total, align_center
-        for offset in range(1, 4):
-            ws[f"{get_column_letter(c_idx+offset)}{current_row}"].font, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment = font_total, align_right
-
+        for offset in range(1, 4): ws[f"{get_column_letter(c_idx+offset)}{current_row}"].font, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment = font_total, align_right
         ws[f"{get_column_letter(c_idx+4)}{current_row}"].font, ws[f"{get_column_letter(c_idx+4)}{current_row}"].alignment = font_total_red, align_right
         ws[f"{get_column_letter(c_idx+5)}{current_row}"].font, ws[f"{get_column_letter(c_idx+5)}{current_row}"].alignment = font_total, align_right
         ws[f"{get_column_letter(c_idx+6)}{current_row}"].font, ws[f"{get_column_letter(c_idx+6)}{current_row}"].alignment = font_total_blue, align_right
         c_idx += 8
 
     ws.column_dimensions['A'].width = 8
-    for c in range(2, col_idx):
-        ws.column_dimensions[get_column_letter(c)].width = 13
+    for c in range(2, col_idx): ws.column_dimensions[get_column_letter(c)].width = 13
+    excel_buffer = io.BytesIO(); wb.save(excel_buffer); excel_data = excel_buffer.getvalue()
 
-    excel_buffer = io.BytesIO()
-    wb.save(excel_buffer)
-    excel_data = excel_buffer.getvalue()
-
-    # 🎨 5. สร้าง HTML สำหรับแสดงบนหน้าเว็บ (สีแมตช์กับ Excel ด้านบนเป๊ะๆ)
     header_row1 = "".join([f'<th colspan="8" style="background-color:#E2E8F0;color:#1E293B;border:1px solid #CBD5E1;padding:6px;font-size:12px;text-align:center;">{b["code"]}</th>' for b in branches_config])
     header_row2 = "".join(['<th style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">นับทั้งหมด</th><th colspan="3" style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">แรงดันตก (ครั้ง)</th><th colspan="3" style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">แรงดันตก (%)</th><th style="background-color:#F1F5F9;color:#1E293B;border:1px solid #CBD5E1;padding:4px;font-size:10px;">หมายเหตุ</th>' for _ in branches_config])
     header_row3 = "".join(['<th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">จำนวน<br>(ครั้ง)</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">ตกทั้งหมด</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:35px;">ตกทั้งหมด</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">ตกตาม<br>เงื่อนไขPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:45px;">เกินนอกเหนือ<br>จากการPM</th><th style="background-color:#F8FAFC;color:#475569;border:1px solid #CBD5E1;padding:4px;font-size:9px;width:100px;"></th>' for _ in branches_config])
@@ -1442,9 +1212,7 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
                 p_pm_s = f"{(item['pm'] / item['total'] * 100):.2f}%" if item['total'] > 0 else "0.00%"
                 p_npm_s = f"{(item['non_pm'] / item['total'] * 100):.2f}%" if item['total'] > 0 else "0.00%"
                 rem_s = item['remark']
-            else:
-                c_tot_s, c_drp_s, c_pm_s, c_npm_s, p_drp_s, p_pm_s, p_npm_s, rem_s = "", "", "", "", "", "", "", ""
-                
+            else: c_tot_s, c_drp_s, c_pm_s, c_npm_s, p_drp_s, p_pm_s, p_npm_s, rem_s = "", "", "", "", "", "", "", ""
             body_rows += f'<td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:center;font-size:10px;font-weight:bold;">{c_tot_s}</td><td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;font-weight:bold;">{c_drp_s}</td><td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;font-weight:bold;">{c_pm_s}</td><td style="background-color:#FFFBEB;border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;font-weight:bold;">{c_npm_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;">{p_drp_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;">{p_pm_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:right;font-size:10px;">{p_npm_s}</td><td style="border:1px solid #CBD5E1;padding:4px;text-align:left;font-size:10px;color:#475569;">{rem_s}</td>'
         body_rows += '</tr>'
 
@@ -1458,75 +1226,7 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         total_row_html += f'<td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:center;font-size:10px;font-weight:bold;">{t_cnt_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_drp_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_pm_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;">{t_npm_s}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#D32F2F;">{bt["p_tot"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#1E293B;">{bt["p_pm"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:right;font-size:10px;font-weight:bold;color:#1976D2;">{bt["p_npm"]}</td><td style="background-color:#F1F5F9;border:1px solid #CBD5E1;padding:6px;text-align:left;font-size:10px;"></td>'
     total_row_html += '</tr>'
 
-    # =========================================================
-    # 🎯 ส่วนสร้าง HTML สำหรับ Print (ดีไซน์เดิม + บีบลง 1 หน้า)
-    # =========================================================
-    table_full_html = f"""<!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset='utf-8'>
-        <title>Print</title>
-        <style>
-            /* 🎯 1. ตั้งหน้ากระดาษและลดขอบ Margin เพื่อดึงพื้นที่ว่างกลับมา */
-            @page {{ size: A4 portrait; margin: 5mm 8mm; }} 
-            
-            body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 0; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
-            
-            /* 🎯 2. คงดีไซน์ดั้งเดิมของคุณเอาไว้ (Header สีดำ) */
-            .header-banner1 {{ 
-                text-align: center; 
-                font-size: 14px; 
-                font-weight: bold; 
-                margin-bottom: 2px; 
-                padding: 4px; 
-                background-color: #2D2D2D !important; /* สีดำแบบในรูป */
-                color: #FFFFFF !important; 
-            }} 
-            
-            /* 🎯 3. ดีไซน์ดั้งเดิมแถบรอง (Sub-header สีเทา) */
-            .header-banner2 {{ 
-                text-align: center; 
-                font-size: 12px; 
-                font-weight: bold; 
-                padding: 3px; 
-                margin-bottom: 4px; 
-                background-color: #F3F4F6 !important; /* สีเทาอ่อน */
-            }} 
-            
-            table {{ width: 100%; border-collapse: collapse; }} 
-            
-            /* 🎯 4. หัวใจสำคัญ: บีบความสูงตารางเพื่อไม่ให้ตกไปหน้า 2 */
-            th, td {{ 
-                font-family: 'Sarabun', Tahoma, sans-serif; 
-                color: #000000 !important; 
-                border: 1px solid #CBD5E1 !important; 
-                padding: 1.5px 2px !important;  /* 👈 บีบช่องว่างบน-ล่างให้เหลือแค่ 1.5px */
-                font-size: 8.5px !important;      /* 👈 ลดขนาดฟอนต์ลงนิดหน่อยให้อยู่ในหน้าเดียว */
-                line-height: 1.05 !important;   /* 👈 ลดระยะห่างระหว่างบรรทัด */
-                text-align: center;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class='header-banner1'>รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div>
-        <div class='header-banner2'>ประจำเดือน {month_str} {year_buddhist}</div>
-        <table>
-            <thead>
-                <tr>
-                    <th rowspan='3' style='background-color:#F1F5F9;color:#1E293B;padding:4px;font-size:10px;width:35px;'>วันที่</th>
-                    {header_row1}
-                </tr>
-                <tr>{header_row2}</tr>
-                <tr>{header_row3}</tr>
-            </thead>
-            <tbody>
-                {body_rows}
-                {total_row_html}
-            </tbody>
-        </table>
-    </body>
-    </html>"""
-    
+    table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 portrait; margin: 5mm 8mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 0; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} .header-banner1 {{ text-align: center; font-size: 14px; font-weight: bold; margin-bottom: 2px; padding: 4px; background-color: #2D2D2D !important; color: #FFFFFF !important; }} .header-banner2 {{ text-align: center; font-size: 12px; font-weight: bold; padding: 3px; margin-bottom: 4px; background-color: #F3F4F6 !important; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; border: 1px solid #CBD5E1 !important; padding: 1.5px 2px !important; font-size: 8.5px !important; line-height: 1.05 !important; text-align: center; }}</style></head><body><div class='header-banner1'>รายงานการตกของ แรงดันไอน้ำปลายทาง ของบอยเลอร์ แบบเปรียบเทียบ</div><div class='header-banner2'>ประจำเดือน {month_str} {year_buddhist}</div><table><thead><tr><th rowspan='3' style='background-color:#F1F5F9;color:#1E293B;padding:4px;font-size:10px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table></body></html>"
     return raw_data, excel_data, json.dumps(table_full_html)
 
 @st.cache_data(show_spinner=False)
@@ -1534,7 +1234,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 🎯 1. ดึงข้อมูลค่ามาตรฐาน (STD) จากตารางใหม่
             std = {'p_cubft': 12.00, 'stm_mul': 0.1875, 'p_ton': 240.00, 'avg_p': 3.00, 'kg_ton': 300.00, 'kg_cubft': 15.00}
             cur.execute("SELECT * FROM std_settings LIMIT 1")
             s_res = cur.fetchone()
@@ -1546,12 +1245,10 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 std['kg_ton'] = float(s_res.get('std_fuel_kg_per_steam_ton', 300.00))
                 std['kg_cubft'] = float(s_res.get('std_fuel_kg_per_cubft', 15.00))
 
-            # 🎯 2. ดึงข้อมูลเชื้อเพลิงและบอยเลอร์
             if b_id_t4 == "ทั้งหมด":
                 sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
-                
                 sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, (start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
@@ -1560,7 +1257,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql = f"SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
-                
                 sql_oven = f"SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id IN ({placeholders}) AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, allowed_tuple + (start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
@@ -1568,7 +1264,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (b_id_t4, start_date_str, end_date_str))
                 raw_data = cur.fetchall()
-                
                 sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id = %s AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, (b_id_t4, start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
@@ -1579,137 +1274,74 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     
     if not raw_data and not oven_raw: return [], [], None, None
 
-    # ==============================================================================
-    # 🎯 3. เพิ่มระบบคัดกรอง: แสดงเฉพาะข้อมูลที่ลงครบทั้ง 3 ส่วน
-    # ==============================================================================
     complete_set = set()
     if oven_raw and raw_data:
         oven_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in oven_raw)
         b1_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in raw_data if str(r.get('boiler_name')) == 'บอยเลอร์ 1')
         b2_set = set((str(r.get('record_date')), str(r.get('branch_id'))) for r in raw_data if str(r.get('boiler_name')) == 'บอยเลอร์ 2')
         complete_set = oven_set.intersection(b1_set).intersection(b2_set)
-        
         oven_raw_filtered = [r for r in oven_raw if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set]
-    else:
-        oven_raw_filtered = []
+    else: oven_raw_filtered = []
 
     start_dt = pd.to_datetime(start_date_str)
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
-
-    master_summary = {}
-    grouped_data = {}
+    master_summary, grouped_data = {}, {}
 
     for r in raw_data:
         b_name = str(r.get('boiler_name') or 'บอยเลอร์ 1')
         if b_name not in grouped_data: grouped_data[b_name] = []
-        
         grouped_data[b_name].append(r)
         
         if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set:
-            bn = str(r.get('branch_name') or '-')
-            dt = r['record_date']
+            bn, dt = str(r.get('branch_name') or '-'), r['record_date']
             k = (bn, dt)
-            if k not in master_summary:
-                master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
-                
-            master_summary[k]['sw'] += float(r.get('sawdust_weight') or 0)
-            master_summary[k]['ww'] += float(r.get('wood_weight') or 0)
-            master_summary[k]['www'] += float(r.get('waste_wood_weight') or 0)
-            master_summary[k]['sp'] += float(r.get('sawdust_price') or 0)
-            master_summary[k]['wp'] += float(r.get('wood_price') or 0)
-            master_summary[k]['wwp'] += float(r.get('waste_wood_price') or 0)
-            master_summary[k]['stm'] += float(r.get('steam_production') or 0)
-            master_summary[k]['hrs'] += float(r.get('working_hours') or 0)
+            if k not in master_summary: master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
+            master_summary[k]['sw'] += float(r.get('sawdust_weight') or 0); master_summary[k]['ww'] += float(r.get('wood_weight') or 0); master_summary[k]['www'] += float(r.get('waste_wood_weight') or 0)
+            master_summary[k]['sp'] += float(r.get('sawdust_price') or 0); master_summary[k]['wp'] += float(r.get('wood_price') or 0); master_summary[k]['wwp'] += float(r.get('waste_wood_price') or 0)
+            master_summary[k]['stm'] += float(r.get('steam_production') or 0); master_summary[k]['hrs'] += float(r.get('working_hours') or 0)
 
     for o in oven_raw_filtered:
-        bn = str(o.get('branch_name') or '-')
-        dt = o['record_date']
+        bn, dt = str(o.get('branch_name') or '-'), o['record_date']
         k = (bn, dt)
-        if k not in master_summary:
-            master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
-        master_summary[k]['oven'] = float(o.get('oven_qty') or 0)
-        master_summary[k]['wood'] = float(o.get('wood_out_cubft') or 0)
-        master_summary[k]['press'] += float(o.get('avg_terminal_pressure') or 0)
-        master_summary[k]['press_cnt'] += 1
+        if k not in master_summary: master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
+        master_summary[k]['oven'] = float(o.get('oven_qty') or 0); master_summary[k]['wood'] = float(o.get('wood_out_cubft') or 0); master_summary[k]['press'] += float(o.get('avg_terminal_pressure') or 0); master_summary[k]['press_cnt'] += 1
 
     wb = Workbook()
     wb.remove(wb.active)
-    
-    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
-    f_b = Font(name="Tahoma", size=10, bold=True)
-    f_w = Font(name="Tahoma", size=10, bold=True, color="FFFFFF")
-    f_n = Font(name="Tahoma", size=10)
-    f_red = Font(name="Tahoma", size=10, color="FF0000")
-    f_bold_ul = Font(name="Tahoma", size=10, bold=True, underline="single")
-    
-    al_c = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    al_r = Alignment(horizontal="right", vertical="center")
+    f_b, f_w, f_n, f_red, f_bold_ul = Font(name="Tahoma", size=10, bold=True), Font(name="Tahoma", size=10, bold=True, color="FFFFFF"), Font(name="Tahoma", size=10), Font(name="Tahoma", size=10, color="FF0000"), Font(name="Tahoma", size=10, bold=True, underline="single")
+    al_c, al_r = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center")
     tb = Border(left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin"))
-    
-    fill_blue = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid")
-    fill_yellow = PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid")
-    fill_green = PatternFill(start_color="00B050", end_color="00B050", fill_type="solid")
-    fill_peach = PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
+    fill_blue, fill_yellow, fill_green, fill_peach = PatternFill(start_color="0070C0", end_color="0070C0", fill_type="solid"), PatternFill(start_color="FFFF00", end_color="FFFF00", fill_type="solid"), PatternFill(start_color="00B050", end_color="00B050", fill_type="solid"), PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
 
-    html_tables = ""
-    boilers_html_dict = {}
+    html_tables, boilers_html_dict = "", {}
 
-    # ==============================================================================
-    # 🎯 3.1 สร้างตารางรวม Master (บอยเลอร์ 1+2) รวมทุกสาขาที่เลือก
-    # ==============================================================================
     ws_m = wb.create_sheet(title=f"สรุปรวม 1+2")
-
-    ws_m.merge_cells("A1:AD1")
-    ws_m["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}"
-    ws_m["A1"].font = f_w; ws_m["A1"].fill = fill_blue; ws_m["A1"].alignment = al_c
-
-    headers_m = [
-        ("A2:A3","วันที่"), ("B2:B3","จำนวน\nเตาที่อบ"), ("C2:C3","ไม้อบออก\n(ลบ.ฟ.)"),
-        ("D2:F2","เชื้อเพลิงใช้(ตัน/วัน)"), ("G2:G3","รวมน.น.\nเชื้อเพลิง"), 
-        ("H2:K2","ค่าเชื้อเพลิง(บาท)"), ("L2:N2","ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)"),
-        ("O2:R2","ผลิตไอน้ำ"), ("S2:U2","ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)"),
-        ("V2:X2","แรงดันปลายทางเฉลี่ย"), ("Y2:AA2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)"),
-        ("AB2:AD2","เชื้อเพลิงใช้(กก./ลบ.ฟ.)")
-    ]
-    for cell_r, val in headers_m: 
-        ws_m.merge_cells(cell_r); ws_m[cell_r.split(":")[0]] = val
-    
-    h3_m = ["", "", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", 
-            "STD", "ผลงาน", "ผลต่าง", "ตัน/วัน", "STD\nตัน/ชม.", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง",
-            "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง"]
+    ws_m.merge_cells("A1:AD1"); ws_m["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}"; ws_m["A1"].font, ws_m["A1"].fill, ws_m["A1"].alignment = f_w, fill_blue, al_c
+    headers_m = [("A2:A3","วันที่"), ("B2:B3","จำนวน\nเตาที่อบ"), ("C2:C3","ไม้อบออก\n(ลบ.ฟ.)"), ("D2:F2","เชื้อเพลิงใช้(ตัน/วัน)"), ("G2:G3","รวมน.น.\nเชื้อเพลิง"), ("H2:K2","ค่าเชื้อเพลิง(บาท)"), ("L2:N2","ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)"), ("O2:R2","ผลิตไอน้ำ"), ("S2:U2","ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)"), ("V2:X2","แรงดันปลายทางเฉลี่ย"), ("Y2:AA2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)"), ("AB2:AD2","เชื้อเพลิงใช้(กก./ลบ.ฟ.)")]
+    for cell_r, val in headers_m: ws_m.merge_cells(cell_r); ws_m[cell_r.split(":")[0]] = val
+    h3_m = ["", "", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", "STD", "ผลงาน", "ผลต่าง", "ตัน/วัน", "STD\nตัน/ชม.", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง"]
     for idx, val in enumerate(h3_m, 1):
         if val: ws_m.cell(row=3, column=idx, value=val)
-
     for r_idx in [2, 3]:
-        for c_idx in range(1, 31):
-            c = ws_m.cell(row=r_idx, column=c_idx); c.font = f_b; c.alignment = al_c; c.border = tb
+        for c_idx in range(1, 31): c = ws_m.cell(row=r_idx, column=c_idx); c.font, c.alignment, c.border = f_b, al_c, tb
 
-    html_headers_m = """
-    <tr><th rowspan="2">วันที่</th><th rowspan="2">จำนวน<br>เตาที่อบ</th><th rowspan="2">ไม้อบออก<br>(ลบ.ฟ.)</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวมน.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)</th><th colspan="4">ผลิตไอน้ำ</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)</th><th colspan="3">แรงดันปลายทางเฉลี่ย</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ลบ.ฟ.)</th></tr>
-    <tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>ตัน/วัน</th><th>STD<br>ตัน/ชม.</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>
-    """
+    html_headers_m = """<tr><th rowspan="2">วันที่</th><th rowspan="2">จำนวน<br>เตาที่อบ</th><th rowspan="2">ไม้อบออก<br>(ลบ.ฟ.)</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวมน.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)</th><th colspan="4">ผลิตไอน้ำ</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)</th><th colspan="3">แรงดันปลายทางเฉลี่ย</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ลบ.ฟ.)</th></tr><tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>ตัน/วัน</th><th>STD<br>ตัน/ชม.</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>"""
 
     cur_row = 4; body_html_m = ""
     s_ov = s_wo = s_sw = s_ww = s_www = s_tw = s_sp = s_wp = s_wwp = s_tp = s_stm = s_hrs = s_prs = s_pcnt = 0
-
     sorted_master_data = sorted(master_summary.items(), key=lambda x: (x[0][1], x[0][0]))
 
     for k, v in sorted_master_data:
-        branch_full = k[0]
-        dt_val = k[1]
-        
+        branch_full, dt_val = k[0], k[1]
         try: b_short = branch_full.split("สาขา ")[1].split()[0]
         except: b_short = branch_full
         if not b_short or b_short == '-': b_short = "N/A"
-        
         dt = pd.to_datetime(dt_val)
         date_str = f"{dt.day:02d}/{dt.month:02d}/{(dt.year+543)%100}({b_short})"
         
-        tw = v['sw'] + v['ww'] + v['www']
-        tp = v['sp'] + v['wp'] + v['wwp']
+        tw, tp = v['sw'] + v['ww'] + v['www'], v['sp'] + v['wp'] + v['wwp']
         avg_p = v['press'] / v['press_cnt'] if v['press_cnt'] > 0 else 0
-        
         act_p_cub = tp / v['wood'] if v['wood'] > 0 else 0
         std_stm_hr = v['oven'] * std['stm_mul']
         act_stm_hr = v['stm'] / v['hrs'] if v['hrs'] > 0 else 0
@@ -1717,32 +1349,17 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         act_kg_ton = (tw * 1000) / v['stm'] if v['stm'] > 0 else 0
         act_kg_cub = (tw * 1000) / v['wood'] if v['wood'] > 0 else 0
         
-        vals = [
-            date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp,
-            std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub,
-            v['stm'], std_stm_hr, act_stm_hr, act_stm_hr - std_stm_hr,
-            std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton,
-            std['avg_p'], avg_p, avg_p - std['avg_p'],
-            std['kg_ton'], act_kg_ton, std['kg_ton'] - act_kg_ton,
-            std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub
-        ]
-        
+        vals = [date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp, std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub, v['stm'], std_stm_hr, act_stm_hr, act_stm_hr - std_stm_hr, std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton, std['avg_p'], avg_p, avg_p - std['avg_p'], std['kg_ton'], act_kg_ton, std['kg_ton'] - act_kg_ton, std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub]
         s_ov+=v['oven']; s_wo+=v['wood']; s_sw+=v['sw']; s_ww+=v['ww']; s_www+=v['www']; s_tw+=tw; s_sp+=v['sp']; s_wp+=v['wp']; s_wwp+=v['wwp']; s_tp+=tp; s_stm+=v['stm']; s_hrs+=v['hrs']; s_prs+=v['press']; s_pcnt+=v['press_cnt']
 
         body_html_m += "<tr>"
         for idx, val in enumerate(vals, 1):
-            c = ws_m.cell(row=cur_row, column=idx, value=val)
-            c.border = tb; c.alignment = al_c if idx==1 else al_r
-            
-            is_diff_col = idx in [14, 18, 21, 24, 27, 30]
-            is_std_col = idx in [12, 16, 19, 22, 25, 28]
-            if is_diff_col and val < 0: c.font = f_red
-            else: c.font = f_n
-            
-            if is_std_col: c.fill = fill_green; c.font = f_w
+            c = ws_m.cell(row=cur_row, column=idx, value=val); c.border, c.alignment = tb, al_c if idx==1 else al_r
+            is_diff_col = idx in [14, 18, 21, 24, 27, 30]; is_std_col = idx in [12, 16, 19, 22, 25, 28]
+            c.font = f_red if is_diff_col and val < 0 else f_n
+            if is_std_col: c.fill, c.font = fill_green, f_w
             elif idx in [2, 3, 23]: c.fill = fill_yellow 
             if isinstance(val, (int, float)): c.number_format = '#,##0.00'
-            
             bg = "background-color:#00B050;color:white;" if is_std_col else ("background-color:#FFFF00;" if idx in [2, 3, 23] else "")
             tc = "color:red;" if is_diff_col and val < 0 else ""
             fw = "font-weight:bold;" if idx in [7,11] else ""
@@ -1758,82 +1375,38 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     avg_kg_ton = (s_tw * 1000) / s_stm if s_stm > 0 else 0
     avg_kg_cub = (s_tw * 1000) / s_wo if s_wo > 0 else 0
 
-    f1_vals = [
-        "รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp,
-        "", avg_p_cub, std['p_cubft'] - avg_p_cub,
-        s_stm, sum_std_stm, avg_stm_hr, avg_stm_hr - sum_std_stm,
-        "", avg_p_ton, std['p_ton'] - avg_p_ton,
-        "", avg_press, avg_press - std['avg_p'],
-        "", avg_kg_ton, std['kg_ton'] - avg_kg_ton,
-        "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub
-    ]
-    
+    f1_vals = ["รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp, "", avg_p_cub, std['p_cubft'] - avg_p_cub, s_stm, sum_std_stm, avg_stm_hr, avg_stm_hr - sum_std_stm, "", avg_p_ton, std['p_ton'] - avg_p_ton, "", avg_press, avg_press - std['avg_p'], "", avg_kg_ton, std['kg_ton'] - avg_kg_ton, "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub]
     f_html_m = "<tr style='font-weight:bold; background-color:#FCE4D6;'>"
     for idx, val in enumerate(f1_vals, 1):
-        c = ws_m.cell(row=cur_row, column=idx, value=val)
-        c.border, c.font, c.alignment = tb, f_b, al_r if idx > 1 else al_c
-        c.fill = fill_peach
+        c = ws_m.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment, c.fill = tb, f_b, al_r if idx > 1 else al_c, fill_peach
         is_diff_col = idx in [14, 18, 21, 24, 27, 30]
         if is_diff_col and val != "" and val < 0: c.font = f_red
         if isinstance(val, (int, float)): c.number_format = '#,##0.00'
         tc = "color:red;" if is_diff_col and val != "" and val < 0 else ""
         f_html_m += f"<td style='{tc}text-align:{'center' if idx==1 else 'right'};'>{val if val == '' or idx==1 else f'{val:,.2f}'}</td>"
     f_html_m += "</tr>"
-    
     for i in range(1, 31): ws_m.column_dimensions[get_column_letter(i)].width = 10
     ws_m.column_dimensions['A'].width = 14
 
-    master_html = f"""<table style='margin-bottom: 30px;'><thead><tr><th colspan='30' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}</th></tr>{html_headers_m}</thead><tbody>{body_html_m}{f_html_m}</tbody></table>"""
-    
-    # 🌟 ปรับตาราง Master รวม (บอยเลอร์ 1+2) ให้ลง A4 แนวนอนได้ (ปรับฟอนต์และระยะให้เล็กที่สุด)
-    boilers_html_dict[f"🌟 รวมสาขา {selected_branch_display} (บอยเลอร์ 1+2)"] = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
-        @page {{ size: A4 landscape; margin: 4mm; }} 
-        * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
-        body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size: 8px; color: #000; margin: 0; padding: 2px; }} 
-        table {{ width: 100%; border-collapse: collapse; }} 
-        th, td {{ 
-            border: 1px solid #000; 
-            padding: 1.5px 2px !important;  
-            color: #000 !important; 
-            font-size: 7.5px !important; 
-            line-height: 1.05 !important; 
-            white-space: nowrap !important; /* 👈 บังคับไม่ให้ขึ้นบรรทัดใหม่ */
-        }} 
-        th {{ background-color: #F8F9FA; text-align: center; font-weight: bold; white-space: normal !important; }} 
-        .header-main {{ background-color: #0070C0; color: white !important; font-size: 12px; padding: 4px; }}
-    </style></head><body>{master_html}</body></html>"""
+    master_html = f"<table style='margin-bottom: 30px;'><thead><tr><th colspan='30' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}</th></tr>{html_headers_m}</thead><tbody>{body_html_m}{f_html_m}</tbody></table>"
+    boilers_html_dict[f"🌟 รวมสาขา {selected_branch_display} (บอยเลอร์ 1+2)"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 4mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size: 8px; color: #000; margin: 0; padding: 2px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 1.5px 2px !important; color: #000 !important; font-size: 7.5px !important; line-height: 1.05 !important; white-space: nowrap !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight: bold; white-space: normal !important; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 12px; padding: 4px; }}</style></head><body>{master_html}</body></html>"
     html_tables += master_html
 
-
-    # ==============================================================================
-    # 🎯 3.2 สร้างตารางย่อยแยกรายบอยเลอร์ (1 และ 2)
-    # ==============================================================================
     for boiler_name in sorted(grouped_data.keys()):
-        data_list = grouped_data[boiler_name]
-        data_list = sorted(data_list, key=lambda x: (str(x.get('record_date') or ''), str(x.get('branch_name') or '')))
-        
+        data_list = sorted(grouped_data[boiler_name], key=lambda x: (str(x.get('record_date') or ''), str(x.get('branch_name') or '')))
         ws = wb.create_sheet(title=boiler_name)
-
-        ws.merge_cells("A1:O1")
-        ws["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}"
-        ws["A1"].font = f_w; ws["A1"].fill = fill_blue; ws["A1"].alignment = al_c
-
-        headers_merge = [("A2:A3","วันที่"), ("B2:D2","เชื้อเพลิงใช้(ตัน/วัน)"), ("E2:E3","รวม น.น.\nเชื้อเพลิง"), 
-                         ("F2:I2","ค่าเชื้อเพลิง(บาท)"), ("J2:K2","ผลิตไอน้ำ"), ("L2:L3","ค่าเชื้อเพลิง\n(บาท/ตันไอน้ำ)"), 
-                         ("M2:O2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)")]
+        ws.merge_cells("A1:O1"); ws["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}"; ws["A1"].font, ws["A1"].fill, ws["A1"].alignment = f_w, fill_blue, al_c
+        headers_merge = [("A2:A3","วันที่"), ("B2:D2","เชื้อเพลิงใช้(ตัน/วัน)"), ("E2:E3","รวม น.น.\nเชื้อเพลิง"), ("F2:I2","ค่าเชื้อเพลิง(บาท)"), ("J2:K2","ผลิตไอน้ำ"), ("L2:L3","ค่าเชื้อเพลิง\n(บาท/ตันไอน้ำ)"), ("M2:O2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)")]
         for cell_r, val in headers_merge: ws.merge_cells(cell_r); ws[cell_r.split(":")[0]] = val
         h3 = ["", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", "ตัน/วัน", "ตัน/ชม.", "", "STD", "ผลงาน", "ผลต่าง"]
         for idx, val in enumerate(h3, 1):
             if val: ws.cell(row=3, column=idx, value=val)
         for r_idx in [2, 3]:
-            for c_idx in range(1, 16):
-                c = ws.cell(row=r_idx, column=c_idx); c.font = f_b; c.alignment = al_c; c.border = tb
-
+            for c_idx in range(1, 16): c = ws.cell(row=r_idx, column=c_idx); c.font, c.alignment, c.border = f_b, al_c, tb
         html_headers = """<tr><th rowspan="2">วันที่</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวม น.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="2">ผลิตไอน้ำ</th><th rowspan="2">ค่าเชื้อเพลิง<br>(บาท/ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th></tr><tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>ตัน/วัน</th><th>ตัน/ชม.</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>"""
 
         cur_row = 4; body_html = ""
         sum_sw = sum_ww = sum_www = sum_tot_w = sum_sp = sum_wp = sum_wwp = sum_tot_p = sum_steam = sum_hrs = 0
-        
         for r in data_list:
             dt = pd.to_datetime(r['record_date'])
             bn = str(r.get('branch_name') or '-')
@@ -1845,7 +1418,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0), float(r.get('wood_weight') or 0), float(r.get('waste_wood_weight') or 0)
             s_p, w_p, ww_p = float(r.get('sawdust_price') or 0), float(r.get('wood_price') or 0), float(r.get('waste_wood_price') or 0)
             stm, hrs = float(r.get('steam_production') or 0), float(r.get('working_hours') or 0)
-            
             t_w, t_p = (s_w + w_w + ww_w), (s_p + w_p + ww_p)
             stm_hr = stm / hrs if hrs > 0 else 0
             cost_ton = t_p / stm if stm > 0 else 0
@@ -1853,18 +1425,14 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             diff = std['kg_ton'] - fuel_ton
             
             sum_sw+=s_w; sum_ww+=w_w; sum_www+=ww_w; sum_tot_w+=t_w; sum_sp+=s_p; sum_wp+=w_p; sum_wwp+=ww_p; sum_tot_p+=t_p; sum_steam+=stm; sum_hrs+=hrs
-
             row_vals = [date_str, s_w, w_w, ww_w, t_w, s_p, w_p, ww_p, t_p, stm, stm_hr, cost_ton, std['kg_ton'], fuel_ton, diff]
             
             body_html += "<tr>"
             for idx, val in enumerate(row_vals, 1):
-                c = ws.cell(row=cur_row, column=idx, value=val)
-                c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
-                
+                c = ws.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
                 if idx in [2, 3, 4, 10]: c.fill = fill_yellow
-                elif idx == 13: c.fill = fill_green; c.font = f_w
+                elif idx == 13: c.fill, c.font = fill_green, f_w
                 if isinstance(val, (int, float)): c.number_format = '#,##0.00'
-                
                 bg = "background-color:#FFFF00;" if idx in [2,3,4,10] else ("background-color:#00B050;color:white;" if idx==13 else "")
                 tc = "color:red;" if idx==15 and val<0 else ""
                 fw = "font-weight:bold;" if idx in [5,9] else ""
@@ -1878,22 +1446,17 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         avg_diff = std['kg_ton'] - avg_fuel_ton
         
         ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row, end_column=1)
-        c_title = ws.cell(row=cur_row, column=1, value="รวมทั้งหมด")
-        c_title.alignment = al_c; c_title.fill = fill_peach; c_title.border = tb; c_title.font = f_bold_ul
-        
+        c_title = ws.cell(row=cur_row, column=1, value="รวมทั้งหมด"); c_title.alignment, c_title.fill, c_title.border, c_title.font = al_c, fill_peach, tb, f_bold_ul
         f1_vals = ["", sum_sw, sum_ww, sum_www, sum_tot_w, sum_sp, sum_wp, sum_wwp, sum_tot_p, sum_steam, avg_stm_hr, avg_cost_ton, std['kg_ton'], avg_fuel_ton, avg_diff]
         footer_html = f"<tr style='font-weight:bold; background-color:#FCE4D6;'><td style='text-align:center; text-decoration:underline;'>รวมทั้งหมด</td>"
         
         for idx in range(2, 16):
-            val = f1_vals[idx-1]
-            c = ws.cell(row=cur_row, column=idx, value=val)
-            c.border, c.font, c.alignment = tb, f_b, al_r
+            val = f1_vals[idx-1]; c = ws.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment = tb, f_b, al_r
             if isinstance(val, (int, float)): c.number_format = '#,##0.00'
             if idx == 9: c.font = f_red
             if idx == 11: c.fill = fill_yellow
             if idx == 14: c.font = f_bold_ul
             if idx == 15 and val < 0: c.font = f_red
-            
             bg = "background-color:#FFFF00;" if idx==11 else ""
             tc = "color:red;" if idx==9 or (idx==15 and val<0) else ""
             ul = "text-decoration:underline;" if idx==14 else ""
@@ -1905,40 +1468,15 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         
         single_table_html = f"<table style='margin-bottom: 30px;'><thead><tr><th colspan='15' class='header-main'>รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}</th></tr>{html_headers}</thead><tbody>{body_html}{footer_html}</tbody></table>"
         html_tables += single_table_html
-        
-        # 🌟 ปรับตารางรายบอยเลอร์ ให้ลง A4 แนวนอน ไม่บีบและไม่ล้นหน้า
-        boilers_html_dict[f"🔥 ข้อมูล {boiler_name}"] = f"""<!DOCTYPE html><html><head><meta charset='utf-8'><style>
-            @page {{ size: A4 landscape; margin: 8mm 5mm; }} 
-            * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} 
-            body {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000; margin: 0; padding: 0; }} 
-            table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }} 
-            th, td {{ 
-                border: 1px solid #000; 
-                padding: 2.5px 2px !important;  
-                color: #000 !important; 
-                font-size: 9px !important; 
-                line-height: 1.1 !important; 
-                white-space: nowrap !important; /* 👈 บังคับไม่ให้ขึ้นบรรทัดใหม่ */
-            }} 
-            th {{ background-color: #F8F9FA; text-align: center; font-weight: bold; white-space: normal !important; }} 
-            .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}
-        </style></head><body>{single_table_html}</body></html>"""
+        boilers_html_dict[f"🔥 ข้อมูล {boiler_name}"] = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 8mm 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000; margin: 0; padding: 0; }} table {{ width: 100%; border-collapse: collapse; margin-top: 5px; }} th, td {{ border: 1px solid #000; padding: 2.5px 2px !important; color: #000 !important; font-size: 9px !important; line-height: 1.1 !important; white-space: nowrap !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight: bold; white-space: normal !important; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{single_table_html}</body></html>"
 
     full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><style>@page {{ size: A4 landscape; margin: 5mm; }} * {{ -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; font-size:10px; color:#000; margin:0; padding:10px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ border: 1px solid #000; padding: 4px; color:#000 !important; }} th {{ background-color: #F8F9FA; text-align: center; font-weight:bold; }} .header-main {{ background-color: #0070C0; color: white !important; font-size: 14px; padding: 6px; }}</style></head><body>{html_tables}</body></html>"
-
-    final_json_data = {
-        "full_print_html": full_html,
-        "boilers": boilers_html_dict
-    }
-
-    excel_buffer = io.BytesIO()
-    wb.save(excel_buffer)
-    
+    final_json_data = { "full_print_html": full_html, "boilers": boilers_html_dict }
+    excel_buffer = io.BytesIO(); wb.save(excel_buffer)
     return raw_data, oven_raw_filtered, excel_buffer.getvalue(), json.dumps(final_json_data)
 
-
 # ==========================================================
-# 📊 5. ฟังก์ชันหลักสำหรับ Render Report Tabs
+# 📊 5. ฟังก์ชันหลักสำหรับ Render Report Tabs (รวม Dual View PC/Mobile)
 # ==========================================================
 def render_all_reports_module(user_branch_name, selected_sub_menu=None):
     
@@ -1948,6 +1486,16 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
         header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
+        
+        /* 📱 ระบบซ่อน/โชว์ อัจฉริยะ (Dual View) */
+        @media (min-width: 769px) {
+            div[data-testid="stVerticalBlock"]:has(.mobile-view-marker) { display: none !important; }
+            div[data-testid="stVerticalBlock"]:has(.desktop-view-marker) { display: block !important; }
+        }
+        @media (max-width: 768px) {
+            div[data-testid="stVerticalBlock"]:has(.desktop-view-marker) { display: none !important; }
+            div[data-testid="stVerticalBlock"]:has(.mobile-view-marker) { display: block !important; }
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -1998,42 +1546,80 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t1:
                 pk_col_t1 = list(raw_data_t1[0].keys())[0]
-                
-                # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
                 paginated_t1 = render_custom_pagination(raw_data_t1, session_prefix="rep1")
-
-                # =========================================================
-                # ส่วนแสดงผลตาราง
-                # =========================================================
                 st.markdown("<br>", unsafe_allow_html=True)
-                header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
-                for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                with st.container(height=380, border=False):
-                    for r in paginated_t1:
-                        rec_id = r[pk_col_t1]
-                        cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                        cols[0].write(rec_id)
-                        cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                        cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                        cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
+                # =========================================================
+                # 🖥️ DESKTOP VIEW: แสดงตารางแบบเดิม
+                # =========================================================
+                with st.container():
+                    st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                    header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
+                    headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
+                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+
+                    with st.container(height=380, border=False):
+                        for r in paginated_t1:
+                            rec_id = r[pk_col_t1]
+                            cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
+                            cols[0].write(rec_id)
+                            cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                            cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                            cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
+                            
+                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                            if can_crud:
+                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e1_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
+                                if c_del.button("🗑️", key=f"d1_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
+                            else: cols[8].write("-")
+                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                # =========================================================
+                # 📱 MOBILE VIEW: แสดงตารางแบบใหม่ (Dataframe + แผงควบคุม)
+                # =========================================================
+                with st.container():
+                    st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                    if paginated_t1:
+                        df_list = []
+                        for r in paginated_t1:
+                            df_list.append({
+                                "ID": r[pk_col_t1],
+                                "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
+                                "สาขา": r.get('branch_name') or '-',
+                                "ชื่อเครื่องจักร": r.get('machine_name') or '-',
+                                "จำนวน": r.get('machine_qty') or 0,
+                                "ชม.ทำงาน": f"{float(r.get('working_hours') or 0.0):.2f}",
+                                "ชม.เบรกดาวน์": f"{float(r.get('breakdown_hours') or 0.0):.2f}",
+                                "หมายเหตุ": r.get('remarks') or '-'
+                            })
+                        st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
+
+                        st.markdown("---")
+                        st.markdown("<h5 style='color:#333333; font-weight:bold;'>🛠️ จัดการข้อมูล (แก้ไข / ลบรายการ)</h5>", unsafe_allow_html=True)
+                        editable_records = [r for r in paginated_t1 if current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)]
                         
-                        can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                        if can_crud:
-                            c_edit, c_del = cols[8].columns(2, gap="small")
-                            if c_edit.button("✏️", key=f"e1_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
-                            if c_del.button("🗑️", key=f"d1_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
-                        else: cols[8].write("-")
-                        st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                        if editable_records:
+                            col_sel, col_btn_e, col_btn_d = st.columns([2.5, 1, 1])
+                            opts = {f"ID: {r[pk_col_t1]} | วันที่: {pd.to_datetime(r.get('record_date')).strftime('%d/%m/%Y')} | {r.get('machine_name')}": r for r in editable_records}
+                            sel_lbl = col_sel.selectbox("เลือกลำดับข้อมูล", options=list(opts.keys()), label_visibility="collapsed", key="sel_crud_t1_mob")
+                            sel_row = opts[sel_lbl]
+                            
+                            if col_btn_e.button("✏️", use_container_width=True, key=f"e1_btn_mob"): update_record_dialog_t1(sel_row, pk_col_t1)
+                            if col_btn_d.button("🗑️", use_container_width=True, key=f"d1_btn_mob"): delete_record_dialog_t1(sel_row, pk_col_t1)
+                        else:
+                            st.info("ไม่มีสิทธิ์จัดการข้อมูล")
 
-                st.write("")
+                # =========================================================
+                # 🖨️ ปุ่มด้านล่าง (โชว์ทั้ง PC และ Mobile พร้อมแก้ช่องไฟบนมือถือ)
+                # =========================================================
+                st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
+                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
-                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
+                with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสาร</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
             
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
@@ -2065,41 +1651,82 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t2:
                 pk_col_t2 = list(raw_data_t2[0].keys())[0]
-                
-                # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
                 paginated_t2 = render_custom_pagination(raw_data_t2, session_prefix="rep2")
-
-                # =================== วาดตาราง Tab 2 ===================
                 st.markdown("<br>", unsafe_allow_html=True)
-                header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
-                for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                with st.container(height=380, border=False):
-                    for r in paginated_t2:
-                        rec_id = r[pk_col_t2]
-                        lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
-                        cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                        cols[0].write(rec_id)
-                        cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                        cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
-                        cols[3].write(r.get('engine_code') or '-'); cols[4].write(f"{lts:.2f}"); cols[5].write(f"{hrs:.2f}"); cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}"); cols[7].write(r.get('remark') or '-')
+                # =========================================================
+                # 🖥️ DESKTOP VIEW: แสดงตารางแบบเดิม
+                # =========================================================
+                with st.container():
+                    st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                    header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
+                    headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
+                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+
+                    with st.container(height=380, border=False):
+                        for r in paginated_t2:
+                            rec_id = r[pk_col_t2]
+                            lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
+                            cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
+                            cols[0].write(rec_id)
+                            cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                            cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
+                            cols[3].write(r.get('engine_code') or '-'); cols[4].write(f"{lts:.2f}"); cols[5].write(f"{hrs:.2f}"); cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}"); cols[7].write(r.get('remark') or '-')
+                            
+                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                            if can_crud:
+                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e2_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
+                                if c_del.button("🗑️", key=f"d2_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
+                            else: cols[8].write("-")
+                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                # =========================================================
+                # 📱 MOBILE VIEW: แสดงตารางแบบใหม่
+                # =========================================================
+                with st.container():
+                    st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                    if paginated_t2:
+                        df_list = []
+                        for r in paginated_t2:
+                            lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
+                            df_list.append({
+                                "ID": r[pk_col_t2],
+                                "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
+                                "สาขา/ประเภท": f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}",
+                                "ทะเบียนรถ": r.get('engine_code') or '-',
+                                "ลิตร": f"{lts:.2f}",
+                                "ชม.ทำงาน": f"{hrs:.2f}",
+                                "ลิตร/ชม.": f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}",
+                                "หมายเหตุ": r.get('remark') or '-'
+                            })
+                        st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
                         
-                        can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                        if can_crud:
-                            c_edit, c_del = cols[8].columns(2, gap="small")
-                            if c_edit.button("✏️", key=f"e2_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
-                            if c_del.button("🗑️", key=f"d2_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
-                        else: cols[8].write("-")
-                        st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                        st.markdown("---")
+                        st.markdown("<h5 style='color:#333333; font-weight:bold;'>🛠️ จัดการข้อมูล (แก้ไข / ลบรายการ)</h5>", unsafe_allow_html=True)
+                        editable_records = [r for r in paginated_t2 if current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)]
+                        
+                        if editable_records:
+                            col_sel, col_btn_e, col_btn_d = st.columns([2.5, 1, 1])
+                            opts = {f"ID: {r[pk_col_t2]} | วันที่: {pd.to_datetime(r.get('record_date')).strftime('%d/%m/%Y')} | {r.get('engine_code')}": r for r in editable_records}
+                            sel_lbl = col_sel.selectbox("เลือกลำดับข้อมูล", options=list(opts.keys()), label_visibility="collapsed", key="sel_crud_t2_mob")
+                            sel_row = opts[sel_lbl]
+                            
+                            if col_btn_e.button("✏️", use_container_width=True, key=f"e2_btn_mob"): update_record_dialog_t2(sel_row, pk_col_t2, engine_lbl_list, engine_details_t2)
+                            if col_btn_d.button("🗑️", use_container_width=True, key=f"d2_btn_mob"): delete_record_dialog_t2(sel_row, pk_col_t2)
+                        else:
+                            st.info("ไม่มีสิทธิ์จัดการข้อมูล")
 
-                st.write("")
+                # =========================================================
+                # 🖨️ ปุ่มด้านล่าง
+                # =========================================================
+                st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
+                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
-                with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview2()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
+                with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview2()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสาร</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
     # =========================================================================
@@ -2130,40 +1757,80 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
             if raw_data_t3:
                 pk_col_t3 = list(raw_data_t3[0].keys())[0]
-                
-                # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
                 paginated_t3 = render_custom_pagination(raw_data_t3, session_prefix="rep3")
-
-                # =================== วาดตาราง Tab 3 ===================
                 st.markdown("<br>", unsafe_allow_html=True)
-                header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
-                for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                with st.container(height=380, border=False):
-                    for r in paginated_t3:
-                        rec_id = r[pk_col_t3]
-                        cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                        cols[0].write(rec_id)
-                        cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                        cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                        cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
+                # =========================================================
+                # 🖥️ DESKTOP VIEW: แสดงตารางแบบเดิม
+                # =========================================================
+                with st.container():
+                    st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                    header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
+                    headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
+                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
+                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+
+                    with st.container(height=380, border=False):
+                        for r in paginated_t3:
+                            rec_id = r[pk_col_t3]
+                            cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
+                            cols[0].write(rec_id)
+                            cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                            cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                            cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
+                            
+                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                            if can_crud:
+                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                if c_edit.button("✏️", key=f"e3_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
+                                if c_del.button("🗑️", key=f"d3_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
+                            else: cols[8].write("-")
+                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                # =========================================================
+                # 📱 MOBILE VIEW: แสดงตารางแบบใหม่
+                # =========================================================
+                with st.container():
+                    st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                    if paginated_t3:
+                        df_list = []
+                        for r in paginated_t3:
+                            df_list.append({
+                                "ID": r[pk_col_t3],
+                                "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
+                                "สาขา": r.get('branch_name') or '-',
+                                "ทั้งหมด(ครั้ง)": r.get('total_count') or 0,
+                                "ตก(ครั้ง)": r.get('total_drop') or 0,
+                                "ตก PM": r.get('pm_drop') or 0,
+                                "ตกนอก PM": r.get('non_pm_drop') or 0,
+                                "หมายเหตุ": r.get('remark') or '-'
+                            })
+                        st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
+
+                        st.markdown("---")
+                        st.markdown("<h5 style='color:#333333; font-weight:bold;'>🛠️ จัดการข้อมูล (แก้ไข / ลบรายการ)</h5>", unsafe_allow_html=True)
+                        editable_records = [r for r in paginated_t3 if current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)]
                         
-                        can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                        if can_crud:
-                            c_edit, c_del = cols[8].columns(2, gap="small")
-                            if c_edit.button("✏️", key=f"e3_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
-                            if c_del.button("🗑️", key=f"d3_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
-                        else: cols[8].write("-")
-                        st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                        if editable_records:
+                            col_sel, col_btn_e, col_btn_d = st.columns([2.5, 1, 1])
+                            opts = {f"ID: {r[pk_col_t3]} | วันที่: {pd.to_datetime(r.get('record_date')).strftime('%d/%m/%Y')} | {r.get('branch_name')}": r for r in editable_records}
+                            sel_lbl = col_sel.selectbox("เลือกลำดับข้อมูล", options=list(opts.keys()), label_visibility="collapsed", key="sel_crud_t3_mob")
+                            sel_row = opts[sel_lbl]
+                            
+                            if col_btn_e.button("✏️", use_container_width=True, key=f"e3_btn_mob"): update_record_dialog_t3(sel_row, pk_col_t3)
+                            if col_btn_d.button("🗑️", use_container_width=True, key=f"d3_btn_mob"): delete_record_dialog_t3(sel_row, pk_col_t3)
+                        else:
+                            st.info("ไม่มีสิทธิ์จัดการข้อมูล")
 
-                st.write("")
+                # =========================================================
+                # 🖨️ ปุ่มด้านล่าง
+                # =========================================================
+                st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
+                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
-                with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview3()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสารรายงาน</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
+                with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview3()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสาร</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
     # =========================================================================
@@ -2195,47 +1862,75 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
             if raw_data_t4 or oven_raw_t4:
                 pk_col_t4 = list(raw_data_t4[0].keys())[0] if raw_data_t4 else None
                 pk_col_ov = list(oven_raw_t4[0].keys())[0] if oven_raw_t4 else None
-                
                 unique_boilers = sorted(list(set([str(r.get('boiler_name') or 'ไม่ระบุ') for r in raw_data_t4]))) if raw_data_t4 else []
-                
                 tab_names = ["📁 ข้อมูลยอดรวมสาขา (เตา/ไม้อบ/แรงดัน)"] + [f"🔥 ข้อมูล {b}" for b in unique_boilers]
                 tabs_list = st.tabs(tab_names)
-
-                parsed_print_data = json.loads(json_html_t4)
-                boilers_print_dict = parsed_print_data.get("boilers", {})
 
                 # ==========================================
                 # 🎯 แท็บย่อยที่ 0: ข้อมูลยอดรวมสาขา (เตา/ไม้อบ)
                 # ==========================================
                 with tabs_list[0]:
                     if oven_raw_t4:
-                        # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
                         paginated_ov = render_custom_pagination(oven_raw_t4, session_prefix="rep4_ov")
-
                         st.markdown("<br>", unsafe_allow_html=True)
-                        header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
-                        headers = ["ID", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
-                        for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
-                        st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                        
+                        # 🖥️ DESKTOP VIEW
+                        with st.container():
+                            st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                            header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                            headers = ["ID", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
+                            for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
+                            st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                        with st.container(height=380, border=False):
-                            for r in paginated_ov:
-                                rec_id = r[pk_col_ov]
-                                cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
-                                cols[0].write(rec_id)
-                                cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                                cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                                cols[3].write(r.get('oven_qty') or 0)
-                                cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
-                                cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
+                            with st.container(height=380, border=False):
+                                for r in paginated_ov:
+                                    rec_id = r[pk_col_ov]
+                                    cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                                    cols[0].write(rec_id)
+                                    cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                                    cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                                    cols[3].write(r.get('oven_qty') or 0)
+                                    cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
+                                    cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
+                                    
+                                    can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                                    if can_crud:
+                                        c_edit, c_del = cols[6].columns(2, gap="small")
+                                        if c_edit.button("✏️", key=f"e_ov_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_oven(r, pk_col_ov)
+                                        if c_del.button("🗑️", key=f"d_ov_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_oven(r, pk_col_ov)
+                                    else: cols[6].write("-")
+                                    st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                        # 📱 MOBILE VIEW
+                        with st.container():
+                            st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                            if paginated_ov:
+                                df_list = []
+                                for r in paginated_ov:
+                                    df_list.append({
+                                        "ID": r[pk_col_ov],
+                                        "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
+                                        "สาขา": r.get('branch_name') or '-',
+                                        "จำนวนเตา(เตา)": r.get('oven_qty') or 0,
+                                        "ไม้อบออก(ลบ.ฟ.)": f"{float(r.get('wood_out_cubft') or 0.0):.2f}",
+                                        "แรงดันเฉลี่ย": f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}"
+                                    })
+                                st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
+
+                                st.markdown("---")
+                                st.markdown("<h5 style='color:#333333; font-weight:bold;'>🛠️ จัดการข้อมูลยอดรวมสาขา (แก้ไข / ลบ)</h5>", unsafe_allow_html=True)
+                                editable_records = [r for r in paginated_ov if current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)]
                                 
-                                can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                                if can_crud:
-                                    c_edit, c_del = cols[6].columns(2, gap="small")
-                                    if c_edit.button("✏️", key=f"e_ov_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_oven(r, pk_col_ov)
-                                    if c_del.button("🗑️", key=f"d_ov_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_oven(r, pk_col_ov)
-                                else: cols[6].write("-")
-                                st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                                if editable_records:
+                                    col_sel, col_btn_e, col_btn_d = st.columns([2.5, 1, 1])
+                                    opts = {f"ID: {r[pk_col_ov]} | วันที่: {pd.to_datetime(r.get('record_date')).strftime('%d/%m/%Y')} | {r.get('branch_name')}": r for r in editable_records}
+                                    sel_lbl = col_sel.selectbox("เลือกลำดับข้อมูล", options=list(opts.keys()), label_visibility="collapsed", key="sel_crud_ov_mob")
+                                    sel_row = opts[sel_lbl]
+                                    
+                                    if col_btn_e.button("✏️", use_container_width=True, key=f"e_ov_btn_mob"): update_record_dialog_oven(sel_row, pk_col_ov)
+                                    if col_btn_d.button("🗑️", use_container_width=True, key=f"d_ov_btn_mob"): delete_record_dialog_oven(sel_row, pk_col_ov)
+                                else:
+                                    st.info("ไม่มีสิทธิ์จัดการข้อมูล")
                     else:
                         st.info("ไม่พบข้อมูลยอดรวมสาขาในช่วงเวลาที่เลือก")
 
@@ -2247,37 +1942,71 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
                         return
 
-                    # 🌟 เรียกใช้ฟังก์ชัน Pagination ส่วนกลาง
                     paginated_t4 = render_custom_pagination(data_list, session_prefix=f"rep4_b_{boiler_label}")
-
                     st.markdown("<br>", unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                    headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                    
+                    # 🖥️ DESKTOP VIEW
+                    with st.container():
+                        st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                        header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                        headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
+                        for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
-                    with st.container(height=380, border=False):
-                        for r in paginated_t4:
-                            rec_id = r[pk_col_t4]
-                            s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
-                            tot_w = s_w + w_w + ww_w
-                            s_prod = float(r.get('steam_production') or 1.0)
-                            cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                            cols[0].write(rec_id)
-                            cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
-                            cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                            cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
+                        with st.container(height=380, border=False):
+                            for r in paginated_t4:
+                                rec_id = r[pk_col_t4]
+                                s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
+                                tot_w = s_w + w_w + ww_w
+                                s_prod = float(r.get('steam_production') or 1.0)
+                                cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                                cols[0].write(rec_id)
+                                cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
+                                cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
+                                cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
+                                
+                                can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
+                                if can_crud:
+                                    c_edit, c_del = cols[7].columns(2, gap="small")
+                                    if c_edit.button("✏️", key=f"e4_{boiler_label}_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
+                                    if c_del.button("🗑️", key=f"d4_{boiler_label}_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
+                                else: cols[7].write("-")
+                                st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+
+                    # 📱 MOBILE VIEW
+                    with st.container():
+                        st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                        if paginated_t4:
+                            df_list = []
+                            for r in paginated_t4:
+                                s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
+                                tot_w = s_w + w_w + ww_w
+                                s_prod = float(r.get('steam_production') or 1.0)
+                                df_list.append({
+                                    "ID": r[pk_col_t4],
+                                    "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
+                                    "สาขา": r.get('branch_name') or '-',
+                                    "เชื้อเพลิงรวม(ตัน)": f"{tot_w:.2f}",
+                                    "ผลิตไอน้ำ(ตัน)": f"{s_prod:.2f}",
+                                    "ชม.ทำงาน": f"{float(r.get('working_hours') or 0.0):.2f}",
+                                    "ผลงาน(กก./ตัน)": f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}"
+                                })
+                            st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
+
+                            st.markdown("---")
+                            st.markdown(f"<h5 style='color:#333333; font-weight:bold;'>🛠️ จัดการข้อมูล {boiler_label} (แก้ไข / ลบ)</h5>", unsafe_allow_html=True)
+                            editable_records = [r for r in paginated_t4 if current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)]
                             
-                            can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
-                            if can_crud:
-                                c_edit, c_del = cols[7].columns(2, gap="small")
-                                if c_edit.button("✏️", key=f"e4_{boiler_label}_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t4(r, pk_col_t4)
-                                if c_del.button("🗑️", key=f"d4_{boiler_label}_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t4(r, pk_col_t4)
-                            else: cols[7].write("-")
-                            st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
+                            if editable_records:
+                                col_sel, col_btn_e, col_btn_d = st.columns([2.5, 1, 1])
+                                opts = {f"ID: {r[pk_col_t4]} | วันที่: {pd.to_datetime(r.get('record_date')).strftime('%d/%m/%Y')} | {r.get('branch_name')}": r for r in editable_records}
+                                sel_lbl = col_sel.selectbox("เลือกลำดับข้อมูล", options=list(opts.keys()), label_visibility="collapsed", key=f"sel_crud_{boiler_label}_mob")
+                                sel_row = opts[sel_lbl]
+                                if col_btn_e.button("✏️", use_container_width=True, key=f"e_{boiler_label}_btn_mob"): update_record_dialog_t4(sel_row, pk_col_t4)
+                                if col_btn_d.button("🗑️", use_container_width=True, key=f"d_{boiler_label}_btn_mob"): delete_record_dialog_t4(sel_row, pk_col_t4)
+                            else:
+                                st.info("ไม่มีสิทธิ์จัดการข้อมูล")
 
-                # ==========================================
-                # 🎯 ลูปวาดแท็บย่อยบอยเลอร์ที่เหลือ
                 # ==========================================
                 for idx, boiler_label in enumerate(unique_boilers):
                     with tabs_list[idx + 1]:
@@ -2285,11 +2014,11 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         render_boiler_table(data_boiler, boiler_label)
 
                 # ==========================================
-                # 🎯 ปุ่มด้านล่าง (Export, สรุป, ปริ้น)
+                # 🖨️ ปุ่มด้านล่าง (ใส่กล่องคั่นระยะ 25px แก้ปุ่มเบียด)
                 # ==========================================
-                st.write("")
+                st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.5, 4.2, 2.5])
-                with col_btn1: st.download_button("📗 Export เป็น Excel (.xlsx)", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
+                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 
                         parsed_data = json.loads(json_html_t4)
@@ -2297,13 +2026,11 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with col_btn3: 
                     parsed_print_data = json.loads(json_html_t4)
                     boilers_print_dict = parsed_print_data.get("boilers", {})
-                    
                     master_html_str = ""
                     for k, v in boilers_print_dict.items():
                         if "รวมสาขา" in k or "รวม 1+2" in k:
                             master_html_str = v
                             break
-                            
                     boiler_html_snippets = {}
                     for b_lbl in unique_boilers:
                         found_html = ""
@@ -2315,7 +2042,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
 
                     components.html(f"""
                     <body style="margin:0;padding:2px;overflow:hidden;">
-                        <button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสารรายงาน</button>
+                        <button onclick="openPrintPreview4()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสาร</button>
                     </body>
                     <script>
                     function openPrintPreview4() {{
@@ -2328,35 +2055,22 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                                     selectedTabName = text.trim();
                                 }}
                             }}
-
                             var printHtml = "";
                             var masterHtml = {json.dumps(master_html_str)};
                             var boilerSnippets = {json.dumps(boiler_html_snippets)};
 
-                            if(selectedTabName.includes("ยอดรวมสาขา") || selectedTabName === "") {{
-                                printHtml = masterHtml;
-                            }} else {{
+                            if(selectedTabName.includes("ยอดรวมสาขา") || selectedTabName === "") {{ printHtml = masterHtml; }} 
+                            else {{
                                 for (var bKey in boilerSnippets) {{
-                                    if(selectedTabName.includes(bKey)) {{
-                                        printHtml = boilerSnippets[bKey];
-                                        break;
-                                    }}
+                                    if(selectedTabName.includes(bKey)) {{ printHtml = boilerSnippets[bKey]; break; }}
                                 }}
-                                if(printHtml === "") {{
-                                    printHtml = masterHtml; 
-                                }}
+                                if(printHtml === "") {{ printHtml = masterHtml; }}
                             }}
-
                             var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
-                            w.document.write(printHtml);
-                            w.document.close();
-                            setTimeout(function(){{ w.print(); }}, 500);
+                            w.document.write(printHtml); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);
                         }} catch (e) {{
-                            console.error("Print Error:", e);
                             var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes');
-                            w.document.write({json.dumps(master_html_str)});
-                            w.document.close();
-                            setTimeout(function(){{ w.print(); }}, 500);
+                            w.document.write({json.dumps(master_html_str)}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);
                         }}
                     }}
                     </script>
