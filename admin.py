@@ -24,7 +24,7 @@ def render_admin_user_management():
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY position ASC")
+            cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY pos ASC")
             for r in cur.fetchall():
                 if r['pos']: position_list.append(r['pos'].strip())
         conn.close()
