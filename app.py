@@ -371,32 +371,33 @@ if not st.session_state.get('logged_in'):
         
         header {visibility: hidden;} #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
         .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; max-width: 950px !important; margin: auto; } 
-        div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
-        div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
-        div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
+        
+        /* 🌟 1. บังคับซ่อน Sidebar ในหน้า Login แบบเด็ดขาด */
+        [data-testid="stSidebar"] { display: none !important; visibility: hidden !important; width: 0px !important; }
+        [data-testid="stSidebarCollapseButton"] { display: none !important; }       
+        [data-testid="collapsedControl"] { display: none !important; }
+        section[data-testid="stSidebar"] { display: none !important; }
+
+        /* 🌟 2. ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) เท่านั้น ห้ามลามไปปุ่มอื่น */
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
+        
+        /* ตกแต่งฟอร์ม Login */
         div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
         div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
         div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
         div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
-        div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
         
-        [data-testid="stSidebarCollapseButton"] { display: none !important; }       
-        [data-testid="collapsedControl"] { display: none !important; }
-
-        html, body, [class*="st-"], h1, h2, h3, h4, h5, h6, p, span, div, label, button, input {
-            font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-        }
-
-        /* 🌟 ป้องกันฟอนต์ไอคอนพังในหน้าล็อกอิน */
-        span.material-symbols-rounded, span.material-icons, .material-symbols-rounded, .material-icons, [data-testid="stIconMaterial"], [data-testid="stTooltipIcon"] {
-            font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
-        }
+        html, body, [class*="st-"], h1, h2, h3, h4, h5, h6, p, span, div, label, button, input { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; }
+        span.material-symbols-rounded, span.material-icons, .material-symbols-rounded, .material-icons, [data-testid="stIconMaterial"], [data-testid="stTooltipIcon"] { font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important; }
 
         .login-header-title { font-size: 30px; font-weight: 800; color: #FFFFFF; text-align: center; margin-bottom: 4px; } 
         .login-header-subtitle { font-size: 13px; color: #BBDEFB; text-align: center; margin-bottom: 25px; } 
         .newhere-header-title { font-size: 30px; font-weight: 800; color: #1E293B; margin-bottom: 12px; } 
         .newhere-header-desc { font-size: 15px; color: #64748B; line-height: 1.6; margin-bottom: 25px; max-width: 280px; } 
-        @media (max-width: 768px) { div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
+        @media (max-width: 768px) { section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
         </style>""", unsafe_allow_html=True)
         col_left, col_right = st.columns([1.15, 0.95], gap="small")
         with col_left:
@@ -600,7 +601,7 @@ else:
         c_chart1, c_chart2 = st.columns(2)
         
         with c_chart1:
-            st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>📉 Performance Trend: ปริมาณเชื้อเพลิง (7 วัน)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>📉 ปริมาณเชื้อเพลิง (7 วัน)</h4>", unsafe_allow_html=True)
             with st.container(border=True):
                 if not db_data["fuel_chart_df"].empty:
                     df_f = db_data["fuel_chart_df"].reset_index()
@@ -635,7 +636,7 @@ else:
                     st.info("📊 ยังไม่มีข้อมูลปริมาณเชื้อเพลิงใน 7 วันล่าสุด")
                 
         with c_chart2:
-            st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>🚀 Traffic Trend: แรงดันไอน้ำตกสะสม (7 วัน)</h4>", unsafe_allow_html=True)
+            st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>🚀 แรงดันไอน้ำตกสะสม (7 วัน)</h4>", unsafe_allow_html=True)
             with st.container(border=True):
                 if not db_data["pressure_chart_df"].empty:
                     df_p = db_data["pressure_chart_df"].reset_index()
@@ -673,17 +674,21 @@ else:
     # 🌟 หน้าอื่นๆ
     # =========================================================================
     elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
-        st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
-        render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+        with st.spinner("กำลังเตรียมหน้าต่างบันทึกข้อมูล..."):
+            st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
+            render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
         
     elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
-        render_admin_user_management()
+        with st.spinner("กำลังดึงข้อมูลผู้ใช้งานและสิทธิ์..."):
+            render_admin_user_management()
         
     elif selected_main == report_menu_label: 
-        render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+        with st.spinner("กำลังประมวลผลรายงาน..."):
+            render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
         
     elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
-        render_add_new_equipment()
+        with st.spinner("กำลังโหลดฐานข้อมูลอุปกรณ์..."):
+            render_add_new_equipment()
 
 
     # =========================================================================
