@@ -5,6 +5,7 @@ import os
 import pandas as pd
 import numpy as np
 import altair as alt
+from home import render_dashboard
 from database import get_db_connection, hash_password
 from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
@@ -560,135 +561,28 @@ else:
     # 🌟 Dashboard View
     # =========================================================================
     if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
-        
-        db_data = get_dashboard_data(current_branch_id)
-        
-        st.markdown(f"<h1 class='dash-title' style='color: #333333; font-weight: 800;'>หน้าหลัก (Dashboard)</h1>", unsafe_allow_html=True)
-        
         user_position = st.session_state.get('position', '-')
-        welcome_html = f"""
-        <div style="background-color: #FCFBF8; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #D6D3D1; border-left: 6px solid #D97706; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);">
-            <h3 class='welcome-title' style="color: #D97706; margin-top: 0; font-weight: 800; margin-bottom: 8px;">😊 ยินดีต้อนรับเข้าสู่ระบบ</h3>
-            <p class='welcome-desc' style="color: #666666; margin-bottom: 15px;">สวัสดีคุณ <strong style="color: #333333;">{disp_name}</strong> — เลือกงานจากเมนูด้านซ้ายหรือดูสรุปข้อมูลด้านล่างได้เลยครับ</p>
-            <div class='welcome-details' style="color: #333333; line-height: 1.8;">
-                <div><span style="font-weight: 600; color: #64748B;">👤 กลุ่มสิทธิ์:</span> {role_th}</div>
-                <div><span style="font-weight: 600; color: #64748B;">🏢 สาขา:</span> {current_branch}</div>
-                <div><span style="font-weight: 600; color: #64748B;">💼 ตำแหน่ง:</span> {user_position}</div>
-                <div style="margin-top: 4px;"><span style="font-weight: 600; color: #64748B;">👑 ระดับสิทธิ์:</span> {current_access} — <strong style="color: {access_color};">{access_desc}</strong></div>
-            </div>
-        </div>
-        """
-        st.markdown(welcome_html, unsafe_allow_html=True)
-        
-        fuel_display = f"{db_data['fuel_usage']:,.1f}" if db_data['fuel_usage'] > 0 else "0.0"
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            with st.container(border=True):
-                st.metric("⚙️ เครื่องจักรทำงาน (วันนี้)", f"{db_data['active_machines']} เครื่อง")
-        with col2:
-            with st.container(border=True):
-                st.metric("⚠️ แจ้งซ่อม (ค้างซ่อม)", f"{db_data['breakdown_count']} รายการ")
-        with col3:
-            with st.container(border=True):
-                st.metric("🚚 เชื้อเพลิง 7 วัน (ลิตร)", fuel_display)
-        with col4:
-            with st.container(border=True):
-                st.metric("💨 แรงดันตก (วันนี้)", f"{db_data['boiler_drop']} ครั้ง")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        c_chart1, c_chart2 = st.columns(2)
-        
-        with c_chart1:
-            st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>📉 ปริมาณเชื้อเพลิง (7 วัน)</h4>", unsafe_allow_html=True)
-            with st.container(border=True):
-                if not db_data["fuel_chart_df"].empty:
-                    df_f = db_data["fuel_chart_df"].reset_index()
-                    
-                    area_f = alt.Chart(df_f).mark_area(
-                        interpolate='monotone', color='#6366F1', opacity=0.15
-                    ).encode(
-                        x=alt.X('วันที่:O', axis=alt.Axis(labelAngle=-45, grid=False, title=None)),
-                        y=alt.Y('ปริมาณเชื้อเพลิง (ลิตร):Q', axis=alt.Axis(grid=True, gridColor='#E8E3DD', title=None))
-                    )
-                    
-                    line_f = alt.Chart(df_f).mark_line(
-                        interpolate='monotone', color='#6366F1', strokeWidth=3
-                    ).encode(
-                        x='วันที่:O', y='ปริมาณเชื้อเพลิง (ลิตร):Q'
-                    )
-                    
-                    points_f = alt.Chart(df_f).mark_circle(
-                        size=80, color='#FCFBF8', stroke='#6366F1', strokeWidth=2
-                    ).encode(
-                        x='วันที่:O', y='ปริมาณเชื้อเพลิง (ลิตร):Q',
-                        tooltip=[alt.Tooltip('วันที่', title='วันที่'), alt.Tooltip('ปริมาณเชื้อเพลิง (ลิตร)', title='ลิตร')]
-                    )
-                    
-                    chart_f = (area_f + line_f + points_f).configure(
-                        font='"TH Sarabun PSK", Sarabun, sans-serif'
-                    ).configure_view(strokeWidth=0).configure_axis(
-                        domain=False, tickColor='transparent', labelColor='#666666', labelFontSize=14
-                    )
-                    st.altair_chart(chart_f, use_container_width=True)
-                else:
-                    st.info("📊 ยังไม่มีข้อมูลปริมาณเชื้อเพลิงใน 7 วันล่าสุด")
-                
-        with c_chart2:
-            st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>🚀 แรงดันไอน้ำตกสะสม (7 วัน)</h4>", unsafe_allow_html=True)
-            with st.container(border=True):
-                if not db_data["pressure_chart_df"].empty:
-                    df_p = db_data["pressure_chart_df"].reset_index()
-                    
-                    area_p = alt.Chart(df_p).mark_area(
-                        interpolate='monotone', color='#F59E0B', opacity=0.15
-                    ).encode(
-                        x=alt.X('วันที่:O', axis=alt.Axis(labelAngle=-45, grid=False, title=None)),
-                        y=alt.Y('จำนวนครั้งที่ตก:Q', axis=alt.Axis(grid=True, gridColor='#E8E3DD', title=None))
-                    )
-                    
-                    line_p = alt.Chart(df_p).mark_line(
-                        interpolate='monotone', color='#F59E0B', strokeWidth=3
-                    ).encode(
-                        x='วันที่:O', y='จำนวนครั้งที่ตก:Q'
-                    )
-                    
-                    points_p = alt.Chart(df_p).mark_circle(
-                        size=80, color='#FCFBF8', stroke='#F59E0B', strokeWidth=2
-                    ).encode(
-                        x='วันที่:O', y='จำนวนครั้งที่ตก:Q',
-                        tooltip=[alt.Tooltip('วันที่', title='วันที่'), alt.Tooltip('จำนวนครั้งที่ตก', title='ครั้ง')]
-                    )
-                    
-                    chart_p = (area_p + line_p + points_p).configure(
-                        font='"TH Sarabun PSK", Sarabun, sans-serif'
-                    ).configure_view(strokeWidth=0).configure_axis(
-                        domain=False, tickColor='transparent', labelColor='#666666', labelFontSize=14
-                    )
-                    st.altair_chart(chart_p, use_container_width=True)
-                else:
-                    st.info("🔥 ยังไม่มีการบันทึกแรงดันไอน้ำตกใน 7 วันล่าสุด")
+        # โยนหน้าที่วาดหน้าจอไปให้ไฟล์ home.py จัดการ
+        render_dashboard(
+            current_branch_id, disp_name, role_th, current_branch, 
+            user_position, current_access, access_color, access_desc
+        )
 
     # =========================================================================
     # 🌟 หน้าอื่นๆ
     # =========================================================================
     elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
-        with st.spinner("กำลังเตรียมหน้าต่างบันทึกข้อมูล..."):
-            st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
-            render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+        st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
+        render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
         
     elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
-        with st.spinner("กำลังดึงข้อมูลผู้ใช้งานและสิทธิ์..."):
-            render_admin_user_management()
+        render_admin_user_management()
         
     elif selected_main == report_menu_label: 
-        with st.spinner("กำลังประมวลผลรายงาน..."):
-            render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+        render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
         
     elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
-        with st.spinner("กำลังโหลดฐานข้อมูลอุปกรณ์..."):
-            render_add_new_equipment()
+        render_add_new_equipment()
 
 
     # =========================================================================
