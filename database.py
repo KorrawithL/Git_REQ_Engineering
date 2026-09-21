@@ -7,7 +7,7 @@ def get_db_connection():
     return pymysql.connect(
         host='gateway01.ap-southeast-1.prod.aws.tidbcloud.com',      # หรือใช้ 'localhost' เพื่อชี้มาที่เครื่องตัวเอง
         port=4000,             # Port มาตรฐานของ MySQL/MariaDB บนเครื่อง (ปรับเป็น 3307 ได้หากตั้งค่าไว้)
-        user='2mbHs86f3hLpHFz.root',           # User ปกติของเครื่อง Local มักจะเป็น 'root'
+        user='cJaPr62UlEdMdvs6',           # User ปกติของเครื่อง Local มักจะเป็น 'root'
         password='TfUTagG5fPuGk4Bd',           # รหัสผ่าน MySQL บนเครื่องของคุณ (ถ้าไม่มีให้ใส่ '')
         database='Woodwork_Engineering_Records_System', # ชื่อฐานข้อมูลภายในเครื่อง
         charset='utf8mb4',
