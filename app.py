@@ -407,78 +407,96 @@ if not st.session_state.get('logged_in'):
             st.session_state.page = "login"
             st.rerun()
     else:
-        # 🌟 นำโค้ด CSS สำหรับหน้า Login กลับมาใส่ตรงนี้ 🌟
-        st.markdown("""<style>
-        /* ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) */
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
+        # 🌟 1. สร้างกล่องเปล่า (Placeholder) ครอบหน้า Login ไว้ทั้งหมด
+        login_placeholder = st.empty()
         
-        div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
-        div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
-        div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
-        div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
-        
-        .login-header-title { font-size: 30px; font-weight: 800; color: #FFFFFF; text-align: center; margin-bottom: 4px; } 
-        .login-header-subtitle { font-size: 13px; color: #BBDEFB; text-align: center; margin-bottom: 25px; } 
-        .newhere-header-title { font-size: 30px; font-weight: 800; color: #1E293B; margin-bottom: 12px; } 
-        .newhere-header-desc { font-size: 15px; color: #64748B; line-height: 1.6; margin-bottom: 25px; max-width: 280px; } 
-        @media (max-width: 768px) { section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
-        </style>""", unsafe_allow_html=True)
-        
-        col_left, col_right = st.columns([1.15, 0.95], gap="small")
-        with col_left:
-            st.markdown('<div class="login-header-title">Welcome Back</div><div class="login-header-subtitle">Woodwork Engineering Records System</div>', unsafe_allow_html=True)
-            with st.form("login_form", clear_on_submit=False):
-                username_input = st.text_input("User Name", placeholder="👤 User Name", label_visibility="collapsed")
-                password_input = st.text_input("Password", type="password", placeholder="🔒 Password", label_visibility="collapsed")
-                if st.form_submit_button("Login", type="primary", use_container_width=True):
-                    if not username_input or not password_input: st.error("⚠️ กรุณากรอก Username และ Password ให้ครบถ้วน")
-                    else:
-                        try:
-                            conn = get_db_connection()
-                            with conn.cursor() as cur:
-                                sql = """SELECT u.user_id, u.username, u.full_name, u.position, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
-                                         FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id 
-                                         WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4)"""
-                                cur.execute(sql, (username_input,))
-                                user = cur.fetchone()
-                                
-                                if user:
-                                    cur.execute("SELECT branch_id FROM user_branches WHERE user_id = %s", (user['user_id'],))
-                                    extra_branches = cur.fetchall()
-                            conn.close()
+        with login_placeholder.container():
+            st.markdown("""<style>
+            /* ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) */
+            section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
+            section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
+            section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
+            
+            div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
+            div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
+            div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
+            div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
+            section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
+            
+            .login-header-title { font-size: 30px; font-weight: 800; color: #FFFFFF; text-align: center; margin-bottom: 4px; } 
+            .login-header-subtitle { font-size: 13px; color: #BBDEFB; text-align: center; margin-bottom: 25px; } 
+            .newhere-header-title { font-size: 30px; font-weight: 800; color: #1E293B; margin-bottom: 12px; } 
+            .newhere-header-desc { font-size: 15px; color: #64748B; line-height: 1.6; margin-bottom: 25px; max-width: 280px; } 
+            @media (max-width: 768px) { section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
+            </style>""", unsafe_allow_html=True)
+            
+            col_left, col_right = st.columns([1.15, 0.95], gap="small")
+            with col_left:
+                st.markdown('<div class="login-header-title">Welcome Back</div><div class="login-header-subtitle">Woodwork Engineering Records System</div>', unsafe_allow_html=True)
+                with st.form("login_form", clear_on_submit=False):
+                    username_input = st.text_input("User Name", placeholder="👤 User Name", label_visibility="collapsed")
+                    password_input = st.text_input("Password", type="password", placeholder="🔒 Password", label_visibility="collapsed")
+                    if st.form_submit_button("Login", type="primary", use_container_width=True):
+                        if not username_input or not password_input: 
+                            st.error("⚠️ กรุณากรอก Username และ Password ให้ครบถ้วน")
+                        else:
+                            try:
+                                conn = get_db_connection()
+                                with conn.cursor() as cur:
+                                    sql = """SELECT u.user_id, u.username, u.full_name, u.position, u.password_hash, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
+                                             FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id 
+                                             WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4)"""
+                                    cur.execute(sql, (username_input,))
+                                    user = cur.fetchone()
+                                    
+                                    if user:
+                                        cur.execute("SELECT branch_id FROM user_branches WHERE user_id = %s", (user['user_id'],))
+                                        extra_branches = cur.fetchall()
+                                conn.close()
 
-                            if user and user['password_hash'] == hash_password(password_input):
-                                if user['status'] != 'active': st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
-                                else:
-                                    now_time = time.time()
-                                    st.session_state['logged_in'] = True
-                                    for k in ['user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name']: 
-                                        st.session_state[k] = user[k]
-                                    st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
-                                    
-                                    raw_tabs = user.get('allowed_tabs', '') or ''
-                                    st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
-                                    
-                                    allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
-                                    st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
-                                    st.session_state['last_activity'] = now_time
-                                    
-                                    # 🍪 สั่งบันทึกคุกกี้อย่างปลอดภัย
-                                    safe_set_cookie("auth_user", user['username'], SESSION_TIMEOUT_SECONDS)
-                                    
-                                    st.success("เข้าสู่ระบบสำเร็จ!")
-                                    time.sleep(0.5) 
-                                    st.rerun()
-                            else: st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
-                        except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
-        with col_right:
-            st.markdown('<div class="newhere-header-title">New Here?</div><div class="newhere-header-desc">Dear all, the team has completed the development of the machine usage logging system...</div>', unsafe_allow_html=True)
-            if st.button("Sign Up", use_container_width=True):
-                st.session_state.page = "register"
-                st.rerun()
+                                if user and user['password_hash'] == hash_password(password_input):
+                                    if user['status'] != 'active': 
+                                        st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+                                    else:
+                                        # 🔥 2. รหัสถูกปุ๊บ สั่งทำลายหน้า Login สีน้ำเงินทิ้งทันที! 🔥
+                                        login_placeholder.empty()
+                                        
+                                        # 🔥 3. โชว์หน้าจอ Loading สวยๆ โล่งๆ คั่นเวลา 🔥
+                                        st.markdown("""
+                                            <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
+                                                <h1 style='color:#1D4ED8; font-weight:800; font-size:45px;'>✅ เข้าสู่ระบบสำเร็จ!</h1>
+                                                <p style='color:#64748B; font-size:18px;'>กำลังจัดเตรียมหน้าแดชบอร์ดของคุณ...</p>
+                                            </div>
+                                        """, unsafe_allow_html=True)
+                                        
+                                        # 4. แอบเซ็ต Cookie และ Session State ทำงานอยู่เบื้องหลัง
+                                        safe_set_cookie("auth_user", user['username'], SESSION_TIMEOUT_SECONDS)
+                                        
+                                        now_time = time.time()
+                                        st.session_state['logged_in'] = True
+                                        for k in ['user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name']: 
+                                            st.session_state[k] = user[k]
+                                        st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
+                                        
+                                        raw_tabs = user.get('allowed_tabs', '') or ''
+                                        st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
+                                        
+                                        allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
+                                        st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
+                                        st.session_state['last_activity'] = now_time
+                                        
+                                        # 5. รอให้คุกกี้เซฟเสร็จ 0.7 วิ แล้วพาวาร์ปไป Dashboard
+                                        time.sleep(0.7) 
+                                        st.rerun()
+                                else: 
+                                    st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
+                            except Exception as e: 
+                                st.error(f"เกิดข้อผิดพลาด: {e}")
+            with col_right:
+                st.markdown('<div class="newhere-header-title">New Here?</div><div class="newhere-header-desc">Dear all, the team has completed the development of the machine usage logging system...</div>', unsafe_allow_html=True)
+                if st.button("Sign Up", use_container_width=True):
+                    st.session_state.page = "register"
+                    st.rerun()
 
 # -----------------------------------------------------------------------------
 # 🎯 4. หน้าจอหลักของระบบ (Main Layout) 
