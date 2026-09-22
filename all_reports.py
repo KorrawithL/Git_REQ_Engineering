@@ -202,22 +202,17 @@ def update_record_dialog_t1(row_data, pk_col):
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        # 🌟 ล็อคปฏิทิน ห้ามเลือกวันที่ในอนาคต
         e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
         e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
     with col2:
-        # 🌟 ล็อคค่าห้ามติดลบ (min_value=0.0)
         e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), min_value=0.0, format="%.2f")
         e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), min_value=0.0, format="%.2f")
     e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
     
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
-        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
         if (e_work + e_break) > 24.0:
             st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ต้องไม่เกิน 24 ชั่วโมงต่อวันครับ")
             return
-
-        # ⏳ แสดง Spinner โหลดข้อมูลกันคนกดย้ำ
         with st.spinner("กำลังบันทึกข้อมูล..."):
             try:
                 conn = get_db_connection()
@@ -228,7 +223,7 @@ def update_record_dialog_t1(row_data, pk_col):
                 conn.close()
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "UPDATE", "All Report: Tab 1", f"แก้ไข ID: {rec_id}")
-                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="🎉") # 🌟 เปลี่ยนมาใช้ Toast แจ้งเตือนมุมจอ
+                st.toast("✅ อัปเดตข้อมูลสำเร็จ!", icon="🎉") 
                 time.sleep(1.2)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
@@ -299,11 +294,9 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}")
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
-        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
         if e_work > 24.0:
             st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรถยนต์ต้องไม่เกิน 24 ชั่วโมงต่อวัน")
             return
-            
         with st.spinner("กำลังบันทึกข้อมูล..."):
             try:
                 u_liter_hr = round(e_liters / e_work, 2) if e_work > 0 else 0.00
@@ -351,11 +344,9 @@ def update_record_dialog_t3(row_data, pk_col):
     e_rem = st.text_input("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''))
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary"):
-        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
         if (e_pm + e_npm) > e_tot:
             st.error("⚠️ ไม่สามารถบันทึกได้: จำนวนครั้งที่ 'แรงดันตก' (PM + นอก PM) ต้องไม่มากกว่า 'จำนวนครั้งที่ตรวจเช็คทั้งหมด'")
             return
-            
         with st.spinner("กำลังบันทึกข้อมูล..."):
             try:
                 conn = get_db_connection()
@@ -424,11 +415,9 @@ def update_record_dialog_t4(row_data, pk_col):
 
     btn_disabled = (e_boiler == "-- ไม่มีข้อมูลบอยเลอร์ --")
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
-        # 🛑 Validation: ตรวจสอบความถูกต้องก่อนเซฟ
         if e_hrs > 24.0:
             st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานต้องไม่เกิน 24 ชั่วโมงต่อวัน")
             return
-            
         with st.spinner("กำลังบันทึกข้อมูล..."):
             try:
                 conn = get_db_connection()
@@ -1564,18 +1553,24 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                    headers = ["ID", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
+                    headers = ["No.", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in paginated_t1:
+                        start_num = (st.session_state.get("rep1_page", 1) - 1) * st.session_state.get("rep1_rows", 15)
+                        for i, r in enumerate(paginated_t1):
+                            seq_num = start_num + i + 1
                             rec_id = r[pk_col_t1]
                             cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                            cols[0].write(rec_id)
+                            cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                            cols[3].write(r.get('machine_name') or '-'); cols[4].write(r.get('machine_qty') or 0); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}"); cols[7].write(r.get('remarks') or '-')
+                            cols[3].write(str(r.get('machine_name') or '-'))
+                            cols[4].write(str(r.get('machine_qty') or 0))
+                            cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}")
+                            cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}")
+                            cols[7].write(str(r.get('remarks') or '-'))
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
@@ -1592,9 +1587,11 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     if paginated_t1:
                         df_list = []
-                        for r in paginated_t1:
+                        start_num = (st.session_state.get("rep1_page", 1) - 1) * st.session_state.get("rep1_rows", 15)
+                        for i, r in enumerate(paginated_t1):
+                            seq_num = start_num + i + 1
                             df_list.append({
-                                "ID": r[pk_col_t1],
+                                "ลำดับ": seq_num,
                                 "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
                                 "สาขา": r.get('branch_name') or '-',
                                 "ชื่อเครื่องจักร": r.get('machine_name') or '-',
@@ -1669,19 +1666,25 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                    headers = ["ID", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
+                    headers = ["No.", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in paginated_t2:
+                        start_num = (st.session_state.get("rep2_page", 1) - 1) * st.session_state.get("rep2_rows", 15)
+                        for i, r in enumerate(paginated_t2):
+                            seq_num = start_num + i + 1
                             rec_id = r[pk_col_t2]
                             lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
                             cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                            cols[0].write(rec_id)
+                            cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
-                            cols[3].write(r.get('engine_code') or '-'); cols[4].write(f"{lts:.2f}"); cols[5].write(f"{hrs:.2f}"); cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}"); cols[7].write(r.get('remark') or '-')
+                            cols[3].write(str(r.get('engine_code') or '-'))
+                            cols[4].write(f"{lts:.2f}")
+                            cols[5].write(f"{hrs:.2f}")
+                            cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}")
+                            cols[7].write(str(r.get('remark') or '-'))
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
@@ -1698,10 +1701,12 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     if paginated_t2:
                         df_list = []
-                        for r in paginated_t2:
+                        start_num = (st.session_state.get("rep2_page", 1) - 1) * st.session_state.get("rep2_rows", 15)
+                        for i, r in enumerate(paginated_t2):
+                            seq_num = start_num + i + 1
                             lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
                             df_list.append({
-                                "ID": r[pk_col_t2],
+                                "ลำดับ": seq_num,
                                 "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
                                 "สาขา/ประเภท": f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}",
                                 "ทะเบียนรถ": r.get('engine_code') or '-',
@@ -1775,18 +1780,24 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                    headers = ["ID", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
+                    headers = ["No.", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
-                        for r in paginated_t3:
+                        start_num = (st.session_state.get("rep3_page", 1) - 1) * st.session_state.get("rep3_rows", 15)
+                        for i, r in enumerate(paginated_t3):
+                            seq_num = start_num + i + 1
                             rec_id = r[pk_col_t3]
                             cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                            cols[0].write(rec_id)
+                            cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                            cols[3].write(r.get('total_count') or 0); cols[4].write(r.get('total_drop') or 0); cols[5].write(r.get('pm_drop') or 0); cols[6].write(r.get('non_pm_drop') or 0); cols[7].write(r.get('remark') or '-')
+                            cols[3].write(str(r.get('total_count') or 0))
+                            cols[4].write(str(r.get('total_drop') or 0))
+                            cols[5].write(str(r.get('pm_drop') or 0))
+                            cols[6].write(str(r.get('non_pm_drop') or 0))
+                            cols[7].write(str(r.get('remark') or '-'))
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
@@ -1803,9 +1814,11 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     if paginated_t3:
                         df_list = []
-                        for r in paginated_t3:
+                        start_num = (st.session_state.get("rep3_page", 1) - 1) * st.session_state.get("rep3_rows", 15)
+                        for i, r in enumerate(paginated_t3):
+                            seq_num = start_num + i + 1
                             df_list.append({
-                                "ID": r[pk_col_t3],
+                                "ลำดับ": seq_num,
                                 "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
                                 "สาขา": r.get('branch_name') or '-',
                                 "ทั้งหมด(ครั้ง)": r.get('total_count') or 0,
@@ -1887,18 +1900,20 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         with st.container():
                             st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                             header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
-                            headers = ["ID", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
+                            headers = ["No.", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
                             for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                             st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                             with st.container(height=380, border=False):
-                                for r in paginated_ov:
+                                start_num = (st.session_state.get("rep4_ov_page", 1) - 1) * st.session_state.get("rep4_ov_rows", 15)
+                                for i, r in enumerate(paginated_ov):
+                                    seq_num = start_num + i + 1
                                     rec_id = r[pk_col_ov]
                                     cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
-                                    cols[0].write(rec_id)
+                                    cols[0].write(str(seq_num))
                                     cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                                     cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
-                                    cols[3].write(r.get('oven_qty') or 0)
+                                    cols[3].write(str(r.get('oven_qty') or 0))
                                     cols[4].write(f"{float(r.get('wood_out_cubft') or 0.0):.2f}")
                                     cols[5].write(f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}")
                                     
@@ -1915,9 +1930,11 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                             if paginated_ov:
                                 df_list = []
-                                for r in paginated_ov:
+                                start_num = (st.session_state.get("rep4_ov_page", 1) - 1) * st.session_state.get("rep4_ov_rows", 15)
+                                for i, r in enumerate(paginated_ov):
+                                    seq_num = start_num + i + 1
                                     df_list.append({
-                                        "ID": r[pk_col_ov],
+                                        "ลำดับ": seq_num,
                                         "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
                                         "สาขา": r.get('branch_name') or '-',
                                         "จำนวนเตา(เตา)": r.get('oven_qty') or 0,
@@ -1951,25 +1968,28 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.info(f"ไม่พบข้อมูลสำหรับ {boiler_label}")
                         return
 
-                    paginated_t4 = render_custom_pagination(data_list, session_prefix=f"rep4_b_{boiler_label}")
+                    session_prefix = f"rep4_b_{boiler_label}"
+                    paginated_t4 = render_custom_pagination(data_list, session_prefix=session_prefix)
                     st.markdown("<br>", unsafe_allow_html=True)
                     
                     # 🖥️ DESKTOP VIEW
                     with st.container():
                         st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                         header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                        headers = ["ID", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
+                        headers = ["No.", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
                         for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                         st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                         with st.container(height=380, border=False):
-                            for r in paginated_t4:
+                            start_num = (st.session_state.get(f"{session_prefix}_page", 1) - 1) * st.session_state.get(f"{session_prefix}_rows", 15)
+                            for i, r in enumerate(paginated_t4):
+                                seq_num = start_num + i + 1
                                 rec_id = r[pk_col_t4]
                                 s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
                                 tot_w = s_w + w_w + ww_w
                                 s_prod = float(r.get('steam_production') or 1.0)
                                 cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
-                                cols[0].write(rec_id)
+                                cols[0].write(str(seq_num))
                                 cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                                 cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
                                 cols[3].write(f"{tot_w:.2f}"); cols[4].write(f"{s_prod:.2f}"); cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}"); cols[6].write(f"{((tot_w / s_prod) * 1000 if s_prod > 0 else 0.0):.2f}")
@@ -1987,12 +2007,14 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         st.markdown('<div class="mobile-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                         if paginated_t4:
                             df_list = []
-                            for r in paginated_t4:
+                            start_num = (st.session_state.get(f"{session_prefix}_page", 1) - 1) * st.session_state.get(f"{session_prefix}_rows", 15)
+                            for i, r in enumerate(paginated_t4):
+                                seq_num = start_num + i + 1
                                 s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
                                 tot_w = s_w + w_w + ww_w
                                 s_prod = float(r.get('steam_production') or 1.0)
                                 df_list.append({
-                                    "ID": r[pk_col_t4],
+                                    "ลำดับ": seq_num,
                                     "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
                                     "สาขา": r.get('branch_name') or '-',
                                     "เชื้อเพลิงรวม(ตัน)": f"{tot_w:.2f}",
