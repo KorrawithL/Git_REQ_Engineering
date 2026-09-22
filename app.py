@@ -254,11 +254,11 @@ if 'app_init' not in st.session_state:
     st.session_state['app_init'] = True
     st.markdown("""
         <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
-            <h1 style='color:#D97706; font-weight:800; font-size:45px;'>🪵 WORK WOOD</h1>
+            <h1 style='color:#D97706; font-weight:800; font-size:45px;'> WORK WOOD</h1>
             <p style='color:#64748B; font-size:18px;'>กำลังเชื่อมต่อและตรวจสอบข้อมูลการเข้าสู่ระบบ...</p>
         </div>
     """, unsafe_allow_html=True)
-    time.sleep(2) # สั่งหยุดรอ 2 วินาที
+    time.sleep(2.5) # สั่งหยุดรอ 2.5 วินาที
     st.rerun() 
 # =========================================================================
 
