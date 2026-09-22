@@ -3,3 +3,4 @@ pymysql
 cryptography
 pandas
 openpyxl
+streamlit-cookies-controller
