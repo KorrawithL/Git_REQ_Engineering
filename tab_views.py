@@ -4,9 +4,18 @@ import time
 from datetime import datetime
 from database import get_db_connection, log_activity
 from config import branch_dict
-
 # 🎯 1. นำเข้าฟังก์ชันดึงรายงาน เพื่อเอามาล้างแคชเฉพาะจุด (Targeted Cache Clearing)
 from all_reports import process_t1, process_t2, process_t3, process_t4
+
+# =========================================================================
+# 🌟 ท่าไม้ตายล้างกราฟค้าง (Force UI Flush) 🌟
+# =========================================================================
+ui_flusher = st.empty()
+with ui_flusher:
+    st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
+time.sleep(0.05) 
+ui_flusher.empty() 
+# =========================================================================
 
 # 📌 เพิ่มรับค่า parameter 'selected_sub_menu=None' เข้ามา
 def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):

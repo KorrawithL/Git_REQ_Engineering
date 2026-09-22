@@ -7,6 +7,7 @@ import numpy as np
 import altair as alt
 
 # 📦 นำเข้าฟังก์ชันจากไฟล์แยกที่ทำการ Refactoring ไว้
+from streamlit_cookies_controller import CookieController
 from home import render_dashboard
 from database import get_db_connection, hash_password
 from tab_views import render_engineering_system_tabs
@@ -40,21 +41,19 @@ def get_branch_dict_from_db():
 def setup_pwa():
     pwa_script = """
     <script>
-        // ป้องกันการแอดโค้ดซ้ำ
         if (!window.parent.document.getElementById('pwa-manifest')) {
-            // 1. สร้าง Manifest ปลอมขึ้นมา (บอกชื่อแอป สี และไอคอน)
             const manifest = {
                 "name": "Woodwork Engineering Records System",
                 "short_name": "Work Wood",
                 "theme_color": "#D97706",
                 "background_color": "#F2EFEA",
-                "display": "standalone", // คำสั่งบังคับให้เปิดแบบเต็มจอ (ซ่อนแถบ URL)
-                "orientation": "portrait", // ล็อคหน้าจอแนวตั้ง
+                "display": "standalone", 
+                "orientation": "portrait", 
                 "scope": "/",
                 "start_url": "/",
                 "icons": [
                     {
-                        "src": "https://cdn-icons-png.flaticon.com/512/3206/3206016.png", // ลิงก์รูปไอคอนแอป (เปลี่ยนได้)
+                        "src": "https://cdn-icons-png.flaticon.com/512/3206/3206016.png", 
                         "sizes": "192x192",
                         "type": "image/png"
                     },
@@ -65,8 +64,6 @@ def setup_pwa():
                     }
                 ]
             };
-            
-            // แปลง Manifest ให้เป็น Data URL แล้วฝังใน Header
             const manifestString = JSON.stringify(manifest);
             const manifestUrl = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(manifestString);
             
@@ -76,7 +73,6 @@ def setup_pwa():
             link.href = manifestUrl;
             window.parent.document.head.appendChild(link);
             
-            // 2. ตั้งค่า Meta Tags บังคับให้ iOS (iPhone/iPad) มองว่าเป็น App
             const metaTags = [
                 {name: "apple-mobile-web-app-capable", content: "yes"},
                 {name: "apple-mobile-web-app-status-bar-style", content: "black-translucent"},
@@ -91,7 +87,6 @@ def setup_pwa():
                 window.parent.document.head.appendChild(meta);
             });
 
-            // 3. กำหนดไอคอนสำหรับ iOS
             const appleIcon = window.parent.document.createElement('link');
             appleIcon.rel = "apple-touch-icon";
             appleIcon.href = "https://cdn-icons-png.flaticon.com/512/3206/3206016.png";
@@ -113,15 +108,210 @@ st.set_page_config(
 
 setup_pwa()
 
-SESSION_TIMEOUT_SECONDS = 1800  
+# =========================================================================
+# 🚀 🌟 CSS หลักสำหรับแต่งหน้าจอ 🌟 🚀
+# =========================================================================
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
+
+.stAppDeployButton { display: none !important; }
+[data-testid="stHeaderActionElements"] { display: none !important; }
+#MainMenu { display: none !important; }
+footer { display: none !important; }
+
+@media (min-width: 769px) {
+    html body header[data-testid="stHeader"] { display: none !important; visibility: hidden !important; }
+    html body [data-testid="stSidebarCollapseButton"] { display: none !important; }       
+    html body [data-testid="collapsedControl"] { display: none !important; }
+    [data-testid="stSidebar"] { min-width: 250px !important; max-width: 250px !important; }
+    .main .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
+    div[data-testid="stMainBlockContainer"] { padding-top: 1.5rem !important; }
+    .dash-title { font-size: 38px !important; margin-top: 0px !important; }
+    .welcome-title { font-size: 26px !important; }
+    .welcome-desc { font-size: 18px !important; }
+    .welcome-details { font-size: 16px !important; }
+}
+
+@media (max-width: 768px) {
+    html body header[data-testid="stHeader"] { 
+        display: block !important; 
+        visibility: visible !important;
+        background: transparent !important; 
+        box-shadow: none !important; 
+    }
+    html body [data-testid="stSidebarCollapseButton"], 
+    html body [data-testid="collapsedControl"],
+    html body button[kind="header"] { 
+        display: inline-flex !important; 
+        visibility: visible !important;
+        z-index: 99999 !important;
+    }
+    .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; }
+    div[data-testid="stMainBlockContainer"] { padding-top: 3.5rem !important; }
+    .dash-title { font-size: 28px !important; margin-top: 10px !important; }
+    .welcome-title { font-size: 20px !important; }
+    .welcome-desc { font-size: 15px !important; }
+    .welcome-details { font-size: 14px !important; }
+}
+
+.stApp { background-color: #F2EFEA !important; color: #333333 !important; }
+[data-testid="stSidebar"] { background-color: #E8E3DD !important; border-right: 1px solid #D6D3D1 !important; }
+
+html, body, h1, h2, h3, h4, h5, h6, p, label, input, div.stMarkdown, div.stMetric {
+    font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
+    color: #333333 !important; 
+}
+
+span.material-symbols-rounded, 
+span.material-icons, 
+.material-symbols-rounded, 
+.material-icons, 
+[data-testid="stIconMaterial"], 
+[data-testid="stTooltipIcon"],
+html body [data-testid="stSidebarCollapseButton"] *, 
+html body [data-testid="collapsedControl"] *, 
+html body header[data-testid="stHeader"] * {
+    font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+    color: #333333 !important;
+}
+
+div[data-baseweb="tab"][aria-selected="false"] p, div[data-baseweb="tab"][aria-selected="false"] span { color: #666666 !important; }
+
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.data-entry-marker) {
+    background-color: #FCFBF8 !important; border: 2px solid #D97706 !important;  
+    border-radius: 12px !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08) !important; padding: 5px !important;
+}
+
+div[data-testid="stForm"] { background-color: transparent !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; padding: 20px !important; }
+div[data-testid="stExpander"] details { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; overflow: hidden !important; }
+div[data-testid="stExpander"] details summary { background-color: #FCFBF8 !important; padding: 10px !important; }
+div[data-testid="stExpander"] details summary:hover { background-color: #F5F5F5 !important; }
+
+.stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
+table th, table td { color: #333333 !important; border-color: #D6D3D1 !important; background-color: #F2EFEA !important; }
+div[data-baseweb="select"] > div, div[data-baseweb="select"] > div:hover { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
+div[data-baseweb="select"] span { color: #000000 !important; }
+div[data-baseweb="select"] svg, div[data-testid="stDateInput"] svg, div[data-testid="stTimeInput"] svg { fill: #0F172A !important; color: #0F172A !important; }
+
+div[role="dialog"], [data-testid="stDialog"], div[data-testid="stModal"] > div { background-color: #FFFFFF !important; }
+div[role="dialog"] p, div[role="dialog"] span, div[role="dialog"] label, div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, div[role="dialog"] h4, div[role="dialog"] h5, div[role="dialog"] h6 { color: #0F172A !important; -webkit-text-fill-color: #0F172A !important; }
+div[role="dialog"] button[data-testid="baseButton-primary"] * { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+div[role="dialog"] div[data-testid="stForm"] { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+div[role="dialog"] input, div[role="dialog"] textarea, div[role="dialog"] div[data-baseweb="select"] span { background-color: transparent !important; color: #0F172A !important; }
+
+div[data-testid="stNumberInput"] button { background-color: #F8FAFC !important; border: none !important; }
+div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
+
+[data-testid="stSidebar"] div.stButton > button { 
+    background-color: #FFFFFF !important; border: 1px solid #D6D3D1 !important; color: #333333 !important; 
+    border-radius: 8px !important; padding: 10px 14px !important; 
+    font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
+    font-size: 18px !important; font-weight: 700 !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; 
+}
+[data-testid="stSidebar"] div.stButton > button:hover { border-color: #D97706 !important; color: #D97706 !important; }
+[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] { 
+    background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
+}
+
+[data-testid="stSidebar"] div[data-testid="stRadio"] { border-left: 2px solid #D6D3D1 !important; margin-left: 20px !important; padding-left: 5px !important; margin-bottom: 15px !important; }
+[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"], [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div { display: none !important; }
+[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label { background-color: transparent !important; padding: 8px 10px !important; margin: 0 !important; border-radius: 8px !important; cursor: pointer !important; }
+[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label p { color: #666666 !important; font-size: 16px !important; font-weight: 500 !important; margin: 0 !important; line-height: 1.5 !important; }
+[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover { background-color: #F5F5F5 !important; }
+[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important; }
+[data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p { color: #D97706 !important; font-weight: 700 !important; }
+
+div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
+
+[data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
+
+/* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
+    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] p,
+    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] span,
+    div[role="dialog"] div.stButton button[kind="primary"] p,
+    div[role="dialog"] div.stButton button[kind="primary"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    /* 🌟 2. คืนชีพปุ่มเมนูแถบซ้าย (Sidebar) ที่กำลังใช้งานอยู่ ให้พื้นหลังเป็นสีส้ม และตัวหนังสือสีขาวเด่นๆ */
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"],
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] { 
+        background-color: #D97706 !important; 
+        border: 1px solid #D97706 !important; 
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
+    }
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] p,
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] span,
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] p,
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 700 !important;
+
+</style>
+""", unsafe_allow_html=True)
+
+# 🍪 เริ่มต้นการทำงานของระบบคุกกี้
+controller = CookieController()
+SESSION_TIMEOUT_SECONDS = 1800
+
+# =========================================================================
+# 🌟 ท่าไม้ตาย: ดักการกด F5 เพื่อรอรับคุกกี้ ป้องกันหน้า Login กระพริบ 🌟
+# =========================================================================
+if 'app_init' not in st.session_state:
+    st.session_state['app_init'] = True
+    # สร้างหน้าต่าง Loading คั่นเวลา 0.6 วินาที เพื่อให้เบราว์เซอร์ส่งคุกกี้กลับมาให้ทัน
+    st.markdown("""
+        <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
+            <h1 style='color:#D97706; font-weight:800; font-size:45px;'>WORK WOOD</h1>
+            <p style='color:#64748B; font-size:18px;'>กำลังตรวจสอบข้อมูลการเข้าสู่ระบบ...</p>
+        </div>
+    """, unsafe_allow_html=True)
+    time.sleep(0.6) # สั่งหยุดรอ 0.6 วินาที
+    st.rerun() # เริ่มวาดหน้าจอใหม่ (ซึ่งคราวนี้คุกกี้มาถึงแล้ว!)
+# =========================================================================
 
 def perform_logout(message=None):
     for key in ['logged_in', 'user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'allowed_branches', 'last_activity', 'page']:
         if key in st.session_state:
             del st.session_state[key]
-    # ❌ ปิดการเคลียร์ URL Query (ตามมาตรการความปลอดภัย)
+    controller.remove("auth_user") # ล้างคุกกี้ทันทีที่ออกจากระบบ
     if message:
         st.warning(message)
+
+def restore_session_from_cookie():
+    if not st.session_state.get('logged_in'):
+        saved_user = controller.get("auth_user")
+        if saved_user:
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    sql = """SELECT u.user_id, u.username, u.full_name, u.position, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
+                             FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id
+                             WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4) AND u.status = 'active'"""
+                    cur.execute(sql, (saved_user,))
+                    user = cur.fetchone()
+                    if user:
+                        cur.execute("SELECT branch_id FROM user_branches WHERE user_id = %s", (user['user_id'],))
+                        extra_branches = cur.fetchall()
+                conn.close()
+
+                if user:
+                    now_time = time.time()
+                    st.session_state['logged_in'] = True
+                    for k in ['user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name']:
+                        st.session_state[k] = user[k]
+                    st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
+                    raw_tabs = user.get('allowed_tabs', '') or ''
+                    st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
+                    allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
+                    st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
+                    st.session_state['last_activity'] = now_time
+            except Exception as e: print(f"Error: {e}")
 
 def check_session_timeout():
     if st.session_state.get('logged_in'):
@@ -162,7 +352,8 @@ def change_password_dialog():
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
 
-# ❌ เอาฟังก์ชัน restore_session_from_url ออก (ตามมาตรการความปลอดภัย)
+# 🍪 เรียกใช้งานการดึงคุกกี้เมื่อเปิดหน้าเว็บ
+restore_session_from_cookie()
 check_session_timeout()
 
 # -----------------------------------------------------------------------------
@@ -235,9 +426,26 @@ if not st.session_state.get('logged_in'):
         @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
         
         header {visibility: hidden;} #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
-        .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; max-width: 950px !important; margin: auto; } 
         
-        /* 🌟 บังคับซ่อน Sidebar ในหน้า Login แบบเด็ดขาด */
+        /* 🌟 1. เวทมนตร์จัดการ UI Flickering 🌟
+           ซ่อนเนื้อหาหน้า Login ทั้งหมดไว้ก่อน 5 วินาที
+           ถ้าเซิร์ฟเวอร์เจอกุญแจคุกกี้ มันจะวาร์ปไปหน้า Dashboard ก่อนที่เวลาจะหมด
+           แต่ถ้าไม่มีคุกกี้ หน้า Login จะค่อยๆ ลอยขึ้นมาแบบ Fade-in สวยๆ ครับ */
+        .main .block-container { 
+            padding-top: 3.5rem !important; 
+            padding-bottom: 2rem !important; 
+            max-width: 950px !important; 
+            margin: auto; 
+            animation: smoothLoginFade 5s ease-in-out forwards;
+        } 
+        
+        @keyframes smoothLoginFade {
+            0% { opacity: 0; transform: translateY(15px); }
+            70% { opacity: 0; transform: translateY(15px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 🌟 2. ซ่อน Sidebar ในหน้า Login แบบเด็ดขาด */
         [data-testid="stSidebar"] { display: none !important; visibility: hidden !important; width: 0px !important; }
         [data-testid="stSidebarCollapseButton"] { display: none !important; }       
         [data-testid="collapsedControl"] { display: none !important; }
@@ -301,10 +509,12 @@ if not st.session_state.get('logged_in'):
                                     
                                     allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
                                     st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
-                                    
                                     st.session_state['last_activity'] = now_time
-                                    # ❌ ถอดการทำงาน st.query_params ออกจากจุดนี้
+                                    
+                                    # 🍪 สั่งบันทึกคุกกี้เก็บไว้ในเบราว์เซอร์ 30 นาที
+                                    controller.set("auth_user", user['username'], max_age=SESSION_TIMEOUT_SECONDS)
                                     st.success("เข้าสู่ระบบสำเร็จ!")
+                                    time.sleep(1) # ให้เวลา Browser บันทึกคุกกี้ก่อนเปลี่ยนหน้า
                                     st.rerun()
                             else: st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
                         except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
@@ -319,7 +529,6 @@ if not st.session_state.get('logged_in'):
 # -----------------------------------------------------------------------------
 else:
     st.session_state['last_activity'] = time.time()
-    # ❌ ถอดการทำงาน st.query_params ออกจากจุดนี้ 
 
     disp_name = st.session_state.get('full_name') or st.session_state.get('username')
     current_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
@@ -420,175 +629,39 @@ else:
     sub_menu_report = st.session_state.get('sidebar_sub_report')
 
     # =========================================================================
-    # 🌟 Dashboard View (เคลียร์ Spinner ออก ป้องกัน Ghosting)
+    # 🌟 ท่าไม้ตายล้างกราฟค้าง (Force UI Flush) 🌟
     # =========================================================================
-    if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
-        user_position = st.session_state.get('position', '-')
-        render_dashboard(
-            current_branch_id, disp_name, role_th, current_branch, 
-            user_position, current_access, access_color, access_desc
-        )
-
+    ui_flusher = st.empty()
+    with ui_flusher:
+        st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
+    time.sleep(0.05) 
+    ui_flusher.empty() 
     # =========================================================================
-    # 🌟 หน้าอื่นๆ (เคลียร์ Spinner ออก ป้องกัน Ghosting)
-    # =========================================================================
-    elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
-        st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
-        render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
-        
-    elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
-        render_admin_user_management()
-        
-    elif selected_main == report_menu_label: 
-        render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
-        
-    elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
-        render_add_new_equipment()
 
     # =========================================================================
-    # 🚀 🌟 CSS หลักสำหรับแต่งหน้าจอ (ลบโค้ดกราฟขยะเก่าออกหมดแล้ว) 🌟 🚀
+    # 🌟 พื้นที่แสดงผลหลัก (แก้ปัญหากราฟค้างด้วยการ Clear Container)
     # =========================================================================
-    st.markdown("""
-    <style>
-    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
-    @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
+    main_view = st.empty() # สร้างตัวล้างหน้าจอ
+    
+    with main_view.container(): # <--- เพิ่มบรรทัดนี้ แล้วครอบ if/elif ทั้งหมด
+        if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
+            user_position = st.session_state.get('position', '-')
+            render_dashboard(
+                current_branch_id, disp_name, role_th, current_branch, 
+                user_position, current_access, access_color, access_desc
+            )
 
-    .stAppDeployButton { display: none !important; }
-    [data-testid="stHeaderActionElements"] { display: none !important; }
-    #MainMenu { display: none !important; }
-    footer { display: none !important; }
-    
-    @media (min-width: 769px) {
-        html body header[data-testid="stHeader"] { display: none !important; visibility: hidden !important; }
-        html body [data-testid="stSidebarCollapseButton"] { display: none !important; }       
-        html body [data-testid="collapsedControl"] { display: none !important; }
-        [data-testid="stSidebar"] { min-width: 250px !important; max-width: 250px !important; }
-        .main .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
-        div[data-testid="stMainBlockContainer"] { padding-top: 1.5rem !important; }
-        .dash-title { font-size: 38px !important; margin-top: 0px !important; }
-        .welcome-title { font-size: 26px !important; }
-        .welcome-desc { font-size: 18px !important; }
-        .welcome-details { font-size: 16px !important; }
-    }
+        elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
+            st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
+            render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+            
+        elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
+            render_admin_user_management()
+            
+        elif selected_main == report_menu_label: 
+            render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+            
+        elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
+            render_add_new_equipment()
 
-    @media (max-width: 768px) {
-        html body header[data-testid="stHeader"] { 
-            display: block !important; 
-            visibility: visible !important;
-            background: transparent !important; 
-            box-shadow: none !important; 
-        }
-        html body [data-testid="stSidebarCollapseButton"], 
-        html body [data-testid="collapsedControl"],
-        html body button[kind="header"] { 
-            display: inline-flex !important; 
-            visibility: visible !important;
-            z-index: 99999 !important;
-        }
-        .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; }
-        div[data-testid="stMainBlockContainer"] { padding-top: 3.5rem !important; }
-        .dash-title { font-size: 28px !important; margin-top: 10px !important; }
-        .welcome-title { font-size: 20px !important; }
-        .welcome-desc { font-size: 15px !important; }
-        .welcome-details { font-size: 14px !important; }
-    }
     
-    .stApp { background-color: #F2EFEA !important; color: #333333 !important; }
-    [data-testid="stSidebar"] { background-color: #E8E3DD !important; border-right: 1px solid #D6D3D1 !important; }
-    
-    html, body, h1, h2, h3, h4, h5, h6, p, label, input, div.stMarkdown, div.stMetric {
-        font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-        color: #333333 !important; 
-    }
-    
-    span.material-symbols-rounded, 
-    span.material-icons, 
-    .material-symbols-rounded, 
-    .material-icons, 
-    [data-testid="stIconMaterial"], 
-    [data-testid="stTooltipIcon"],
-    html body [data-testid="stSidebarCollapseButton"] *, 
-    html body [data-testid="collapsedControl"] *, 
-    html body header[data-testid="stHeader"] * {
-        font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
-        color: #333333 !important;
-    }
-    
-    div[data-baseweb="tab"][aria-selected="false"] p, div[data-baseweb="tab"][aria-selected="false"] span { color: #666666 !important; }
-    
-    div[data-testid="stVerticalBlockBorderWrapper"]:has(.data-entry-marker) {
-        background-color: #FCFBF8 !important; border: 2px solid #D97706 !important;  
-        border-radius: 12px !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08) !important; padding: 5px !important;
-    }
-
-    div[data-testid="stForm"] { background-color: transparent !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; padding: 20px !important; }
-    div[data-testid="stExpander"] details { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; overflow: hidden !important; }
-    div[data-testid="stExpander"] details summary { background-color: #FCFBF8 !important; padding: 10px !important; }
-    div[data-testid="stExpander"] details summary:hover { background-color: #F5F5F5 !important; }
-
-    .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
-    table th, table td { color: #333333 !important; border-color: #D6D3D1 !important; background-color: #F2EFEA !important; }
-    div[data-baseweb="select"] > div, div[data-baseweb="select"] > div:hover { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
-    div[data-baseweb="select"] span { color: #000000 !important; }
-    div[data-baseweb="select"] svg, div[data-testid="stDateInput"] svg, div[data-testid="stTimeInput"] svg { fill: #0F172A !important; color: #0F172A !important; }
-    
-    div[role="dialog"], [data-testid="stDialog"], div[data-testid="stModal"] > div { background-color: #FFFFFF !important; }
-    div[role="dialog"] p, div[role="dialog"] span, div[role="dialog"] label, div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, div[role="dialog"] h4, div[role="dialog"] h5, div[role="dialog"] h6 { color: #0F172A !important; -webkit-text-fill-color: #0F172A !important; }
-    div[role="dialog"] button[data-testid="baseButton-primary"] * { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
-    div[role="dialog"] div[data-testid="stForm"] { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
-    div[role="dialog"] input, div[role="dialog"] textarea, div[role="dialog"] div[data-baseweb="select"] span { background-color: transparent !important; color: #0F172A !important; }
-    
-    div[data-testid="stNumberInput"] button { background-color: #F8FAFC !important; border: none !important; }
-    div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
-    
-    [data-testid="stSidebar"] div.stButton > button { 
-        background-color: #FFFFFF !important; border: 1px solid #D6D3D1 !important; color: #333333 !important; 
-        border-radius: 8px !important; padding: 10px 14px !important; 
-        font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-        font-size: 18px !important; font-weight: 700 !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; 
-    }
-    [data-testid="stSidebar"] div.stButton > button:hover { border-color: #D97706 !important; color: #D97706 !important; }
-    [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] { 
-        background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
-    }
-    
-    [data-testid="stSidebar"] div[data-testid="stRadio"] { border-left: 2px solid #D6D3D1 !important; margin-left: 20px !important; padding-left: 5px !important; margin-bottom: 15px !important; }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"], [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div { display: none !important; }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label { background-color: transparent !important; padding: 8px 10px !important; margin: 0 !important; border-radius: 8px !important; cursor: pointer !important; }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label p { color: #666666 !important; font-size: 16px !important; font-weight: 500 !important; margin: 0 !important; line-height: 1.5 !important; }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:hover { background-color: #F5F5F5 !important; }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important; }
-    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p { color: #D97706 !important; font-weight: 700 !important; }
-    
-    div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
-    
-    [data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
-    
-    /* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
-    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] p,
-    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] span,
-    div[role="dialog"] div.stButton button[kind="primary"] p,
-    div[role="dialog"] div.stButton button[kind="primary"] span {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }
-
-    /* 🌟 2. คืนชีพปุ่มเมนูแถบซ้าย (Sidebar) ที่กำลังใช้งานอยู่ ให้พื้นหลังเป็นสีส้ม และตัวหนังสือสีขาวเด่นๆ */
-    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"],
-    [data-testid="stSidebar"] div.stButton button[kind="primary"] { 
-        background-color: #D97706 !important; 
-        border: 1px solid #D97706 !important; 
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
-    }
-    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] p,
-    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] span,
-    [data-testid="stSidebar"] div.stButton button[kind="primary"] p,
-    [data-testid="stSidebar"] div.stButton button[kind="primary"] span {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-        font-weight: 700 !important;
-    
-
-    </style>
-    """, unsafe_allow_html=True)

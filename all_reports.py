@@ -12,6 +12,16 @@ from openpyxl.utils import get_column_letter
 from database import get_db_connection, log_activity
 from config import branch_dict
 
+# =========================================================================
+# 🌟 ท่าไม้ตายล้างกราฟค้าง (Force UI Flush) 🌟
+# =========================================================================
+ui_flusher = st.empty()
+with ui_flusher:
+    st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
+time.sleep(0.05) 
+ui_flusher.empty() 
+# =========================================================================
+
 # ==========================================================
 # 🛑 1. ฟังก์ชัน Popup ยืนยันการลบข้อมูล (Delete Dialogs)
 # ==========================================================
