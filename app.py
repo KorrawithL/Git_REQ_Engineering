@@ -108,9 +108,7 @@ st.set_page_config(
 
 setup_pwa()
 
-# =========================================================================
-# 🚀 🌟 CSS หลักสำหรับแต่งหน้าจอ 🌟 🚀
-# =========================================================================
+# 🚀 🌟 วาง CSS หลักสำหรับแต่งหน้าจอ ไว้บนสุดเพื่อแก้ปัญหาหน้าจอสีขาว 🌟 🚀
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
@@ -136,19 +134,8 @@ footer { display: none !important; }
 }
 
 @media (max-width: 768px) {
-    html body header[data-testid="stHeader"] { 
-        display: block !important; 
-        visibility: visible !important;
-        background: transparent !important; 
-        box-shadow: none !important; 
-    }
-    html body [data-testid="stSidebarCollapseButton"], 
-    html body [data-testid="collapsedControl"],
-    html body button[kind="header"] { 
-        display: inline-flex !important; 
-        visibility: visible !important;
-        z-index: 99999 !important;
-    }
+    html body header[data-testid="stHeader"] { display: block !important; visibility: visible !important; background: transparent !important; box-shadow: none !important; }
+    html body [data-testid="stSidebarCollapseButton"], html body [data-testid="collapsedControl"], html body button[kind="header"] { display: inline-flex !important; visibility: visible !important; z-index: 99999 !important; }
     .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; }
     div[data-testid="stMainBlockContainer"] { padding-top: 3.5rem !important; }
     .dash-title { font-size: 28px !important; margin-top: 10px !important; }
@@ -160,30 +147,13 @@ footer { display: none !important; }
 .stApp { background-color: #F2EFEA !important; color: #333333 !important; }
 [data-testid="stSidebar"] { background-color: #E8E3DD !important; border-right: 1px solid #D6D3D1 !important; }
 
-html, body, h1, h2, h3, h4, h5, h6, p, label, input, div.stMarkdown, div.stMetric {
-    font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-    color: #333333 !important; 
-}
+html, body, h1, h2, h3, h4, h5, h6, p, label, input, div.stMarkdown, div.stMetric { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; color: #333333 !important; }
 
-span.material-symbols-rounded, 
-span.material-icons, 
-.material-symbols-rounded, 
-.material-icons, 
-[data-testid="stIconMaterial"], 
-[data-testid="stTooltipIcon"],
-html body [data-testid="stSidebarCollapseButton"] *, 
-html body [data-testid="collapsedControl"] *, 
-html body header[data-testid="stHeader"] * {
-    font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
-    color: #333333 !important;
-}
+span.material-symbols-rounded, span.material-icons, .material-symbols-rounded, .material-icons, [data-testid="stIconMaterial"], [data-testid="stTooltipIcon"], html body [data-testid="stSidebarCollapseButton"] *, html body [data-testid="collapsedControl"] *, html body header[data-testid="stHeader"] * { font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important; color: #333333 !important; }
 
 div[data-baseweb="tab"][aria-selected="false"] p, div[data-baseweb="tab"][aria-selected="false"] span { color: #666666 !important; }
 
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.data-entry-marker) {
-    background-color: #FCFBF8 !important; border: 2px solid #D97706 !important;  
-    border-radius: 12px !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08) !important; padding: 5px !important;
-}
+div[data-testid="stVerticalBlockBorderWrapper"]:has(.data-entry-marker) { background-color: #FCFBF8 !important; border: 2px solid #D97706 !important; border-radius: 12px !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08) !important; padding: 5px !important; }
 
 div[data-testid="stForm"] { background-color: transparent !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; padding: 20px !important; }
 div[data-testid="stExpander"] details { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; overflow: hidden !important; }
@@ -205,16 +175,9 @@ div[role="dialog"] input, div[role="dialog"] textarea, div[role="dialog"] div[da
 div[data-testid="stNumberInput"] button { background-color: #F8FAFC !important; border: none !important; }
 div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
 
-[data-testid="stSidebar"] div.stButton > button { 
-    background-color: #FFFFFF !important; border: 1px solid #D6D3D1 !important; color: #333333 !important; 
-    border-radius: 8px !important; padding: 10px 14px !important; 
-    font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-    font-size: 18px !important; font-weight: 700 !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; 
-}
+[data-testid="stSidebar"] div.stButton > button { background-color: #FFFFFF !important; border: 1px solid #D6D3D1 !important; color: #333333 !important; border-radius: 8px !important; padding: 10px 14px !important; font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 18px !important; font-weight: 700 !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; }
 [data-testid="stSidebar"] div.stButton > button:hover { border-color: #D97706 !important; color: #D97706 !important; }
-[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] { 
-    background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
-}
+[data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] { background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; }
 
 [data-testid="stSidebar"] div[data-testid="stRadio"] { border-left: 2px solid #D6D3D1 !important; margin-left: 20px !important; padding-left: 5px !important; margin-bottom: 15px !important; }
 [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"], [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] input[type="radio"] + div { display: none !important; }
@@ -225,7 +188,6 @@ div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
 [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p { color: #D97706 !important; font-weight: 700 !important; }
 
 div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
-
 [data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
 
 /* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
@@ -255,43 +217,62 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
 </style>
 """, unsafe_allow_html=True)
 
-# 🍪 เริ่มต้นการทำงานของระบบคุกกี้
+# =========================================================================
+# 🍪 เกราะป้องกันระบบคุกกี้ (Cookie Safe Methods) 🍪
+# ดักจับ Error ทุกชนิด ป้องกันโค้ดหยุดทำงานกลางคัน
+# =========================================================================
 controller = CookieController()
-SESSION_TIMEOUT_SECONDS = 1800
+SESSION_TIMEOUT_SECONDS = 1800  
+
+def safe_set_cookie(name, value, max_age):
+    try:
+        # บังคับสร้าง Dictionary จำลองถ้าเบราว์เซอร์ยังโหลดไม่เสร็จ
+        if getattr(controller, '_CookieController__cookies', None) is None:
+            controller._CookieController__cookies = {}
+        controller.set(name, value, max_age=max_age)
+    except Exception:
+        pass
+
+def safe_remove_cookie(name):
+    try:
+        if getattr(controller, '_CookieController__cookies', None) is None:
+            controller._CookieController__cookies = {}
+        controller.remove(name)
+    except Exception:
+        pass
+
+def safe_get_cookie(name):
+    try:
+        return controller.get(name)
+    except Exception:
+        return None
 
 # =========================================================================
 # 🌟 ท่าไม้ตาย: ดักการกด F5 เพื่อรอรับคุกกี้ ป้องกันหน้า Login กระพริบ 🌟
 # =========================================================================
 if 'app_init' not in st.session_state:
     st.session_state['app_init'] = True
-    # สร้างหน้าต่าง Loading คั่นเวลา 0.6 วินาที เพื่อให้เบราว์เซอร์ส่งคุกกี้กลับมาให้ทัน
     st.markdown("""
         <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
-            <h1 style='color:#D97706; font-weight:800; font-size:45px;'>WORK WOOD</h1>
-            <p style='color:#64748B; font-size:18px;'>กำลังตรวจสอบข้อมูลการเข้าสู่ระบบ...</p>
+            <h1 style='color:#D97706; font-weight:800; font-size:45px;'>🪵 WORK WOOD</h1>
+            <p style='color:#64748B; font-size:18px;'>กำลังเชื่อมต่อและตรวจสอบข้อมูลการเข้าสู่ระบบ...</p>
         </div>
     """, unsafe_allow_html=True)
-    time.sleep(0.6) # สั่งหยุดรอ 0.6 วินาที
-    st.rerun() # เริ่มวาดหน้าจอใหม่ (ซึ่งคราวนี้คุกกี้มาถึงแล้ว!)
+    time.sleep(0.7) # สั่งหยุดรอ 0.7 วินาที
+    st.rerun() 
 # =========================================================================
 
 def perform_logout(message=None):
     for key in ['logged_in', 'user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'allowed_branches', 'last_activity', 'page']:
         if key in st.session_state:
             del st.session_state[key]
-    controller.remove("auth_user") # ล้างคุกกี้ทันทีที่ออกจากระบบ
+    safe_remove_cookie("auth_user") # ล้างคุกกี้อย่างปลอดภัย
     if message:
         st.warning(message)
 
 def restore_session_from_cookie():
     if not st.session_state.get('logged_in'):
-        # 🌟 ใส่ try...except เพื่อดัก Error ตอนที่ระบบ Cloud ยังโหลดคุกกี้ไม่ทัน
-        try:
-            saved_user = controller.get("auth_user")
-        except TypeError:
-            # ถ้าคุกกี้ยังไม่พร้อมทำงาน ให้ข้ามการทำงานฟังก์ชันนี้ไปก่อน
-            return
-            
+        saved_user = safe_get_cookie("auth_user") # ดึงคุกกี้อย่างปลอดภัย
         if saved_user:
             try:
                 conn = get_db_connection()
@@ -427,55 +408,10 @@ if not st.session_state.get('logged_in'):
             st.rerun()
     else:
         st.markdown("""<style>
-        @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
-        @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
-        @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
-        
-        header {visibility: hidden;} #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
-        
-        /* 🌟 1. เวทมนตร์จัดการ UI Flickering 🌟
-           ซ่อนเนื้อหาหน้า Login ทั้งหมดไว้ก่อน 5 วินาที
-           ถ้าเซิร์ฟเวอร์เจอกุญแจคุกกี้ มันจะวาร์ปไปหน้า Dashboard ก่อนที่เวลาจะหมด
-           แต่ถ้าไม่มีคุกกี้ หน้า Login จะค่อยๆ ลอยขึ้นมาแบบ Fade-in สวยๆ ครับ */
-        .main .block-container { 
-            padding-top: 3.5rem !important; 
-            padding-bottom: 2rem !important; 
-            max-width: 950px !important; 
-            margin: auto; 
-            animation: smoothLoginFade 5s ease-in-out forwards;
-        } 
-        
-        @keyframes smoothLoginFade {
-            0% { opacity: 0; transform: translateY(15px); }
-            70% { opacity: 0; transform: translateY(15px); }
-            100% { opacity: 1; transform: translateY(0); }
-        }
-
-        /* 🌟 2. ซ่อน Sidebar ในหน้า Login แบบเด็ดขาด */
-        [data-testid="stSidebar"] { display: none !important; visibility: hidden !important; width: 0px !important; }
-        [data-testid="stSidebarCollapseButton"] { display: none !important; }       
-        [data-testid="collapsedControl"] { display: none !important; }
-        section[data-testid="stSidebar"] { display: none !important; }
-
-        /* 🌟 ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) */
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
-        
-        div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
-        div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
-        div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
-        div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
-        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
-        
-        html, body, [class*="st-"], h1, h2, h3, h4, h5, h6, p, span, div, label, button, input { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; }
-        span.material-symbols-rounded, span.material-icons, .material-symbols-rounded, .material-icons, [data-testid="stIconMaterial"], [data-testid="stTooltipIcon"] { font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important; }
-
         .login-header-title { font-size: 30px; font-weight: 800; color: #FFFFFF; text-align: center; margin-bottom: 4px; } 
         .login-header-subtitle { font-size: 13px; color: #BBDEFB; text-align: center; margin-bottom: 25px; } 
         .newhere-header-title { font-size: 30px; font-weight: 800; color: #1E293B; margin-bottom: 12px; } 
         .newhere-header-desc { font-size: 15px; color: #64748B; line-height: 1.6; margin-bottom: 25px; max-width: 280px; } 
-        @media (max-width: 768px) { section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
         </style>""", unsafe_allow_html=True)
         
         col_left, col_right = st.columns([1.15, 0.95], gap="small")
@@ -517,10 +453,11 @@ if not st.session_state.get('logged_in'):
                                     st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
                                     st.session_state['last_activity'] = now_time
                                     
-                                    # 🍪 สั่งบันทึกคุกกี้เก็บไว้ในเบราว์เซอร์ 30 นาที
-                                    controller.set("auth_user", user['username'], max_age=SESSION_TIMEOUT_SECONDS)
+                                    # 🍪 สั่งบันทึกคุกกี้อย่างปลอดภัย (ไม่เกิด Error แน่นอน)
+                                    safe_set_cookie("auth_user", user['username'], SESSION_TIMEOUT_SECONDS)
+                                    
                                     st.success("เข้าสู่ระบบสำเร็จ!")
-                                    time.sleep(1) # ให้เวลา Browser บันทึกคุกกี้ก่อนเปลี่ยนหน้า
+                                    time.sleep(0.5) 
                                     st.rerun()
                             else: st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
                         except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
@@ -645,11 +582,10 @@ else:
     # =========================================================================
 
     # =========================================================================
-    # 🌟 พื้นที่แสดงผลหลัก (แก้ปัญหากราฟค้างด้วยการ Clear Container)
+    # 🌟 พื้นที่แสดงผลหลัก 
     # =========================================================================
-    main_view = st.empty() # สร้างตัวล้างหน้าจอ
-    
-    with main_view.container(): # <--- เพิ่มบรรทัดนี้ แล้วครอบ if/elif ทั้งหมด
+    main_view = st.empty()
+    with main_view.container():
         if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
             user_position = st.session_state.get('position', '-')
             render_dashboard(
@@ -669,5 +605,3 @@ else:
             
         elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
             render_add_new_equipment()
-
-    
