@@ -189,31 +189,6 @@ div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
 
 div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
 [data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
-
-/* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
-    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] p,
-    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] span,
-    div[role="dialog"] div.stButton button[kind="primary"] p,
-    div[role="dialog"] div.stButton button[kind="primary"] span {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-    }
-
-    /* 🌟 2. คืนชีพปุ่มเมนูแถบซ้าย (Sidebar) ที่กำลังใช้งานอยู่ ให้พื้นหลังเป็นสีส้ม และตัวหนังสือสีขาวเด่นๆ */
-    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"],
-    [data-testid="stSidebar"] div.stButton button[kind="primary"] { 
-        background-color: #D97706 !important; 
-        border: 1px solid #D97706 !important; 
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
-    }
-    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] p,
-    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] span,
-    [data-testid="stSidebar"] div.stButton button[kind="primary"] p,
-    [data-testid="stSidebar"] div.stButton button[kind="primary"] span {
-        color: #FFFFFF !important;
-        -webkit-text-fill-color: #FFFFFF !important;
-        font-weight: 700 !important;
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -407,11 +382,24 @@ if not st.session_state.get('logged_in'):
             st.session_state.page = "login"
             st.rerun()
     else:
+        # 🌟 นำโค้ด CSS สำหรับหน้า Login กลับมาใส่ตรงนี้ 🌟
         st.markdown("""<style>
+        /* ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) */
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
+        
+        div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
+        div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
+        div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
+        div[data-testid="stFormSubmitButton"] > button, div[data-testid="stForm"] .stButton > button { background: linear-gradient(135deg, #F59E0B 0%, #EA580C 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(234, 88, 12, 0.35) !important; margin-top: 10px !important; } 
+        section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child .stButton > button { background: linear-gradient(135deg, #1D4ED8 0%, #1E40AF 100%) !important; color: #FFFFFF !important; border: none !important; border-radius: 12px !important; padding: 10px 40px !important; font-size: 16px !important; font-weight: 700 !important; box-shadow: 0 4px 15px rgba(30, 64, 175, 0.3) !important; margin-top: 15px !important; } 
+        
         .login-header-title { font-size: 30px; font-weight: 800; color: #FFFFFF; text-align: center; margin-bottom: 4px; } 
         .login-header-subtitle { font-size: 13px; color: #BBDEFB; text-align: center; margin-bottom: 25px; } 
         .newhere-header-title { font-size: 30px; font-weight: 800; color: #1E293B; margin-bottom: 12px; } 
         .newhere-header-desc { font-size: 15px; color: #64748B; line-height: 1.6; margin-bottom: 25px; max-width: 280px; } 
+        @media (max-width: 768px) { section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
         </style>""", unsafe_allow_html=True)
         
         col_left, col_right = st.columns([1.15, 0.95], gap="small")
@@ -453,7 +441,7 @@ if not st.session_state.get('logged_in'):
                                     st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
                                     st.session_state['last_activity'] = now_time
                                     
-                                    # 🍪 สั่งบันทึกคุกกี้อย่างปลอดภัย (ไม่เกิด Error แน่นอน)
+                                    # 🍪 สั่งบันทึกคุกกี้อย่างปลอดภัย
                                     safe_set_cookie("auth_user", user['username'], SESSION_TIMEOUT_SECONDS)
                                     
                                     st.success("เข้าสู่ระบบสำเร็จ!")
