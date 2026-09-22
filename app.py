@@ -700,13 +700,7 @@ else:
     div[data-baseweb="select"] > div, div[data-baseweb="select"] > div:hover { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
     div[data-baseweb="select"] span { color: #000000 !important; }
     div[data-baseweb="select"] svg, div[data-testid="stDateInput"] svg, div[data-testid="stTimeInput"] svg { fill: #0F172A !important; color: #0F172A !important; }
-    
-    div[role="dialog"], [data-testid="stDialog"], div[data-testid="stModal"] > div { background-color: #FFFFFF !important; }
-    div[role="dialog"] p, div[role="dialog"] span, div[role="dialog"] label, div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, div[role="dialog"] h4, div[role="dialog"] h5, div[role="dialog"] h6 { color: #0F172A !important; -webkit-text-fill-color: #0F172A !important; }
-    div[role="dialog"] button[data-testid="baseButton-primary"] * { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
-    div[role="dialog"] div[data-testid="stForm"] { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
-    div[role="dialog"] input, div[role="dialog"] textarea, div[role="dialog"] div[data-baseweb="select"] span { background-color: transparent !important; color: #0F172A !important; }
-    
+
     div[data-testid="stNumberInput"] button { background-color: #F8FAFC !important; border: none !important; }
     div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
     
@@ -750,5 +744,17 @@ else:
         font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
         font-size: 14px !important;
     }
+
+    /* 🌟 บังคับตัวหนังสือปุ่ม Primary ให้เป็นสีขาว (แบบขั้นสูงสุดทะลวงเกราะ) */
+    html body div.stButton button[data-testid="baseButton-primary"] p,
+    html body div.stButton button[data-testid="baseButton-primary"] span,
+    html body div.stButton button[data-testid="baseButton-primary"] div,
+    html body div.stButton button[kind="primary"] p,
+    html body div.stButton button[kind="primary"] span,
+    html body div.stButton button[kind="primary"] div {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
     </style>
     """, unsafe_allow_html=True)
