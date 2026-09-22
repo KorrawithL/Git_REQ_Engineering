@@ -285,7 +285,13 @@ def perform_logout(message=None):
 
 def restore_session_from_cookie():
     if not st.session_state.get('logged_in'):
-        saved_user = controller.get("auth_user")
+        # 🌟 ใส่ try...except เพื่อดัก Error ตอนที่ระบบ Cloud ยังโหลดคุกกี้ไม่ทัน
+        try:
+            saved_user = controller.get("auth_user")
+        except TypeError:
+            # ถ้าคุกกี้ยังไม่พร้อมทำงาน ให้ข้ามการทำงานฟังก์ชันนี้ไปก่อน
+            return
+            
         if saved_user:
             try:
                 conn = get_db_connection()
