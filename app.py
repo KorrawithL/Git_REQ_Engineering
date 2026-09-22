@@ -545,8 +545,31 @@ else:
     sub_opts = get_sub_menu_options(current_role, st.session_state.get('allowed_tabs', []))
     rep_opts = get_report_sub_options(current_role, st.session_state.get('allowed_tabs', []))
 
+    # =========================================================================
+    # 🌟 เตรียมรายการเมนูหลัก 
+    # =========================================================================
+    report_menu_label = "📑 รายงานรวม (All Report)"
+    if current_role == 'admin':
+        main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "⚙️ จัดการผู้ใช้และสิทธิ์", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
+    elif current_role == 'reporter':
+        main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", report_menu_label]
+    else:
+        report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
+        main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label]
+        if current_role == 'manager':
+            main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
+
+    # =========================================================================
+    # 🌟 ฟื้นความจำ: ดึงชื่อ Tab ล่าสุดจากคุกกี้ ป้องกันการเด้งกลับหน้า Dashboard
+    # =========================================================================
+    saved_main_tab = safe_get_cookie("last_main_tab")
+    
     if 'sidebar_main' not in st.session_state:
-        st.session_state['sidebar_main'] = "📊 แดชบอร์ดภาพรวม (Dashboard)"
+        if saved_main_tab and saved_main_tab in main_choices:
+            st.session_state['sidebar_main'] = saved_main_tab
+        else:
+            st.session_state['sidebar_main'] = main_choices[0] # ค่าเริ่มต้น
+            
     if 'sidebar_sub_entry' not in st.session_state:
         st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์"
     if 'sidebar_sub_report' not in st.session_state:
@@ -555,23 +578,14 @@ else:
     with st.sidebar:
         st.markdown(f"<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WORK WOOD</h3>", unsafe_allow_html=True)
 
-        report_menu_label = "📑 รายงานรวม (All Report)"
-        if current_role == 'admin':
-            main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "⚙️ จัดการผู้ใช้และสิทธิ์", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
-        elif current_role == 'reporter':
-            main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", report_menu_label]
-        else:
-            report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
-            main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label]
-            if current_role == 'manager':
-                main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
-
         for choice in main_choices:
             is_main_active = (st.session_state['sidebar_main'] == choice)
             btn_type = "primary" if is_main_active else "secondary"
             
             if st.button(choice, key=f"sb_main_{choice}", use_container_width=True, type=btn_type):
                 st.session_state['sidebar_main'] = choice
+                # 🌟 ท่าไม้ตาย: สั่งจำชื่อหน้าเว็บนี้ฝังลงในเบราว์เซอร์ทันที!
+                safe_set_cookie("last_main_tab", choice, SESSION_TIMEOUT_SECONDS)
                 st.rerun()
                 
             if choice == "📝 บันทึกข้อมูลประจำวัน" and is_main_active and sub_opts:

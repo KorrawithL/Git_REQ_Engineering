@@ -3,7 +3,7 @@ import hashlib
 import streamlit as st
 
 # 🔌 ฟังก์ชันเชื่อมต่อฐานข้อมูล
-def get_db_connection():
+def get_db_connection(ttl=600):
     # 1. สร้างตัวแปร conn มารับค่าการเชื่อมต่อ (เอาคำว่า return ออกไปก่อน)
     conn = pymysql.connect(
         host='gateway01.ap-southeast-1.prod.aws.tidbcloud.com',      # หรือใช้ 'localhost' เพื่อชี้มาที่เครื่องตัวเอง
