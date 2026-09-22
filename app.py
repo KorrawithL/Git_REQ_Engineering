@@ -189,6 +189,31 @@ div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
 
 div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
 [data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
+
+/* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
+    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] p,
+    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] span,
+    div[role="dialog"] div.stButton button[kind="primary"] p,
+    div[role="dialog"] div.stButton button[kind="primary"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+    }
+
+    /* 🌟 2. คืนชีพปุ่มเมนูแถบซ้าย (Sidebar) ที่กำลังใช้งานอยู่ ให้พื้นหลังเป็นสีส้ม และตัวหนังสือสีขาวเด่นๆ */
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"],
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] { 
+        background-color: #D97706 !important; 
+        border: 1px solid #D97706 !important; 
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
+    }
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] p,
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] span,
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] p,
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 700 !important;
+
 </style>
 """, unsafe_allow_html=True)
 
