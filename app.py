@@ -5,6 +5,8 @@ import os
 import pandas as pd
 import numpy as np
 import altair as alt
+
+# 📦 นำเข้าฟังก์ชันจากไฟล์แยกที่ทำการ Refactoring ไว้
 from home import render_dashboard
 from database import get_db_connection, hash_password
 from tab_views import render_engineering_system_tabs
@@ -13,9 +15,9 @@ from all_reports import render_all_reports_module
 from addMachines import render_add_new_equipment
 
 # =============================================================================
-# 🚀 1. ฟังก์ชันดึงข้อมูลสาขาจาก Database
+# 🚀 1. ฟังก์ชันดึงข้อมูลสาขาจาก Database (เพิ่ม show_spinner=False ซ่อนข้อความโหลด)
 # =============================================================================
-@st.cache_data(ttl=300) 
+@st.cache_data(ttl=300, show_spinner=False) 
 def get_branch_dict_from_db():
     b_dict = {}
     conn = None
@@ -97,105 +99,7 @@ def setup_pwa():
         }
     </script>
     """
-    # ซ่อนกล่อง html ไม่ให้แสดงบนหน้าจอ
     components.html(pwa_script, height=0, width=0)
-
-# =============================================================================
-# 🚀 2. ฟังก์ชันดึงข้อมูลจริงทำหน้า Dashboard
-# =============================================================================
-def get_dashboard_data(user_branch_id):
-    data = {
-        "active_machines": 0,
-        "breakdown_count": 0,
-        "fuel_usage": 0.0,
-        "boiler_drop": 0,
-        "fuel_chart_df": pd.DataFrame(),
-        "pressure_chart_df": pd.DataFrame()
-    }
-    conn = None
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            
-            cur.execute("""
-                SELECT COUNT(id) AS count 
-                FROM machine_trans 
-                WHERE record_date = CURDATE() 
-                AND branch_id = %s 
-                AND status = 'active'
-            """, (user_branch_id,))
-            res = cur.fetchone()
-            if res and res['count']: data["active_machines"] = res['count']
-
-            cur.execute("""
-                SELECT COUNT(id) AS count 
-                FROM machine_trans 
-                WHERE record_date = CURDATE() 
-                AND breakdown_hours > 0 
-                AND branch_id = %s 
-                AND status = 'active'
-            """, (user_branch_id,))
-            res = cur.fetchone()
-            if res and res['count']: data["breakdown_count"] = res['count']
-
-            cur.execute("""
-                SELECT SUM(fuel_liters) AS total 
-                FROM fuel_records  
-                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-                AND record_date <= CURDATE()
-                AND branch_id = %s 
-            """, (user_branch_id,))
-            res = cur.fetchone()
-            if res and res['total']: data["fuel_usage"] = round(float(res['total']), 2)
-
-            cur.execute("""
-                SELECT SUM(total_drop) AS drops 
-                FROM boiler_pressure_records  
-                WHERE record_date = CURDATE()
-                AND branch_id = %s 
-            """, (user_branch_id,))
-            res = cur.fetchone()
-            if res and res['drops']: data["boiler_drop"] = int(res['drops'])
-
-            cur.execute("""
-                SELECT DATE(record_date) AS log_date, SUM(fuel_liters) AS total_liters
-                FROM fuel_records  
-                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-                AND record_date <= CURDATE()
-                AND branch_id = %s 
-                GROUP BY DATE(record_date)
-                ORDER BY DATE(record_date) ASC
-            """, (user_branch_id,))
-            fuel_rows = cur.fetchall()
-            if fuel_rows:
-                df_fuel = pd.DataFrame(fuel_rows)
-                df_fuel['วันที่'] = pd.to_datetime(df_fuel['log_date']).dt.strftime('%d/%m/%Y')
-                df_fuel['ปริมาณเชื้อเพลิง (ลิตร)'] = df_fuel['total_liters'].astype(float)
-                df_fuel = df_fuel[['วันที่', 'ปริมาณเชื้อเพลิง (ลิตร)']].set_index('วันที่')
-                data["fuel_chart_df"] = df_fuel
-
-            cur.execute("""
-                SELECT DATE(record_date) AS log_date, SUM(total_drop) AS total_drops
-                FROM boiler_pressure_records 
-                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
-                AND record_date <= CURDATE()
-                AND branch_id = %s 
-                GROUP BY DATE(record_date)
-                ORDER BY DATE(record_date) ASC
-            """, (user_branch_id,))
-            pres_rows = cur.fetchall()
-            if pres_rows:
-                df_pres = pd.DataFrame(pres_rows)
-                df_pres['วันที่'] = pd.to_datetime(df_pres['log_date']).dt.strftime('%d/%m/%Y')
-                df_pres['จำนวนครั้งที่ตก'] = df_pres['total_drops'].astype(float) 
-                df_pres = df_pres[['วันที่', 'จำนวนครั้งที่ตก']].set_index('วันที่')
-                data["pressure_chart_df"] = df_pres
-
-    except Exception as e:
-        st.error(f"⚠️ พบข้อผิดพลาดในการดึงข้อมูลแสดงกราฟ: {e}")
-    finally:
-        if conn: conn.close()
-    return data
 
 # -----------------------------------------------------------------------------
 # 🎯 3. ตั้งค่าหน้าเว็บ Streamlit
@@ -215,48 +119,9 @@ def perform_logout(message=None):
     for key in ['logged_in', 'user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'allowed_branches', 'last_activity', 'page']:
         if key in st.session_state:
             del st.session_state[key]
-    st.query_params.clear()
+    # ❌ ปิดการเคลียร์ URL Query (ตามมาตรการความปลอดภัย)
     if message:
         st.warning(message)
-
-def restore_session_from_url():
-    saved_user = st.query_params.get("auth_user")
-    saved_time = st.query_params.get("auth_time")
-
-    if saved_user and saved_time and not st.session_state.get('logged_in'):
-        try:
-            last_time = float(saved_time)
-            if time.time() - last_time > SESSION_TIMEOUT_SECONDS:
-                perform_logout("⏱️ หมดเวลาการใช้งาน ระบบได้ออกจากระบบอัตโนมัติเพื่อความปลอดภัย")
-                return
-
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                sql = """SELECT u.user_id, u.username, u.full_name, u.position, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status 
-                         FROM system_users u LEFT JOIN branches b ON u.branch_id = b.id
-                         WHERE CONVERT(u.username USING utf8mb4) = CONVERT(%s USING utf8mb4) AND u.status = 'active'"""
-                cur.execute(sql, (saved_user,))
-                user = cur.fetchone()
-                
-                if user:
-                    cur.execute("SELECT branch_id FROM user_branches WHERE user_id = %s", (user['user_id'],))
-                    extra_branches = cur.fetchall()
-            conn.close()
-
-            if user:
-                st.session_state['logged_in'] = True
-                for k in ['user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name']:
-                    st.session_state[k] = user[k]
-                st.session_state['role_tab'] = str(user['Role_tab']).strip().lower()
-                
-                raw_tabs = user.get('allowed_tabs', '') or ''
-                st.session_state['allowed_tabs'] = [x.strip() for x in str(raw_tabs).split(',') if x.strip()]
-                
-                allowed_b_list = [str(user['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
-                st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
-                
-                st.session_state['last_activity'] = last_time
-        except Exception as e: print(f"Error: {e}")
 
 def check_session_timeout():
     if st.session_state.get('logged_in'):
@@ -297,7 +162,7 @@ def change_password_dialog():
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
 
-restore_session_from_url()
+# ❌ เอาฟังก์ชัน restore_session_from_url ออก (ตามมาตรการความปลอดภัย)
 check_session_timeout()
 
 # -----------------------------------------------------------------------------
@@ -310,7 +175,6 @@ if not st.session_state.get('logged_in'):
         try:
             conn = get_db_connection()
             with conn.cursor() as cur:
-                # เปลี่ยน ORDER BY position ASC เป็น ORDER BY pos ASC
                 cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY pos ASC")
                 for r in cur.fetchall():
                     if r['pos']: position_list.append(r['pos'].strip())
@@ -373,18 +237,17 @@ if not st.session_state.get('logged_in'):
         header {visibility: hidden;} #MainMenu {visibility: hidden;} footer {visibility: hidden;} 
         .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; max-width: 950px !important; margin: auto; } 
         
-        /* 🌟 1. บังคับซ่อน Sidebar ในหน้า Login แบบเด็ดขาด */
+        /* 🌟 บังคับซ่อน Sidebar ในหน้า Login แบบเด็ดขาด */
         [data-testid="stSidebar"] { display: none !important; visibility: hidden !important; width: 0px !important; }
         [data-testid="stSidebarCollapseButton"] { display: none !important; }       
         [data-testid="collapsedControl"] { display: none !important; }
         section[data-testid="stSidebar"] { display: none !important; }
 
-        /* 🌟 2. ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) เท่านั้น ห้ามลามไปปุ่มอื่น */
+        /* 🌟 ล็อคเป้าหมายให้กล่องสีน้ำเงิน-ขาว ทำงานเฉพาะในพื้นที่จอหลัก (stMain) */
         section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] { border-radius: 28px; box-shadow: 0 20px 45px rgba(0, 0, 0, 0.15); overflow: hidden; } 
         section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { background: radial-gradient(circle at top right, #1d68d8 0%, #0d47a1 60%, #082d69 100%) !important; border-radius: 28px 0 0 28px !important; padding: 45px 35px 35px 35px !important; color: #FFFFFF !important; display: flex !important; flex-direction: column !important; justify-content: center !important; } 
         section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { background: #FFFFFF !important; border-radius: 0 28px 28px 0 !important; padding: 50px 35px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; align-items: center !important; text-align: center !important; } 
         
-        /* ตกแต่งฟอร์ม Login */
         div[data-testid="stForm"] { border: none !important; padding: 0 !important; background: transparent !important; } 
         div[data-testid="stForm"] div[data-baseweb="input"] { background-color: #CCCCCC !important; border-radius: 12px !important; border: 1px solid #CBD5E1 !important; margin-bottom: 6px !important; } 
         div[data-testid="stForm"] div[data-baseweb="input"] input { color: #0F172A !important; } 
@@ -400,6 +263,7 @@ if not st.session_state.get('logged_in'):
         .newhere-header-desc { font-size: 15px; color: #64748B; line-height: 1.6; margin-bottom: 25px; max-width: 280px; } 
         @media (max-width: 768px) { section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:first-child { border-radius: 24px 24px 0 0 !important; } section[data-testid="stMain"] div[data-testid="stHorizontalBlock"] > div:last-child { border-radius: 0 0 24px 24px !important; } }
         </style>""", unsafe_allow_html=True)
+        
         col_left, col_right = st.columns([1.15, 0.95], gap="small")
         with col_left:
             st.markdown('<div class="login-header-title">Welcome Back</div><div class="login-header-subtitle">Woodwork Engineering Records System</div>', unsafe_allow_html=True)
@@ -439,8 +303,7 @@ if not st.session_state.get('logged_in'):
                                     st.session_state['allowed_branches'] = list(set(allowed_b_list)) 
                                     
                                     st.session_state['last_activity'] = now_time
-                                    st.query_params["auth_user"] = user['username']
-                                    st.query_params["auth_time"] = str(now_time)
+                                    # ❌ ถอดการทำงาน st.query_params ออกจากจุดนี้
                                     st.success("เข้าสู่ระบบสำเร็จ!")
                                     st.rerun()
                             else: st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
@@ -456,8 +319,7 @@ if not st.session_state.get('logged_in'):
 # -----------------------------------------------------------------------------
 else:
     st.session_state['last_activity'] = time.time()
-    st.query_params["auth_user"] = st.session_state['username']
-    st.query_params["auth_time"] = str(st.session_state['last_activity'])
+    # ❌ ถอดการทำงาน st.query_params ออกจากจุดนี้ 
 
     disp_name = st.session_state.get('full_name') or st.session_state.get('username')
     current_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
@@ -558,18 +420,17 @@ else:
     sub_menu_report = st.session_state.get('sidebar_sub_report')
 
     # =========================================================================
-    # 🌟 Dashboard View
+    # 🌟 Dashboard View (เคลียร์ Spinner ออก ป้องกัน Ghosting)
     # =========================================================================
     if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
         user_position = st.session_state.get('position', '-')
-        # โยนหน้าที่วาดหน้าจอไปให้ไฟล์ home.py จัดการ
         render_dashboard(
             current_branch_id, disp_name, role_th, current_branch, 
             user_position, current_access, access_color, access_desc
         )
 
     # =========================================================================
-    # 🌟 หน้าอื่นๆ
+    # 🌟 หน้าอื่นๆ (เคลียร์ Spinner ออก ป้องกัน Ghosting)
     # =========================================================================
     elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
         st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
@@ -584,13 +445,11 @@ else:
     elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
         render_add_new_equipment()
 
-
     # =========================================================================
-    # 🚀 🌟 CSS ท่าไม้ตาย: ย้ายมาไว้ก้นสุดของไฟล์ (ล้างโค้ดงัดตารางเก่าทิ้งแล้ว) 🌟 🚀
+    # 🚀 🌟 CSS หลักสำหรับแต่งหน้าจอ (ลบโค้ดกราฟขยะเก่าออกหมดแล้ว) 🌟 🚀
     # =========================================================================
     st.markdown("""
     <style>
-    /* โหลดฟอนต์ตัวหนังสือ และฟอนต์ไอคอนให้ครบ */
     @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&display=swap');
     @import url('https://fonts.googleapis.com/icon?family=Material+Icons');
     @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0');
@@ -600,7 +459,6 @@ else:
     #MainMenu { display: none !important; }
     footer { display: none !important; }
     
-    /* 🌟 ระบบ Responsive สำหรับหน้าจอคอม (PC) */
     @media (min-width: 769px) {
         html body header[data-testid="stHeader"] { display: none !important; visibility: hidden !important; }
         html body [data-testid="stSidebarCollapseButton"] { display: none !important; }       
@@ -614,7 +472,6 @@ else:
         .welcome-details { font-size: 16px !important; }
     }
 
-    /* 🌟 ระบบ Responsive สำหรับหน้าจอมือถือ (Mobile) - บังคับเปิดปุ่มเมนูให้ทำงานทุกหน้า Tab! */
     @media (max-width: 768px) {
         html body header[data-testid="stHeader"] { 
             display: block !important; 
@@ -629,10 +486,8 @@ else:
             visibility: visible !important;
             z-index: 99999 !important;
         }
-        
         .main .block-container { padding-top: 3.5rem !important; padding-bottom: 2rem !important; }
         div[data-testid="stMainBlockContainer"] { padding-top: 3.5rem !important; }
-        
         .dash-title { font-size: 28px !important; margin-top: 10px !important; }
         .welcome-title { font-size: 20px !important; }
         .welcome-desc { font-size: 15px !important; }
@@ -642,13 +497,11 @@ else:
     .stApp { background-color: #F2EFEA !important; color: #333333 !important; }
     [data-testid="stSidebar"] { background-color: #E8E3DD !important; border-right: 1px solid #D6D3D1 !important; }
     
-    /* 🌟 บังคับฟอนต์ TH Sarabun ให้เฉพาะพวก Text ทั่วไป (หลีกเลี่ยงการโดนปุ่มเมนู) */
     html, body, h1, h2, h3, h4, h5, h6, p, label, input, div.stMarkdown, div.stMetric {
         font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
         color: #333333 !important; 
     }
     
-    /* 🌟 กฎเหล็ก: คืนชีพรูปลูกศรและไอคอน (ห้ามฟอนต์ Sarabun ไปทับไอคอนเด็ดขาด) */
     span.material-symbols-rounded, 
     span.material-icons, 
     .material-symbols-rounded, 
@@ -662,67 +515,42 @@ else:
         color: #333333 !important;
     }
     
-    div[data-baseweb="tab"][aria-selected="false"] p, div[data-baseweb="tab"][aria-selected="false"] span {
-        color: #666666 !important;
-    }
+    div[data-baseweb="tab"][aria-selected="false"] p, div[data-baseweb="tab"][aria-selected="false"] span { color: #666666 !important; }
     
     div[data-testid="stVerticalBlockBorderWrapper"]:has(.data-entry-marker) {
-        background-color: #FCFBF8 !important;
-        border: 2px solid #D97706 !important;  
-        border-radius: 12px !important;
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08) !important;
-        padding: 5px !important;
+        background-color: #FCFBF8 !important; border: 2px solid #D97706 !important;  
+        border-radius: 12px !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08) !important; padding: 5px !important;
     }
 
-    div[data-testid="stForm"] {
-        background-color: transparent !important;
-        border: 1px solid #D6D3D1 !important; 
-        border-radius: 10px !important;
-        padding: 20px !important;
-    }
-
-    div[data-testid="stExpander"] details {
-        background-color: #FCFBF8 !important;
-        border: 1px solid #D6D3D1 !important; 
-        border-radius: 10px !important;
-        overflow: hidden !important;
-    }
-    div[data-testid="stExpander"] details summary {
-        background-color: #FCFBF8 !important;
-        padding: 10px !important;
-    }
-    div[data-testid="stExpander"] details summary:hover {
-        background-color: #F5F5F5 !important;
-    }
+    div[data-testid="stForm"] { background-color: transparent !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; padding: 20px !important; }
+    div[data-testid="stExpander"] details { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; overflow: hidden !important; }
+    div[data-testid="stExpander"] details summary { background-color: #FCFBF8 !important; padding: 10px !important; }
+    div[data-testid="stExpander"] details summary:hover { background-color: #F5F5F5 !important; }
 
     .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
     table th, table td { color: #333333 !important; border-color: #D6D3D1 !important; background-color: #F2EFEA !important; }
     div[data-baseweb="select"] > div, div[data-baseweb="select"] > div:hover { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
     div[data-baseweb="select"] span { color: #000000 !important; }
     div[data-baseweb="select"] svg, div[data-testid="stDateInput"] svg, div[data-testid="stTimeInput"] svg { fill: #0F172A !important; color: #0F172A !important; }
-
+    
+    div[role="dialog"], [data-testid="stDialog"], div[data-testid="stModal"] > div { background-color: #FFFFFF !important; }
+    div[role="dialog"] p, div[role="dialog"] span, div[role="dialog"] label, div[role="dialog"] h1, div[role="dialog"] h2, div[role="dialog"] h3, div[role="dialog"] h4, div[role="dialog"] h5, div[role="dialog"] h6 { color: #0F172A !important; -webkit-text-fill-color: #0F172A !important; }
+    div[role="dialog"] button[data-testid="baseButton-primary"] * { color: #FFFFFF !important; -webkit-text-fill-color: #FFFFFF !important; }
+    div[role="dialog"] div[data-testid="stForm"] { background-color: #F8FAFC !important; border: 1px solid #CBD5E1 !important; }
+    div[role="dialog"] input, div[role="dialog"] textarea, div[role="dialog"] div[data-baseweb="select"] span { background-color: transparent !important; color: #0F172A !important; }
+    
     div[data-testid="stNumberInput"] button { background-color: #F8FAFC !important; border: none !important; }
     div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
     
     [data-testid="stSidebar"] div.stButton > button { 
-        background-color: #FFFFFF !important; 
-        border: 1px solid #D6D3D1 !important; 
-        color: #333333 !important; 
-        border-radius: 8px !important; 
-        padding: 10px 14px !important; 
+        background-color: #FFFFFF !important; border: 1px solid #D6D3D1 !important; color: #333333 !important; 
+        border-radius: 8px !important; padding: 10px 14px !important; 
         font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-        font-size: 18px !important; 
-        font-weight: 700 !important; 
-        width: 100% !important; 
-        margin-bottom: 2px !important; 
-        transition: all 0.2s ease !important; 
+        font-size: 18px !important; font-weight: 700 !important; width: 100% !important; margin-bottom: 2px !important; transition: all 0.2s ease !important; 
     }
     [data-testid="stSidebar"] div.stButton > button:hover { border-color: #D97706 !important; color: #D97706 !important; }
     [data-testid="stSidebar"] div.stButton > button[data-testid="baseButton-primary"] { 
-        background-color: #D97706 !important; 
-        color: #FFFFFF !important; 
-        border: 1px solid #D97706 !important; 
-        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
+        background-color: #D97706 !important; color: #FFFFFF !important; border: 1px solid #D97706 !important; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
     }
     
     [data-testid="stSidebar"] div[data-testid="stRadio"] { border-left: 2px solid #D6D3D1 !important; margin-left: 20px !important; padding-left: 5px !important; margin-bottom: 15px !important; }
@@ -733,28 +561,34 @@ else:
     [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; box-shadow: 0 2px 4px rgba(0,0,0,0.03) !important; }
     [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label:has(input:checked) p { color: #D97706 !important; font-weight: 700 !important; }
     
-    div[data-testid="stMetric"] {
-        background-color: #FCFBF8 !important;
-        padding: 10px !important;
-        border-radius: 8px !important;
-    }
+    div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
     
-    /* 🌟 บังคับฟอนต์ให้ตาราง DataFrame สวยงามเข้ากับเว็บ */
-    [data-testid="stDataFrame"], [data-testid="stDataFrame"] * {
-        font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important;
-        font-size: 14px !important;
-    }
-
-    /* 🌟 บังคับตัวหนังสือปุ่ม Primary ให้เป็นสีขาว (แบบขั้นสูงสุดทะลวงเกราะ) */
-    html body div.stButton button[data-testid="baseButton-primary"] p,
-    html body div.stButton button[data-testid="baseButton-primary"] span,
-    html body div.stButton button[data-testid="baseButton-primary"] div,
-    html body div.stButton button[kind="primary"] p,
-    html body div.stButton button[kind="primary"] span,
-    html body div.stButton button[kind="primary"] div {
+    [data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
+    
+    /* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
+    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] p,
+    div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] span,
+    div[role="dialog"] div.stButton button[kind="primary"] p,
+    div[role="dialog"] div.stButton button[kind="primary"] span {
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
     }
+
+    /* 🌟 2. คืนชีพปุ่มเมนูแถบซ้าย (Sidebar) ที่กำลังใช้งานอยู่ ให้พื้นหลังเป็นสีส้ม และตัวหนังสือสีขาวเด่นๆ */
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"],
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] { 
+        background-color: #D97706 !important; 
+        border: 1px solid #D97706 !important; 
+        box-shadow: 0 4px 12px rgba(217, 119, 6, 0.25) !important; 
+    }
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] p,
+    [data-testid="stSidebar"] div.stButton button[data-testid="baseButton-primary"] span,
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] p,
+    [data-testid="stSidebar"] div.stButton button[kind="primary"] span {
+        color: #FFFFFF !important;
+        -webkit-text-fill-color: #FFFFFF !important;
+        font-weight: 700 !important;
+    
 
     </style>
     """, unsafe_allow_html=True)
