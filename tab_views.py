@@ -35,7 +35,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
     allowed_tabs_list = st.session_state.get('allowed_tabs', [])
-    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
+    user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.get('branch_id'))])
 
     # 📌 แมปชื่อหัวข้อย่อยจาก Sidebar ให้ตรงกับ Key ข้อมูลระบบเดิม (1, 2, 3, 4)
     mapping = {
