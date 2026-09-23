@@ -1648,7 +1648,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
         
         /* 📱 ระบบซ่อน/โชว์ อัจฉริยะ (Dual View) */
-        @media (min-width: 769px) {
+        @media (min-width: 1200px) {
             div[data-testid="stVerticalBlock"]:has(.mobile-view-marker) { display: none !important; }
             div[data-testid="stVerticalBlock"]:has(.desktop-view-marker) { display: block !important; }
         }

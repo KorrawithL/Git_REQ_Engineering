@@ -120,7 +120,7 @@ st.markdown("""
 #MainMenu { display: none !important; }
 footer { display: none !important; }
 
-@media (min-width: 769px) {
+@media (min-width: 1200px) {
     html body header[data-testid="stHeader"] { display: none !important; visibility: hidden !important; }
     html body [data-testid="stSidebarCollapseButton"] { display: none !important; }       
     html body [data-testid="collapsedControl"] { display: none !important; }
