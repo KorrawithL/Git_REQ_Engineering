@@ -124,7 +124,7 @@ footer { display: none !important; }
     html body header[data-testid="stHeader"] { display: none !important; visibility: hidden !important; }
     html body [data-testid="stSidebarCollapseButton"] { display: none !important; }       
     html body [data-testid="collapsedControl"] { display: none !important; }
-    [data-testid="stSidebar"] { min-width: 400px !important; max-width: 400px !important; }
+    [data-testid="stSidebar"] { min-width: 300px !important; max-width: 300px !important; }
     .main .block-container { padding-top: 1.5rem !important; padding-bottom: 2rem !important; }
     div[data-testid="stMainBlockContainer"] { padding-top: 1.5rem !important; }
     .dash-title { font-size: 38px !important; margin-top: 0px !important; }
