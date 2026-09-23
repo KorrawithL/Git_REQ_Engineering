@@ -190,6 +190,21 @@ div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
 div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10px !important; border-radius: 8px !important; }
 [data-testid="stDataFrame"], [data-testid="stDataFrame"] * { font-family: 'TH Sarabun PSK', 'Sarabun', Tahoma, sans-serif !important; font-size: 14px !important; }
 
+/* 🌟 บังคับให้ปุ่มใน Sidebar ตัดคำขึ้นบรรทัดใหม่ได้ 🌟 */
+[data-testid="stSidebar"] div.stButton > button {
+    height: auto !important; /* ปล่อยให้ปุ่มยืดความสูงตามข้อความ */
+    min-height: 45px !important;
+    padding: 8px 2px !important; /* ลดขอบซ้ายขวาลงนิดนึง */
+}
+[data-testid="stSidebar"] div.stButton > button div,
+[data-testid="stSidebar"] div.stButton > button p {
+    white-space: normal !important; /* 👈 คำสั่งหัวใจหลักที่สั่งให้ขึ้นบรรทัดใหม่ */
+    word-wrap: break-word !important;
+    line-height: 1.2 !important;
+    text-align: center !important;
+    font-size: 16px !important;
+}
+
 /* 🌟 1. บังคับตัวหนังสือบนปุ่ม (Primary) ให้เป็นสีขาว "เฉพาะในหน้าต่าง Popup" เท่านั้น */
     div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] p,
     div[role="dialog"] div.stButton button[data-testid="baseButton-primary"] span,
