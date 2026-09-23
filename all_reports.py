@@ -608,12 +608,17 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     new_color_idx = 0
     machines_config = []
     display_name_map = {} 
+    
     for m_name in sorted(list(unique_m_names)):
         disp_name = m_name
         assigned_hex = None
         for k, v in legacy_mapping.items():
             if k.lower() in m_name.lower():
-                disp_name = f"{m_name}{v['suffix']}"
+                # 🌟 แก้บัคชื่อเบิ้ล (เช่น โต๊ะเลื่อย (<= 0.15%) (<= 0.15%))
+                if v['suffix'].strip() not in m_name:
+                    disp_name = f"{m_name}{v['suffix']}"
+                else:
+                    disp_name = m_name
                 assigned_hex = v["hex"]
                 break
         if not assigned_hex:
@@ -626,7 +631,11 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
-    matrix_data = {d: {m['name']: {'qty': 0, 'work': 0.0, 'break': 0.0, 'has_data': False} for m in machines_config} for d in range(1, days_in_month + 1)}
+    
+    # 🌟 ตัวแปรดักจับว่า "เครื่องจักรไหนมีหมายเหตุบ้าง"
+    machine_has_remarks = {m['name']: False for m in machines_config}
+    
+    matrix_data = {d: {m['name']: {'qty': 0, 'work': 0.0, 'break': 0.0, 'rem': '', 'has_data': False} for m in machines_config} for d in range(1, days_in_month + 1)}
     
     for row_m in raw_data:
         d_num = pd.to_datetime(row_m['record_date']).day
@@ -636,12 +645,29 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         w_hr = float(row_m.get('working_hours') or 0.0)
         b_hr = float(row_m.get('breakdown_hours') or 0.0)
         qty = int(row_m.get('machine_qty') or 0)
+        rem = str(row_m.get('remarks') or '').strip()
+        
         matrix_data[d_num][mapped_name]['qty'] += qty
         matrix_data[d_num][mapped_name]['work'] += w_hr
         matrix_data[d_num][mapped_name]['break'] += b_hr
         matrix_data[d_num][mapped_name]['has_data'] = True
+        
+        # เก็บหมายเหตุ ถ้ามี
+        if rem and rem != '-' and rem.lower() != 'none':
+            machine_has_remarks[mapped_name] = True
+            if matrix_data[d_num][mapped_name]['rem']:
+                matrix_data[d_num][mapped_name]['rem'] += f", {rem}"
+            else:
+                matrix_data[d_num][mapped_name]['rem'] = rem
 
-    active_machines_config = [m for m in machines_config if any([matrix_data[d][m['name']]['has_data'] for d in range(1, days_in_month + 1)])]
+    active_machines_config = []
+    for m in machines_config:
+        if any([matrix_data[d][m['name']]['has_data'] for d in range(1, days_in_month + 1)]):
+            # 🌟 กำหนดจำนวนคอลัมน์แบบไดนามิก: มีหมายเหตุ=4, ไม่มีหมายเหตุ=3
+            m['has_rem'] = machine_has_remarks[m['name']]
+            m['cols'] = 4 if m['has_rem'] else 3
+            active_machines_config.append(m)
+            
     if not active_machines_config: active_machines_config = machines_config
         
     totals_work = {m['name']: sum([matrix_data[d][m['name']]['work'] for d in range(1, days_in_month + 1)]) for m in active_machines_config}
@@ -652,15 +678,21 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
 
+    # ==========================================
+    # สร้างไฟล์ Excel
+    # ==========================================
     wb = Workbook()
     ws = wb.active
     ws.title = "Summary Machine Report"
     ws.views.sheetView[0].showGridLines = True
     font_title, font_banner, font_header, font_body, font_total, font_pct = Font(name="Sarabun", size=14, bold=True), Font(name="Sarabun", size=12, bold=True), Font(name="Sarabun", size=9, bold=True), Font(name="Sarabun", size=9), Font(name="Sarabun", size=9, bold=True), Font(name="Sarabun", size=10, bold=True, color="FF0000")
-    align_center, align_right = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center")
+    align_center, align_right, align_left = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center"), Alignment(horizontal="left", vertical="center", wrap_text=True)
     thin_border = Border(left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"), top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000"))
     fill_banner, fill_green = PatternFill(start_color="F8CBAD", end_color="F8CBAD", fill_type="solid"), PatternFill(start_color="E2EFDA", end_color="E2EFDA", fill_type="solid")
-    last_col_letter = get_column_letter(1 + len(active_machines_config) * 3)
+    
+    # 🌟 คำนวณคอลัมน์รวมทั้งหมดแบบไดนามิก
+    total_cols = 1 + sum([m['cols'] for m in active_machines_config])
+    last_col_letter = get_column_letter(total_cols)
 
     ws.merge_cells(f"A1:{last_col_letter}1"); ws["A1"] = f"บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}"; ws["A1"].font, ws["A1"].alignment = font_title, align_center
     ws.merge_cells(f"A2:{last_col_letter}2"); ws["A2"] = f"สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}"; ws["A2"].font, ws["A2"].alignment, ws["A2"].fill = font_banner, align_center, fill_banner
@@ -670,13 +702,18 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
 
     col_idx = 2
     for m in active_machines_config:
-        start_c, end_c = get_column_letter(col_idx), get_column_letter(col_idx + 2)
+        cols_span = m['cols']
+        start_c, end_c = get_column_letter(col_idx), get_column_letter(col_idx + cols_span - 1)
         ws.merge_cells(f"{start_c}3:{end_c}3")
         ws[f"{start_c}3"] = m["name"]; ws[f"{start_c}3"].font, ws[f"{start_c}3"].alignment = font_header, align_center; ws[f"{start_c}3"].fill = PatternFill(start_color=m["hex"], end_color=m["hex"], fill_type="solid")
-        for c in range(col_idx, col_idx + 3): ws[f"{get_column_letter(c)}3"].border = thin_border
-        for i, sh in enumerate(["เครื่องจักร\nใช้งาน\n(เครื่อง)", "ชั่วโมง\nทำงาน\n(ชม.)", "ชั่วโมง\nเบรกดาวน์\n(ชม.)"]):
+        for c in range(col_idx, col_idx + cols_span): ws[f"{get_column_letter(c)}3"].border = thin_border
+        
+        sub_headers = ["เครื่องจักร\nใช้งาน\n(เครื่อง)", "ชั่วโมง\nทำงาน\n(ชม.)", "ชั่วโมง\nเบรกดาวน์\n(ชม.)"]
+        if m['has_rem']: sub_headers.append("หมายเหตุ")
+        
+        for i, sh in enumerate(sub_headers):
             cell_ref = f"{get_column_letter(col_idx + i)}4"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].border = Font(name="Sarabun", size=8, bold=True), align_center, thin_border
-        col_idx += 3
+        col_idx += cols_span
 
     ws.row_dimensions[3].height, ws.row_dimensions[4].height = 20, 35
     current_row = 5
@@ -689,10 +726,18 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
             cell_q.value = (item['qty'] if item['qty'] > 0 else "-") if item['has_data'] else ""
             cell_w.value = (item['work'] if item['work'] > 0 else "-") if item['has_data'] else ""
             cell_b.value = (item['break'] if item['break'] > 0 else "-") if item['has_data'] else ""
-            for cell, al in [(cell_q, align_center), (cell_w, align_right if isinstance(cell_w.value, (int, float)) else align_center), (cell_b, align_right if isinstance(cell_b.value, (int, float)) else align_center)]:
+            
+            cells_to_style = [(cell_q, align_center), (cell_w, align_right if isinstance(cell_w.value, (int, float)) else align_center), (cell_b, align_right if isinstance(cell_b.value, (int, float)) else align_center)]
+            
+            if m['has_rem']:
+                cell_r = ws[f"{get_column_letter(c_idx+3)}{current_row}"]
+                cell_r.value = item['rem'] if item['has_data'] else ""
+                cells_to_style.append((cell_r, align_left))
+                
+            for cell, al in cells_to_style:
                 cell.font, cell.alignment, cell.border = font_body, al, thin_border
                 if isinstance(cell.value, (int, float)): cell.number_format = '#,##0.00'
-            c_idx += 3
+            c_idx += m['cols']
         current_row += 1
 
     ws[f"A{current_row}"] = "รวม"; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].fill, ws[f"A{current_row}"].border = font_total, align_center, fill_green, thin_border
@@ -703,31 +748,51 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         cell_q.value = "-"
         cell_w.value = totals_work[m_n] if totals_work[m_n] > 0 else "-"
         cell_b.value = totals_break[m_n] if totals_break[m_n] > 0 else "-"
-        for cell, al in [(cell_q, align_center), (cell_w, align_right if totals_work[m_n] > 0 else align_center), (cell_b, align_right if totals_break[m_n] > 0 else align_center)]:
+        
+        cells_to_style = [(cell_q, align_center), (cell_w, align_right if totals_work[m_n] > 0 else align_center), (cell_b, align_right if totals_break[m_n] > 0 else align_center)]
+        
+        if m['has_rem']:
+            cell_r = ws[f"{get_column_letter(c_idx+3)}{current_row}"]
+            cell_r.value = ""
+            cells_to_style.append((cell_r, align_center))
+
+        for cell, al in cells_to_style:
             cell.font, cell.alignment, cell.fill, cell.border = font_total, al, fill_green, thin_border
             if isinstance(cell.value, (int, float)): cell.number_format = '#,##0.00'
-        c_idx += 3
+        c_idx += m['cols']
 
     current_row += 1
     ws[f"A{current_row}"] = "คิดเป็น%"; ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_pct, align_center, thin_border
     c_idx = 2
     for m in active_machines_config:
-        start_c, end_c = get_column_letter(c_idx), get_column_letter(c_idx + 2)
+        cols_span = m['cols']
+        start_c, end_c = get_column_letter(c_idx), get_column_letter(c_idx + cols_span - 1)
         ws.merge_cells(f"{start_c}{current_row}:{end_c}{current_row}")
         ws[f"{start_c}{current_row}"].value = percentages[m['name']]; ws[f"{start_c}{current_row}"].font, ws[f"{start_c}{current_row}"].alignment = font_pct, align_center
-        for c in range(c_idx, c_idx + 3): ws[f"{get_column_letter(c)}{current_row}"].border = thin_border
-        c_idx += 3
+        for c in range(c_idx, c_idx + cols_span): ws[f"{get_column_letter(c)}{current_row}"].border = thin_border
+        c_idx += cols_span
 
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
     excel_data = excel_buffer.getvalue()
 
-    MACHINES_PER_PAGE = 10 
+    # ==========================================
+    # สร้างตาราง HTML (Pop-up สรุปรายงาน & Print)
+    # ==========================================
+    MACHINES_PER_PAGE = 7 
     machine_chunks = [active_machines_config[i:i + MACHINES_PER_PAGE] for i in range(0, len(active_machines_config), MACHINES_PER_PAGE)]
     all_tables_html = ""
+    
     for chunk_idx, chunk_machines in enumerate(machine_chunks):
-        header_row1 = "".join([f'<th colspan="3" style="background-color:#{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in chunk_machines])
-        header_row2 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>' for _ in chunk_machines])
+        # 🌟 กำหนด colspan ให้ตรงตามสถานะของเครื่องจักร
+        header_row1 = "".join([f'<th colspan="{m["cols"]}" style="background-color:#{m["hex"]};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{m["name"]}</th>' for m in chunk_machines])
+        
+        header_row2 = ""
+        for m in chunk_machines:
+            header_row2 += '<th style="border:1px solid #000;padding:2px;font-size:8px;width:28px;">เครื่องจักร<br>ใช้งาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>ทำงาน</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:32px;">ชั่วโมง<br>เบรกดาวน์</th>'
+            if m['has_rem']:
+                header_row2 += '<th style="border:1px solid #000;padding:2px;font-size:8px;width:45px;">หมายเหตุ</th>'
+
         body_rows = ""
         for day in range(1, days_in_month + 1):
             body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
@@ -737,19 +802,29 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
                     q_val = str(item['qty']) if item['qty'] > 0 else "-"
                     w_val = f"{item['work']:,.2f}" if item['work'] > 0 else "-"
                     b_val = f"{item['break']:,.2f}" if item['break'] > 0 else "-"
-                else: q_val, w_val, b_val = "", "", ""
+                    r_val = item['rem']
+                else: q_val, w_val, b_val, r_val = "", "", "", ""
+                
                 body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;">{q_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{w_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{b_val}</td>'
+                if m['has_rem']:
+                    body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:left;font-size:8px;color:#475569;">{r_val}</td>'
             body_rows += '</tr>'
+            
         total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;background-color:#E2EFDA;">รวม</td>'
         for m in chunk_machines:
             m_n = m['name']
             tw_s = f"{totals_work[m_n]:,.2f}" if totals_work[m_n] > 0 else '-'
             tb_s = f"{totals_break[m_n]:,.2f}" if totals_break[m_n] > 0 else '-'
             total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tw_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;background-color:#E2EFDA;">{tb_s}</td>'
+            if m['has_rem']:
+                total_row_html += '<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;background-color:#E2EFDA;">-</td>'
         total_row_html += '</tr>'
+        
         pct_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">คิดเป็น%</td>'
-        for m in chunk_machines: pct_row_html += f'<td colspan="3" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
+        for m in chunk_machines: 
+            pct_row_html += f'<td colspan="{m["cols"]}" style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;color:red;">{percentages[m["name"]]}</td>'
         pct_row_html += '</tr>'
+        
         page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(machine_chunks)}</div>" if len(machine_chunks) > 1 else ""
         single_table = f"""<div class="header-title">บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class="banner">สรุปชั่วโมงการทำงานของเครื่องจักร/เบรกดาวน์ ประจำเดือน....{month_str}................... {year_buddhist}</div>{page_info}<table><thead><tr><th rowspan="2" style="background-color:#E2EFDA;border:1px solid #000;padding:3px;font-size:10px;width:35px;color:#000000 !important;">วันที่</th>{header_row1}</tr><tr>{header_row2}</tr></thead><tbody>{body_rows}{total_row_html}{pct_row_html}</tbody></table>"""
         all_tables_html += single_table
@@ -833,24 +908,48 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
-    matrix_data = {d: {e['key']: {'liters': 0.0, 'hours': 0.0, 'has_data': False} for e in all_engines_config} for d in range(1, days_in_month + 1)}
+    
+    # 🌟 เพิ่ม 'rem' สำหรับเก็บหมายเหตุของรถยนต์
+    matrix_data = {d: {e['key']: {'liters': 0.0, 'hours': 0.0, 'rem': '', 'has_data': False} for e in all_engines_config} for d in range(1, days_in_month + 1)}
+    
     for r in raw_data:
         d_num = pd.to_datetime(r['record_date']).day
         e_code, b_name = str(r.get('engine_code') or '').strip(), str(r.get('branch_name') or '').strip()
+        rem = str(r.get('remark') or '').strip()
+        
         if b_id_t2 in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"] and b_name:
             try: b_short = b_name.split("สาขา ")[1].split()[0]
             except: b_short = b_name
             match_key = f"{e_code}_{b_short}"
         else: match_key = e_code
+            
         for e in all_engines_config:
             if e['key'].lower() == match_key.lower():
                 matrix_data[d_num][e['key']]['liters'] += float(r.get('fuel_liters') or 0.0)
                 matrix_data[d_num][e['key']]['hours'] += float(r.get('working_hours') or 0.0)
                 matrix_data[d_num][e['key']]['has_data'] = True
+                
+                # 🌟 เก็บหมายเหตุ ถ้ามี
+                if rem and rem != '-' and rem.lower() != 'none':
+                    if matrix_data[d_num][e['key']]['rem']:
+                        matrix_data[d_num][e['key']]['rem'] += f", {rem}"
+                    else:
+                        matrix_data[d_num][e['key']]['rem'] = rem
                 break
 
-    engines_config = [e for e in all_engines_config if any([matrix_data[d][e['key']]['has_data'] for d in range(1, days_in_month + 1)])]
-    if not engines_config: engines_config = all_engines_config
+    engines_config = []
+    for e in all_engines_config:
+        if any([matrix_data[d][e['key']]['has_data'] for d in range(1, days_in_month + 1)]):
+            # 🌟 กำหนดจำนวนคอลัมน์แบบไดนามิก: มีหมายเหตุ=4, ไม่มีหมายเหตุ=3
+            e['has_rem'] = any([matrix_data[d][e['key']]['rem'] for d in range(1, days_in_month + 1)])
+            e['cols'] = 4 if e['has_rem'] else 3
+            engines_config.append(e)
+            
+    if not engines_config: 
+        for e in all_engines_config:
+            e['has_rem'] = False
+            e['cols'] = 3
+        engines_config = all_engines_config
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_current_month = pd.Period(start_dt, freq='M').days_in_month
@@ -888,16 +987,20 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     month_str = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"][start_dt.month - 1]
     year_buddhist = start_dt.year + 543
 
+    # ==========================================
+    # สร้างไฟล์ Excel
+    # ==========================================
     wb = Workbook()
     ws = wb.active
     ws.title = "Fuel Report Matrix"
     ws.views.sheetView[0].showGridLines = True
     font_title, font_header, font_header_white, font_body, font_total, font_red = Font(name="Sarabun", size=14, bold=True), Font(name="Sarabun", size=9, bold=True), Font(name="Sarabun", size=9, bold=True, color="FFFFFF"), Font(name="Sarabun", size=9), Font(name="Sarabun", size=9, bold=True), Font(name="Sarabun", size=9, bold=True, color="FF0000")
-    align_center, align_right = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center")
+    align_center, align_right, align_left = Alignment(horizontal="center", vertical="center", wrap_text=True), Alignment(horizontal="right", vertical="center"), Alignment(horizontal="left", vertical="center")
     thin_border = Border(left=Side(style="thin", color="000000"), right=Side(style="thin", color="000000"), top=Side(style="thin", color="000000"), bottom=Side(style="thin", color="000000"))
     fill_magenta, fill_green_sum, fill_blue_sum, fill_pink_sum = PatternFill(start_color="D90082", end_color="D90082", fill_type="solid"), PatternFill(start_color="A9D08E", end_color="A9D08E", fill_type="solid"), PatternFill(start_color="BDD7EE", end_color="BDD7EE", fill_type="solid"), PatternFill(start_color="FCE4D6", end_color="FCE4D6", fill_type="solid")
 
-    last_col_idx = 1 + (len(engines_config) * 3) + 6
+    # 🌟 คำนวณคอลัมน์รวมทั้งหมดแบบไดนามิก (บวกอีก 6 ช่องคือของกลุ่ม Toyo และ TCK)
+    last_col_idx = 1 + sum([e['cols'] for e in engines_config]) + 6
     last_col_letter = get_column_letter(last_col_idx)
 
     ws.merge_cells(f"A1:{last_col_letter}1"); ws["A1"] = f"บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}"; ws["A1"].font, ws["A1"].alignment = font_title, align_center
@@ -907,13 +1010,20 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
 
     col_idx = 2
     for e in engines_config:
-        start_c, end_c = get_column_letter(col_idx), get_column_letter(col_idx + 2)
+        cols_span = e['cols']
+        start_c, end_c = get_column_letter(col_idx), get_column_letter(col_idx + cols_span - 1)
         ws.merge_cells(f"{start_c}3:{end_c}3"); ws[f"{start_c}3"] = e["title"]; ws[f"{start_c}3"].font, ws[f"{start_c}3"].alignment = font_header, align_center
         ws.merge_cells(f"{start_c}4:{end_c}4"); ws[f"{start_c}4"] = e["brand"]; ws[f"{start_c}4"].font = font_header_white if e["hex"] == "FF0000" else font_header; ws[f"{start_c}4"].alignment = align_center
         fill_color = PatternFill(start_color=e["hex"], end_color=e["hex"], fill_type="solid"); ws[f"{start_c}4"].fill = fill_color
-        for c in range(col_idx, col_idx + 3): ws[f"{get_column_letter(c)}3"].border = thin_border; ws[f"{get_column_letter(c)}4"].border = thin_border; ws[f"{get_column_letter(c)}4"].fill = fill_color
-        for i, sh in enumerate(["ชม.", "ลิตร", "ล/ชม."]): cell_ref = f"{get_column_letter(col_idx + i)}5"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].border = font_header, align_center, thin_border
-        col_idx += 3
+        for c in range(col_idx, col_idx + cols_span): 
+            ws[f"{get_column_letter(c)}3"].border = thin_border; ws[f"{get_column_letter(c)}4"].border = thin_border; ws[f"{get_column_letter(c)}4"].fill = fill_color
+            
+        sub_hdrs = ["ชม.", "ลิตร", "ล/ชม."]
+        if e['has_rem']: sub_hdrs.append("หมายเหตุ")
+        
+        for i, sh in enumerate(sub_hdrs): 
+            cell_ref = f"{get_column_letter(col_idx + i)}5"; ws[cell_ref] = sh; ws[cell_ref].font, ws[cell_ref].alignment, ws[cell_ref].border = font_header, align_center, thin_border
+        col_idx += cols_span
 
     for grp_title, grp_bg, is_white in [("toyo", "FF0000", True), ("TCK", "FFC000", False)]:
         start_c, end_c = get_column_letter(col_idx), get_column_letter(col_idx + 2)
@@ -935,10 +1045,17 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             cell_h.value = (item['hours'] if item['hours'] > 0 else "-") if item['has_data'] else ""
             cell_l.value = (item['liters'] if item['liters'] > 0 else "-") if item['has_data'] else ""
             cell_r.value = (round(item['liters'] / item['hours'], 2) if item['hours'] > 0 else "-") if item['has_data'] else ""
+            
             for cell in [cell_h, cell_l, cell_r]:
                 cell.font, cell.alignment, cell.border = font_body, (align_right if isinstance(cell.value, (int, float)) else align_center), thin_border
                 if isinstance(cell.value, (int, float)): cell.number_format = '#,##0.00'
-            c_idx += 3
+                
+            if e['has_rem']:
+                cell_rem = ws[f"{get_column_letter(c_idx+3)}{current_row}"]
+                cell_rem.value = item['rem'] if item['has_data'] else ""
+                cell_rem.font, cell_rem.alignment, cell_rem.border = font_body, align_left, thin_border
+            
+            c_idx += e['cols']
 
         for grp_k in ['toyo', 'tck']:
             grp_item = summary_matrix[day][grp_k]
@@ -957,40 +1074,46 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
         ws[f"A{current_row}"] = row_label
         ws[f"A{current_row}"].font, ws[f"A{current_row}"].alignment, ws[f"A{current_row}"].border = font_total, align_center, thin_border
         if bg_color: ws[f"A{current_row}"].fill = bg_color
+        
         c_i = 2
         for e in engines_config:
+            cols_span = e['cols']
             val = target_data.get(e['key'], "-")
             ws[f"{get_column_letter(c_i)}{current_row}"] = val
             cell = ws[f"{get_column_letter(c_i)}{current_row}"]
             cell.font, cell.alignment, cell.border = (font_header_white if font_style == font_header_white else font_style), align_style, thin_border
             if bg_color: cell.fill = bg_color
             if isinstance(val, (int, float)) and font_style != font_header_white: cell.number_format = '#,##0.00'
+            
             if bg_color and font_style != font_total:
-                ws.merge_cells(f"{get_column_letter(c_i)}{current_row}:{get_column_letter(c_i+2)}{current_row}")
-                for off in [1, 2]:
+                ws.merge_cells(f"{get_column_letter(c_i)}{current_row}:{get_column_letter(c_i+cols_span-1)}{current_row}")
+                for off in range(1, cols_span):
                     cell_off = ws[f"{get_column_letter(c_i+off)}{current_row}"]
                     cell_off.border = thin_border
                     cell_off.fill = bg_color
             else:
-                ws[f"{get_column_letter(c_i+1)}{current_row}"] = val if isinstance(val, str) else ""
-                ws[f"{get_column_letter(c_i+2)}{current_row}"] = val if isinstance(val, str) else ""
-                for off in [1, 2]: ws[f"{get_column_letter(c_i+off)}{current_row}"].border = thin_border
-            c_i += 3
+                for off in range(1, cols_span):
+                    ws[f"{get_column_letter(c_i+off)}{current_row}"] = val if isinstance(val, str) else ""
+                    ws[f"{get_column_letter(c_i+off)}{current_row}"].border = thin_border
+            c_i += cols_span
+            
         for sum_val in [toyo_data, tck_data]:
+            cols_span = 3
             ws[f"{get_column_letter(c_i)}{current_row}"] = sum_val
             cell = ws[f"{get_column_letter(c_i)}{current_row}"]
             cell.font, cell.alignment, cell.border = (font_header_white if font_style == font_header_white else font_style), align_style, thin_border
             if bg_color: cell.fill = bg_color
+            
             if bg_color and font_style != font_total:
                 ws.merge_cells(f"{get_column_letter(c_i)}{current_row}:{get_column_letter(c_i+2)}{current_row}")
-                for off in [1, 2]:
+                for off in range(1, 3):
                     cell_off = ws[f"{get_column_letter(c_i+off)}{current_row}"]
                     cell_off.border = thin_border
                     cell_off.fill = bg_color
             else:
-                ws[f"{get_column_letter(c_i+1)}{current_row}"] = ""
-                ws[f"{get_column_letter(c_i+2)}{current_row}"] = ""
-                for off in [1, 2]: ws[f"{get_column_letter(c_i+off)}{current_row}"].border = thin_border
+                for off in range(1, 3):
+                    ws[f"{get_column_letter(c_i+off)}{current_row}"] = ""
+                    ws[f"{get_column_letter(c_i+off)}{current_row}"].border = thin_border
             c_i += 3
         current_row += 1
 
@@ -1003,8 +1126,12 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
         ws[f"{get_column_letter(c_idx)}{current_row}"] = round(totals_hours[c_key], 0) if totals_hours[c_key]>0 else "-"
         ws[f"{get_column_letter(c_idx+1)}{current_row}"] = round(totals_liters[c_key], 0) if totals_liters[c_key]>0 else "-"
         ws[f"{get_column_letter(c_idx+2)}{current_row}"] = avg_l_hr[c_key]
-        for offset in range(3): ws[f"{get_column_letter(c_idx+offset)}{current_row}"].font, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].border = font_total, align_right, thin_border
-        c_idx += 3
+        if e['has_rem']:
+            ws[f"{get_column_letter(c_idx+3)}{current_row}"] = ""
+        for offset in range(e['cols']): 
+            ws[f"{get_column_letter(c_idx+offset)}{current_row}"].font, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx+offset)}{current_row}"].border = font_total, (align_right if offset < 3 else align_center), thin_border
+        c_idx += e['cols']
+        
     for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
         ws[f"{get_column_letter(c_idx)}{current_row}"] = round(th, 0)
         ws[f"{get_column_letter(c_idx+1)}{current_row}"] = round(tl, 0)
@@ -1018,11 +1145,12 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     for e in engines_config:
         diff_val = std_target_hours[e['key']] - round(totals_hours[e['key']], 0)
         ws[f"{get_column_letter(c_idx)}{current_row}"] = int(diff_val); ws[f"{get_column_letter(c_idx)}{current_row}"].font, ws[f"{get_column_letter(c_idx)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx)}{current_row}"].border = font_red if diff_val < 0 else font_total, align_center, thin_border
-        for offset in [1, 2]: ws[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
-        c_idx += 3
+        for offset in range(1, e['cols']): ws[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
+        c_idx += e['cols']
+        
     for diff_val in [tot_target_toyo - round(tot_toyo_hours, 0), tot_target_tck - round(tot_tck_hours, 0)]:
         ws[f"{get_column_letter(c_idx)}{current_row}"] = int(diff_val); ws[f"{get_column_letter(c_idx)}{current_row}"].font, ws[f"{get_column_letter(c_idx)}{current_row}"].alignment, ws[f"{get_column_letter(c_idx)}{current_row}"].border = font_red if diff_val < 0 else font_total, align_center, thin_border
-        for offset in [1, 2]: ws[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
+        for offset in range(1, 3): ws[f"{get_column_letter(c_idx+offset)}{current_row}"].border = thin_border
         c_idx += 3
     current_row += 1
 
@@ -1031,34 +1159,55 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
     add_summary_row("ชม.คงเหลือทั้งเดือน", diff_dict, tot_target_toyo - round(tot_toyo_hours, 0), tot_target_tck - round(tot_tck_hours, 0), fill_pink_sum, font_red, align_center)
 
     ws.column_dimensions['A'].width = 16
-    for c in range(2, col_idx): ws.column_dimensions[get_column_letter(c)].width = 10
+    for c in range(2, last_col_idx + 1): ws.column_dimensions[get_column_letter(c)].width = 10
 
     excel_buffer = io.BytesIO()
     wb.save(excel_buffer)
     
-    ENGINES_PER_PAGE = 10 
+    # ==========================================
+    # สร้างตาราง HTML (Pop-up สรุปรายงาน & Print)
+    # ==========================================
+    # 🌟 ลดจำนวนรถต่อหน้าเหลือ 6 เพื่อเผื่อคอลัมน์ให้หน้าสุดท้าย
+    ENGINES_PER_PAGE = 6 
     engine_chunks = [engines_config[i:i + ENGINES_PER_PAGE] for i in range(0, len(engines_config), ENGINES_PER_PAGE)]
     all_tables_html = ""
     for chunk_idx, chunk_engines in enumerate(engine_chunks):
         is_last_chunk = (chunk_idx == len(engine_chunks) - 1) 
-        header_row1 = "".join([f'<th colspan="3" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in chunk_engines])
+        
+        header_row1 = "".join([f'<th colspan="{e["cols"]}" style="border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["title"]}</th>' for e in chunk_engines])
         if is_last_chunk: header_row1 += '<th colspan="3" style="background-color:#FF0000;color:#FFF;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">toyo</th><th colspan="3" style="background-color:#FFC000;border:1px solid #000;padding:3px;font-size:10px;text-align:center;" rowspan="2">TCK</th>'
-        header_row2 = "".join([f'<th colspan="3" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in chunk_engines])
-        header_row3_cols = len(chunk_engines) + (2 if is_last_chunk else 0)
-        header_row3 = "".join(['<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>' for _ in range(header_row3_cols)])
+        
+        header_row2 = "".join([f'<th colspan="{e["cols"]}" style="background-color:#{e["hex"]};color:{"#FFF" if e["hex"]=="FF0000" else "#000"};border:1px solid #000;padding:3px;font-size:10px;text-align:center;">{e["brand"]}</th>' for e in chunk_engines])
+        
+        header_row3 = ""
+        for e in chunk_engines:
+            header_row3 += '<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>'
+            if e['has_rem']:
+                header_row3 += '<th style="border:1px solid #000;padding:2px;font-size:8px;width:45px;">หมายเหตุ</th>'
+                
+        if is_last_chunk:
+            for _ in range(2):
+                header_row3 += '<th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ชม.</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ลิตร</th><th style="border:1px solid #000;padding:2px;font-size:8px;width:30px;">ล/ชม.</th>'
+                
         body_rows = ""
         for day in range(1, days_in_month + 1):
             body_rows += f'<tr><td style="border:1px solid #000;padding:2px;text-align:center;font-size:9px;font-weight:bold;">{day}</td>'
             for e in chunk_engines:
                 item = matrix_data[day][e['key']]
                 h_val, l_val, r_val = (f"{item['hours']:,.2f}", f"{item['liters']:,.2f}", f"{(item['liters']/item['hours']):,.2f}") if item['has_data'] and item['hours']>0 else ("-", "-", "-")
+                rem_val = item['rem'] if item['has_data'] else ""
+                
                 body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{h_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{l_val}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{r_val}</td>'
+                if e['has_rem']:
+                    body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:left;font-size:8px;color:#475569;">{rem_val}</td>'
+                    
             if is_last_chunk:
                 for grp_k in ['toyo', 'tck']:
                     grp_item = summary_matrix[day][grp_k]
                     th_s, tl_s, tr_s = (f"{grp_item['hours']:,.2f}", f"{grp_item['liters']:,.2f}", f"{(grp_item['liters']/grp_item['hours']):,.2f}") if grp_item['hours']>0 else ("-", "-", "-")
                     body_rows += f'<td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{th_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tl_s}</td><td style="border:1px solid #000;padding:2px;text-align:right;font-size:9px;">{tr_s}</td>'
             body_rows += '</tr>'
+            
         total_row_html = '<tr><td style="border:1px solid #000;padding:3px;text-align:center;font-size:10px;font-weight:bold;">รวม</td>'
         for e in chunk_engines:
             c_key = e['key']
@@ -1066,12 +1215,16 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
             t_l = f"{totals_liters[c_key]:,.2f}" if totals_liters[c_key] > 0 else "-"
             t_r = avg_l_hr[c_key]
             total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_h}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_l}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{t_r}</td>'
+            if e['has_rem']:
+                total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:center;font-size:9px;font-weight:bold;">-</td>'
+                
         if is_last_chunk:
             for th, tl, tr in [(tot_toyo_hours, tot_toyo_liters, avg_toyo_rate), (tot_tck_hours, tot_tck_liters, avg_tck_rate)]:
                 th_s = f"{th:,.2f}" if th > 0 else "-"
                 tl_s = f"{tl:,.2f}" if tl > 0 else "-"
                 total_row_html += f'<td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{th_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tl_s}</td><td style="border:1px solid #000;padding:3px;text-align:right;font-size:9px;font-weight:bold;">{tr}</td>'
         total_row_html += '</tr>'
+        
         page_info = f"<div style='text-align: right; font-size: 10px; margin-bottom: 2px;'>แผ่นที่ {chunk_idx + 1}/{len(engine_chunks)}</div>" if len(engine_chunks) > 1 else ""
         single_table = f"<div class='header-title'>บริษัท วู้ดเวิร์ค จำกัด สาขา {selected_branch_display}</div><div class='banner'>รายงานการใช้เชื้อเพลิงของรถ ประจำเดือน {month_str} {year_buddhist}</div>{page_info}<table><thead><tr><th rowspan='3' style='border:1px solid #000;padding:3px;font-size:10px;width:35px;'>วันที่</th>{header_row1}</tr><tr>{header_row2}</tr><tr>{header_row3}</tr></thead><tbody>{body_rows}{total_row_html}</tbody></table>"
         all_tables_html += single_table
@@ -1079,7 +1232,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
 
     table_full_html = f"<!DOCTYPE html><html><head><meta charset='utf-8'><title>Print</title><style>@page {{ size: A4 landscape; margin: 4mm; }} body {{ font-family: 'Sarabun', Tahoma, sans-serif; margin: 0; padding: 5px; background-color: #FFFFFF; color: #000000; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }} .header-title {{ text-align: center; font-size: 16px; font-weight: bold; margin-bottom: 4px; }} .banner {{ text-align: center; font-size: 14px; font-weight: bold; padding: 5px; margin-bottom: 4px; }} table {{ width: 100%; border-collapse: collapse; }} th, td {{ font-family: 'Sarabun', Tahoma, sans-serif; color: #000000 !important; }}</style></head><body>{all_tables_html}</body></html>"
     return raw_data, excel_buffer.getvalue(), json.dumps(table_full_html), engine_lbl_list, engine_details_t2
-
 @st.cache_data(show_spinner=False)
 def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_branch_display):
     try:
@@ -1488,7 +1640,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
 # ==========================================================
 def render_all_reports_module(user_branch_name, selected_sub_menu=None):
     
-    st.markdown("""
+    st.markdown(""" 
         <style>
         header[data-testid="stHeader"] { display: none !important; }
         header { visibility: hidden !important; }
@@ -1503,6 +1655,24 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
         @media (max-width: 768px) {
             div[data-testid="stVerticalBlock"]:has(.desktop-view-marker) { display: none !important; }
             div[data-testid="stVerticalBlock"]:has(.mobile-view-marker) { display: block !important; }
+        }
+
+        /* เจาะจงลดขนาดปุ่มที่อยู่ในคอลัมน์ (เช่น ปุ่มในคอลัมน์ "จัดการ") */
+        div[data-testid="column"] div.stButton > button {
+            padding: 0px 5px !important;
+            height: 35px !important;
+            min-height: 35px !important;
+            width: 100% !important;
+            max-width: 45px !important; /* ล็อคความกว้างไม่ให้ยืดเกินไป */
+            border-radius: 8px !important;
+            margin: auto !important; /* จัดให้อยู่กึ่งกลาง */
+        }
+    
+        /* ปรับขนาดไอคอนด้านในให้สมส่วน */
+        div[data-testid="column"] div.stButton > button p {
+            font-size: 16px !important;
+            margin: 0 !important;
+            line-height: 1 !important;
         }
         </style>
     """, unsafe_allow_html=True)
