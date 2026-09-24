@@ -693,60 +693,61 @@ else:
     current_view_state = f"{selected_main}_{sub_menu_entry}_{sub_menu_report}"
 
     # =========================================================================
-    # 🌟 พื้นที่แสดงผลหลัก (พร้อมระบบล้างจอก่อนโหลด)
+    # 🌟 พื้นที่แสดงผลหลัก (ระบบโหลดข้อมูลจริง Real-time)
     # =========================================================================
+    
+    # 🌟 สร้างพื้นที่ 2 กล่องเรียงกัน: กล่องโหลด (อยู่บน) และ กล่องเนื้อหา (อยู่ล่าง)
+    loading_box = st.empty()
     main_view = st.empty()
 
     # 🎯 1. เช็คว่าเพิ่งเปลี่ยนหน้ามาใหม่ใช่ไหม? 
-    if st.session_state.get('last_view_state') != current_view_state:
+    is_changing_page = (st.session_state.get('last_view_state') != current_view_state)
+
+    if is_changing_page:
+        # 🪄 ดรอปม่านหน้าจอ Loading ลงมาบังไว้ก่อน (ความสูง 100vh จะดันเนื้อหาจริงไปแอบไว้ข้างล่าง)
+        loading_box.markdown("""
+            <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif; height: 100vh;'>
+                <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
+                <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
+                <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+            </div>
+        """, unsafe_allow_html=True)
         
-        # 🔥 สั่งเคลียร์พื้นที่ทั้งหมดทิ้งทันที! (ลบกราฟและตารางเก่าทิ้งไม่ให้หลงเหลือ)
-        main_view.empty()
-        
-        # วาดหน้า Loading Screen
-        with main_view.container():
-            st.markdown("""
-                <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif; height: 100vh;'>
-                    <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
-                    <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
-                    <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-                </div>
-            """, unsafe_allow_html=True)
-            
-        # 🪄 ย้ายท่าไม้ตายล้างกราฟค้าง มาแอบทำงานตอนกำลังโหลด
+        # 🪄 ท่าไม้ตายล้างกราฟค้างเดิม
         ui_flusher = st.empty()
         with ui_flusher:
             st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
-        time.sleep(0.05) 
+            
+        # บังคับให้ Streamlit โชว์ม่าน Loading ให้ผู้ใช้เห็นทันทีก่อนเริ่มประมวลผลของหนัก
+        time.sleep(0.1) 
         ui_flusher.empty()
-
-        # หน่วงเวลาอีก 1.45 วินาที (รวมกับ 0.05 ด้านบนจะเป็น 1.5 วินาทีพอดี)
-        time.sleep(1.45)  
         
-        # บันทึกว่าโหลดเสร็จแล้ว และสั่งรีเฟรช 1 รอบ
+        # อัปเดตสถานะว่าเปลี่ยนหน้าแล้ว
         st.session_state['last_view_state'] = current_view_state
-        st.rerun()
 
-    # 🎯 2. ถ้าโหลดเสร็จแล้ว (รอจนครบ 1.5 วิ) ให้แสดงเนื้อหาจริง
-    else:
-        with main_view.container():
-            if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
-                user_position = st.session_state.get('position', '-')
-                render_dashboard(
-                    current_branch_id, disp_name, role_th, current_branch, 
-                    user_position, current_access, access_color, access_desc
-                )
+    # 🎯 2. สั่งรันเนื้อหาจริง (โค้ดจะดึงข้อมูล Database และสร้างตารางอยู่เบื้องหลังม่าน Loading)
+    with main_view.container():
+        if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
+            user_position = st.session_state.get('position', '-')
+            render_dashboard(
+                current_branch_id, disp_name, role_th, current_branch, 
+                user_position, current_access, access_color, access_desc
+            )
 
-            elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
-                st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
-                render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
-                
-            elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
-                render_admin_user_management()
-                
-            elif selected_main == report_menu_label: 
-                render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
-                
-            elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
-                render_add_new_equipment()
+        elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
+            st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
+            render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+            
+        elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
+            render_admin_user_management()
+            
+        elif selected_main == report_menu_label: 
+            render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+            
+        elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
+            render_add_new_equipment()
+
+    # 🎯 3. เมื่อดึงข้อมูลและสร้างตารางเสร็จสมบูรณ์ 100% แล้ว ให้ทำลายม่าน Loading ทิ้ง!
+    if is_changing_page:
+        loading_box.empty()
