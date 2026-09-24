@@ -278,14 +278,27 @@ if 'app_init' not in st.session_state:
 # =========================================================================
 
 def perform_logout(message=None):
-    for key in ['logged_in', 'user_id', 'username', 'full_name', 'position', 'branch_id', 'branch_name', 'role_tab', 'allowed_tabs', 'allowed_branches', 'last_activity', 'page']:
-        if key in st.session_state:
-            del st.session_state[key]
-    safe_remove_cookie("auth_user") # ล้างคุกกี้อย่างปลอดภัย
+    # 🌟 1. ล้างข้อมูลในหน่วยความจำทั้งหมดให้สะอาดกริ๊บ
+    st.session_state.clear()
+    
+    # 🌟 2. ปักธงป้องกัน "คุกกี้ผีหลอก"
+    st.session_state['just_logged_out'] = True
+    
+    # 🌟 3. สั่งทำลายคุกกี้
+    safe_remove_cookie("auth_user")
+    
     if message:
         st.warning(message)
+        
+    # 🌟 4. หน่วงเวลาให้เบราว์เซอร์ลบคุกกี้ให้เสร็จจริงๆ (ครึ่งวินาที)
+    time.sleep(0.5)
 
 def restore_session_from_cookie():
+    # 🌟 ดักจับคุกกี้ผีหลอก: ถ้าเพิ่งกดออกจากระบบ ให้ข้ามการอ่านคุกกี้ไปเลย!
+    if st.session_state.get('just_logged_out'):
+        st.session_state['just_logged_out'] = False # ปลดธงทิ้ง
+        return
+
     if not st.session_state.get('logged_in'):
         saved_user = safe_get_cookie("auth_user") # ดึงคุกกี้อย่างปลอดภัย
         if saved_user:
