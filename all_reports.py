@@ -522,7 +522,7 @@ def render_custom_pagination(data_list, session_prefix, default_rows=15):
     if st.session_state[page_key] > total_pages: st.session_state[page_key] = total_pages
     if st.session_state[page_key] < 1: st.session_state[page_key] = 1
 
-    pc1, pc_space, pc2 = st.columns([3.5, 2.5, 4.0])
+    pc1, pc_space, pc2 = st.columns([3.5, 1.5, 5.0])
     with pc1: 
         new_rows = st.number_input(f"พบข้อมูลทั้งหมด {total_records} รายการ (แสดงหน้าละ):", value=st.session_state[rows_key], step=5, key=f"inp_{rows_key}")
         if new_rows != st.session_state[rows_key]:
@@ -539,7 +539,7 @@ def render_custom_pagination(data_list, session_prefix, default_rows=15):
             st.rerun()
 
         st.markdown("<div style='margin-top: -10px;'></div>", unsafe_allow_html=True)
-        c_prev, c_page, c_next = st.columns([1.2, 1.6, 1.2])
+        c_prev, c_page, c_next = st.columns([1.5, 1.5, 1.5])
         with c_prev:
             if st.button("⬅️ ก่อนหน้า", use_container_width=True, disabled=(st.session_state[page_key] <= 1), key=f"btn_prev_{session_prefix}"):
                 st.session_state[page_key] -= 1
@@ -1802,7 +1802,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # 🖨️ ปุ่มด้านล่าง (โชว์ทั้ง PC และ Mobile พร้อมแก้ช่องไฟบนมือถือ)
                 # =========================================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.8, 4.4, 2.0])
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
                 with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
@@ -1918,7 +1918,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # 🖨️ ปุ่มด้านล่าง
                 # =========================================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.8, 4.4, 2.0])
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
                 with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
@@ -2031,7 +2031,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # 🖨️ ปุ่มด้านล่าง
                 # =========================================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.8, 4.4, 2.0])
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
                 with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
@@ -2231,7 +2231,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # 🖨️ ปุ่มด้านล่าง (ใส่กล่องคั่นระยะ 25px แก้ปุ่มเบียด)
                 # ==========================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
-                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([1.8, 1.8, 4.4, 2.0])
+                col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
                 with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
                 with col_btn2: 
                     if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 

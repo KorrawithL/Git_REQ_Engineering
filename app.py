@@ -239,8 +239,9 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
         white-space: normal !important;
         word-wrap: break-word !important;
         height: auto !important;
-        min-height: 45px !important;
+        
         line-height: 1.3 !important;
+        width: 100% !important;
     }
 
     /* 🌟 แก้ไขเมนูตัวเลือก (Radio) ใน Sidebar ให้ขึ้นบรรทัดใหม่ได้ (วงสีน้ำเงิน) 🌟 */
