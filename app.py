@@ -229,6 +229,15 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
         -webkit-text-fill-color: #FFFFFF !important;
         font-weight: 700 !important;
 
+/* บังคับปุ่มในหน้าจอหลักไม่ให้ตัดคำเป็น ... (รองรับทั้งปุ่มปกติและปุ่ม Download) */
+div[data-testid="stMain"] div.stButton > button, 
+div[data-testid="stMain"] div.stDownloadButton > button {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    height: auto !important;
+    min-height: 42px !important;
+}        
+
 </style>
 """, unsafe_allow_html=True)
 
