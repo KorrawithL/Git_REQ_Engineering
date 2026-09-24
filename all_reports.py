@@ -1847,7 +1847,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
-                    header_cols = st.columns([0.6, 1.2, 1.2, 1.2, 1.0, 1.0, 1.0, 1.2])
+                    header_cols = st.columns([0.5, 1.0, 1.1, 1.1, 1.0, 1.0, 1.0, 1.2])
                     headers = ["No.", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
@@ -1858,7 +1858,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             seq_num = start_num + i + 1
                             rec_id = r[pk_col_t2]
                             lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
-                            cols = st.columns([0.6, 1.2, 1.2, 1.2, 1.0, 1.0, 1.0, 1.2])
+                            cols = st.columns([0.5, 1.0, 1.1, 1.1, 1.0, 1.0, 1.0, 1.2])
                             cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
@@ -1962,7 +1962,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
-                    header_cols = st.columns([0.6, 1.2, 1.0, 1.1, 1.1, 1.1, 1.1, 1.2])
+                    header_cols = st.columns([0.5, 1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 1.2])
                     headers = ["No.", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
@@ -1972,7 +1972,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         for i, r in enumerate(paginated_t3):
                             seq_num = start_num + i + 1
                             rec_id = r[pk_col_t3]
-                            cols = st.columns([0.6, 1.2, 1.0, 1.1, 1.1, 1.1, 1.1, 1.2])
+                            cols = st.columns([0.5, 1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 1.2])
                             cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
