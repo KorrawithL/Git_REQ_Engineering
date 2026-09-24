@@ -228,15 +228,39 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
         color: #FFFFFF !important;
         -webkit-text-fill-color: #FFFFFF !important;
         font-weight: 700 !important;
+    } /* 👈👈 เติมปีกกาปิดที่หายไปตรงนี้ครับ !!! */
 
-/* บังคับปุ่มในหน้าจอหลักไม่ให้ตัดคำเป็น ... (รองรับทั้งปุ่มปกติและปุ่ม Download) */
-div[data-testid="stMain"] div.stButton > button, 
-div[data-testid="stMain"] div.stDownloadButton > button {
-    white-space: normal !important;
-    word-wrap: break-word !important;
-    height: auto !important;
-    min-height: 42px !important;
-}        
+    /* 🌟 แก้ไขปุ่มในหน้าจอหลัก & ปุ่ม Download ไม่ให้ตัดคำเป็นจุดไข่ปลา (วงสีแดง) 🌟 */
+    div[data-testid="stDownloadButton"] button,
+    div[data-testid="stDownloadButton"] button p,
+    div[data-testid="stDownloadButton"] button span,
+    div[data-testid="stMain"] div.stButton > button,
+    div[data-testid="stMain"] div.stDownloadButton > button {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        height: auto !important;
+        min-height: 45px !important;
+        line-height: 1.3 !important;
+    }
+
+    /* 🌟 แก้ไขเมนูตัวเลือก (Radio) ใน Sidebar ให้ขึ้นบรรทัดใหม่ได้ (วงสีน้ำเงิน) 🌟 */
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label {
+        height: auto !important;
+        min-height: 45px !important;
+        align-items: flex-start !important; /* ดันปุ่มวงกลมให้อยู่บรรทัดบนสุดเสมอเวลาข้อความยาว */
+        padding-top: 8px !important;
+        padding-bottom: 8px !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label p,
+    [data-testid="stSidebar"] div[data-testid="stRadio"] div[role="radiogroup"] label span {
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        line-height: 1.4 !important;
+        width: 100% !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        display: inline-block !important;
+    }
 
 </style>
 """, unsafe_allow_html=True)
