@@ -633,7 +633,7 @@ else:
     ui_flusher = st.empty()
     with ui_flusher:
         st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
-    time.sleep(0.05) 
+    time.sleep(5) 
     ui_flusher.empty() 
     # =========================================================================
 
@@ -660,8 +660,8 @@ else:
                     </div>
                 """, unsafe_allow_html=True)
             
-            # ⏱️ กำหนดเวลาหน่วงที่คุณตั้งไว้ (2.5 วินาที)
-            time.sleep(2.5)  
+            # ⏱️ กำหนดเวลาหน่วงที่คุณตั้งไว้ (5 วินาที)
+            time.sleep(5)  
             
             # เมื่อครบเวลา สั่งทำลายหน้าจอโหลดทิ้ง
             loading_box.empty() 
