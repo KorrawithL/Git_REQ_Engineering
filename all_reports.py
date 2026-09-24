@@ -1733,7 +1733,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                     # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
-                    header_cols = st.columns([0.5, 1.1, 1.0, 1.8, 0.8, 1.1, 1.3, 1.2])
+                    header_cols = st.columns([0.5, 1.1, 1.0, 1.0, 0.8, 1.1, 1.3, 1.2])
                     headers = ["No.", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
@@ -1743,7 +1743,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         for i, r in enumerate(paginated_t1):
                             seq_num = start_num + i + 1
                             rec_id = r[pk_col_t1]
-                            cols = st.columns([0.5, 1.1, 1.0, 1.8, 0.8, 1.1, 1.3, 1.2])
+                            cols = st.columns([0.5, 1.1, 1.0, 1.0, 0.8, 1.1, 1.3, 1.2])
                             cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
@@ -1989,7 +1989,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                                 if c_del.button("🗑️", key=f"d3_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
                             else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
-                            
+
                 # =========================================================
                 # 📱 MOBILE VIEW: แสดงตารางแบบใหม่
                 # =========================================================
