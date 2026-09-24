@@ -637,11 +637,41 @@ else:
     ui_flusher.empty() 
     # =========================================================================
 
+    # 🌟 สร้าง Key เพื่อเช็คว่า "เพิ่งมีการเปลี่ยนหน้า Tab" หรือไม่
+    current_view_state = f"{selected_main}_{sub_menu_entry}_{sub_menu_report}"
+
     # =========================================================================
     # 🌟 พื้นที่แสดงผลหลัก 
     # =========================================================================
     main_view = st.empty()
     with main_view.container():
+        
+        # 🎯 ท่าไม้ตายใหม่: โชว์หน้า Loading เฉพาะฝั่งขวา ตอนเปลี่ยนหน้า Tab
+        if st.session_state.get('last_view_state') != current_view_state:
+            loading_box = st.empty()
+            with loading_box:
+                # 🎨 ใส่ CSS วาดหน้าจอโหลดตรงกลางจอขวา พร้อมแอนิเมชันหมุนๆ
+                st.markdown("""
+                    <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
+                        <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
+                        <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
+                        <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+                    </div>
+                """, unsafe_allow_html=True)
+            
+            # ⏱️ กำหนดเวลาหน่วงที่คุณตั้งไว้ (2.5 วินาที)
+            time.sleep(2.5)  
+            
+            # เมื่อครบเวลา สั่งทำลายหน้าจอโหลดทิ้ง
+            loading_box.empty() 
+            
+            # บันทึกความจำไว้ว่าตอนนี้อยู่หน้านี้แล้ว (กดปุ่มอื่นในหน้าเดิมจะได้ไม่ต้องโหลดซ้ำ)
+            st.session_state['last_view_state'] = current_view_state
+
+        # ========================================================
+        # 🖥️ ดึงข้อมูลเนื้อหาจริงมาแสดง (หลังจาก Loading หายไป)
+        # ========================================================
         if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
             user_position = st.session_state.get('position', '-')
             render_dashboard(
