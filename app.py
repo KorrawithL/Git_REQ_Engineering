@@ -641,13 +641,18 @@ else:
     current_view_state = f"{selected_main}_{sub_menu_entry}_{sub_menu_report}"
 
     # =========================================================================
-    # 🌟 พื้นที่แสดงผลหลัก 
+    # 🌟 พื้นที่แสดงผลหลัก (พร้อมระบบล้างจอก่อนโหลด)
     # =========================================================================
     main_view = st.empty()
-    with main_view.container():
+
+    # 🎯 1. เช็คว่าเพิ่งเปลี่ยนหน้ามาใหม่ใช่ไหม? 
+    if st.session_state.get('last_view_state') != current_view_state:
         
-        # 🎯 1. เช็คว่าเพิ่งเปลี่ยนหน้ามาใหม่ใช่ไหม? ถ้าใช่ -> โชว์หน้า Loading
-        if st.session_state.get('last_view_state') != current_view_state:
+        # 🔥 สั่งเคลียร์พื้นที่ทั้งหมดทิ้งทันที! (ลบกราฟและตารางเก่าทิ้งไม่ให้หลงเหลือ)
+        main_view.empty()
+        
+        # วาดหน้า Loading Screen
+        with main_view.container():
             st.markdown("""
                 <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif; height: 100vh;'>
                     <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
@@ -657,17 +662,23 @@ else:
                 </div>
             """, unsafe_allow_html=True)
             
-            # บันทึกสถานะว่าหน้าเปลี่ยนแล้ว
-            st.session_state['last_view_state'] = current_view_state
-            
-            # หน่วงเวลา 5 วินาที
-            time.sleep(5)  
-            
-            # หมดเวลาปุ๊บ สั่งรีสตาร์ทตัวเอง 1 รอบ เพื่อล้างหน้า Loading ทิ้ง
-            st.rerun()
+        # 🪄 ย้ายท่าไม้ตายล้างกราฟค้าง มาแอบทำงานตอนกำลังโหลด
+        ui_flusher = st.empty()
+        with ui_flusher:
+            st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
+        time.sleep(0.05) 
+        ui_flusher.empty()
 
-        # 🎯 2. ถ้าโหลดเสร็จแล้ว (เข้าเงื่อนไข else) -> ถึงจะอนุญาตให้โชว์เนื้อหาจริง!
-        else:
+        # หน่วงเวลาอีก 2.45 วินาที (รวมกับ 0.05 ด้านบนจะเป็น 2.5 วินาทีพอดี)
+        time.sleep(2.45)  
+        
+        # บันทึกว่าโหลดเสร็จแล้ว และสั่งรีเฟรช 1 รอบ
+        st.session_state['last_view_state'] = current_view_state
+        st.rerun()
+
+    # 🎯 2. ถ้าโหลดเสร็จแล้ว (รอจนครบ 2.5 วิ) ให้แสดงเนื้อหาจริง
+    else:
+        with main_view.container():
             if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
                 user_position = st.session_state.get('position', '-')
                 render_dashboard(
