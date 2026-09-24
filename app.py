@@ -528,6 +528,10 @@ if not st.session_state.get('logged_in'):
 else:
     st.session_state['last_activity'] = time.time()
 
+    # 🌟 ท่าไม้ตายป้องกัน F5 เด้งหลุด: ย้ำการฝังคุกกี้เข้าเบราว์เซอร์อย่างเด็ดขาด!
+    if st.session_state.get('username'):
+        safe_set_cookie("auth_user", st.session_state.get('username'), SESSION_TIMEOUT_SECONDS)
+
     disp_name = st.session_state.get('full_name') or st.session_state.get('username')
     current_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
     current_branch = st.session_state.get('branch_name', '-')
@@ -597,12 +601,13 @@ else:
             st.session_state['sidebar_main'] = saved_main_tab
         else:
             st.session_state['sidebar_main'] = main_choices[0] # ค่าเริ่มต้น
+            # 🌟 ย้ำการฝังคุกกี้หน้าแรกด้วย เผื่อกรณีเพิ่งเข้าสู่ระบบครั้งแรก
+            safe_set_cookie("last_main_tab", main_choices[0], SESSION_TIMEOUT_SECONDS) 
             
     if 'sidebar_sub_entry' not in st.session_state:
         st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์"
     if 'sidebar_sub_report' not in st.session_state:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
-
     with st.sidebar:
         st.markdown(f"<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WORK WOOD</h3>", unsafe_allow_html=True)
 
