@@ -660,8 +660,8 @@ else:
             # บันทึกสถานะว่าหน้าเปลี่ยนแล้ว
             st.session_state['last_view_state'] = current_view_state
             
-            # หน่วงเวลา 2.5 วินาที
-            time.sleep(2.5)  
+            # หน่วงเวลา 5 วินาที
+            time.sleep(5)  
             
             # หมดเวลาปุ๊บ สั่งรีสตาร์ทตัวเอง 1 รอบ เพื่อล้างหน้า Loading ทิ้ง
             st.rerun()
