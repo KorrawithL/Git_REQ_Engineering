@@ -646,48 +646,44 @@ else:
     main_view = st.empty()
     with main_view.container():
         
-        # 🎯 ท่าไม้ตายใหม่: โชว์หน้า Loading เฉพาะฝั่งขวา ตอนเปลี่ยนหน้า Tab
+        # 🎯 1. เช็คว่าเพิ่งเปลี่ยนหน้ามาใหม่ใช่ไหม? ถ้าใช่ -> โชว์หน้า Loading
         if st.session_state.get('last_view_state') != current_view_state:
-            loading_box = st.empty()
-            with loading_box:
-                # 🎨 ใส่ CSS วาดหน้าจอโหลดตรงกลางจอขวา พร้อมแอนิเมชันหมุนๆ
-                st.markdown("""
-                    <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
-                        <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
-                        <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
-                        <div style="margin: 50px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                        <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-                    </div>
-                """, unsafe_allow_html=True)
+            st.markdown("""
+                <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif; height: 100vh;'>
+                    <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
+                    <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
+                    <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+                </div>
+            """, unsafe_allow_html=True)
             
-            # ⏱️ กำหนดเวลาหน่วงที่คุณตั้งไว้ (5 วินาที)
-            time.sleep(5)  
-            
-            # เมื่อครบเวลา สั่งทำลายหน้าจอโหลดทิ้ง
-            loading_box.empty() 
-            
-            # บันทึกความจำไว้ว่าตอนนี้อยู่หน้านี้แล้ว (กดปุ่มอื่นในหน้าเดิมจะได้ไม่ต้องโหลดซ้ำ)
+            # บันทึกสถานะว่าหน้าเปลี่ยนแล้ว
             st.session_state['last_view_state'] = current_view_state
+            
+            # หน่วงเวลา 2.5 วินาที
+            time.sleep(2.5)  
+            
+            # หมดเวลาปุ๊บ สั่งรีสตาร์ทตัวเอง 1 รอบ เพื่อล้างหน้า Loading ทิ้ง
+            st.rerun()
 
-        # ========================================================
-        # 🖥️ ดึงข้อมูลเนื้อหาจริงมาแสดง (หลังจาก Loading หายไป)
-        # ========================================================
-        if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
-            user_position = st.session_state.get('position', '-')
-            render_dashboard(
-                current_branch_id, disp_name, role_th, current_branch, 
-                user_position, current_access, access_color, access_desc
-            )
+        # 🎯 2. ถ้าโหลดเสร็จแล้ว (เข้าเงื่อนไข else) -> ถึงจะอนุญาตให้โชว์เนื้อหาจริง!
+        else:
+            if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
+                user_position = st.session_state.get('position', '-')
+                render_dashboard(
+                    current_branch_id, disp_name, role_th, current_branch, 
+                    user_position, current_access, access_color, access_desc
+                )
 
-        elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
-            st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
-            render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
-            
-        elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
-            render_admin_user_management()
-            
-        elif selected_main == report_menu_label: 
-            render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
-            
-        elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
-            render_add_new_equipment()
+            elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
+                st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
+                render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
+                
+            elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
+                render_admin_user_management()
+                
+            elif selected_main == report_menu_label: 
+                render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
+                
+            elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
+                render_add_new_equipment()
