@@ -655,7 +655,7 @@ else:
                     <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
                         <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
                         <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
-                        <div style="margin: 20px auto; width: 45px; height: 100px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                        <div style="margin: 50px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                         <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
                     </div>
                 """, unsafe_allow_html=True)
