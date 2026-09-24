@@ -1732,8 +1732,9 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # =========================================================
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
-                    headers = ["No.", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "หมายเหตุ", "จัดการ"]
+                    # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
+                    header_cols = st.columns([0.5, 1.1, 1.0, 1.8, 0.8, 1.1, 1.3, 1.2])
+                    headers = ["No.", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
@@ -1742,7 +1743,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         for i, r in enumerate(paginated_t1):
                             seq_num = start_num + i + 1
                             rec_id = r[pk_col_t1]
-                            cols = st.columns([0.5, 1.0, 0.9, 1.5, 0.7, 0.9, 1.1, 1.3, 1.1])
+                            cols = st.columns([0.5, 1.1, 1.0, 1.8, 0.8, 1.1, 1.3, 1.2])
                             cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
@@ -1750,14 +1751,14 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             cols[4].write(str(r.get('machine_qty') or 0))
                             cols[5].write(f"{float(r.get('working_hours') or 0.0):.2f}")
                             cols[6].write(f"{float(r.get('breakdown_hours') or 0.0):.2f}")
-                            cols[7].write(str(r.get('remarks') or '-'))
+                            # ลบ cols[7] หมายเหตุออก แล้วเลื่อนปุ่มจัดการมาแทน
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                c_edit, c_del = cols[7].columns(2, gap="small")
                                 if c_edit.button("✏️", key=f"e1_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t1(r, pk_col_t1)
                                 if c_del.button("🗑️", key=f"d1_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t1(r, pk_col_t1)
-                            else: cols[8].write("-")
+                            else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
                 # =========================================================
@@ -1845,8 +1846,9 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # =========================================================
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
-                    headers = ["No.", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "หมายเหตุ", "จัดการ"]
+                    # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
+                    header_cols = st.columns([0.6, 1.2, 1.6, 1.6, 1.0, 1.0, 1.0, 1.2])
+                    headers = ["No.", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
@@ -1856,7 +1858,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             seq_num = start_num + i + 1
                             rec_id = r[pk_col_t2]
                             lts, hrs = float(r.get('fuel_liters') or 0.0), float(r.get('working_hours') or 0.0)
-                            cols = st.columns([0.5, 1.0, 1.3, 1.3, 0.9, 0.9, 0.9, 1.2, 1.1])
+                            cols = st.columns([0.6, 1.2, 1.6, 1.6, 1.0, 1.0, 1.0, 1.2])
                             cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].write(f"{r.get('branch_name') or '-'} / {r.get('type_name') or '-'}")
@@ -1864,14 +1866,14 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             cols[4].write(f"{lts:.2f}")
                             cols[5].write(f"{hrs:.2f}")
                             cols[6].write(f"{(round(lts/hrs, 2) if hrs > 0 else 0.00):.2f}")
-                            cols[7].write(str(r.get('remark') or '-'))
+                            # ลบ cols[7] หมายเหตุออก แล้วเลื่อนปุ่มจัดการมาแทน
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                c_edit, c_del = cols[7].columns(2, gap="small")
                                 if c_edit.button("✏️", key=f"e2_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t2(r, pk_col_t2, engine_lbl_list, engine_details_t2)
                                 if c_del.button("🗑️", key=f"d2_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t2(r, pk_col_t2)
-                            else: cols[8].write("-")
+                            else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
 
                 # =========================================================
@@ -1959,8 +1961,9 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # =========================================================
                 with st.container():
                     st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
-                    header_cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
-                    headers = ["No.", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "หมายเหตุ", "จัดการ"]
+                    # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
+                    header_cols = st.columns([0.6, 1.2, 1.0, 1.3, 1.3, 1.3, 1.3, 1.2])
+                    headers = ["No.", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "จัดการ"]
                     for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
                     st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
@@ -1969,7 +1972,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         for i, r in enumerate(paginated_t3):
                             seq_num = start_num + i + 1
                             rec_id = r[pk_col_t3]
-                            cols = st.columns([0.5, 1.0, 0.8, 1.1, 1.1, 1.1, 1.1, 1.5, 1.1])
+                            cols = st.columns([0.6, 1.2, 1.0, 1.3, 1.3, 1.3, 1.3, 1.2])
                             cols[0].write(str(seq_num))
                             cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                             cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
@@ -1977,16 +1980,16 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             cols[4].write(str(r.get('total_drop') or 0))
                             cols[5].write(str(r.get('pm_drop') or 0))
                             cols[6].write(str(r.get('non_pm_drop') or 0))
-                            cols[7].write(str(r.get('remark') or '-'))
+                            # ลบ cols[7] หมายเหตุออก แล้วเลื่อนปุ่มจัดการมาแทน
                             
                             can_crud = current_role == 'admin' or (current_role in ['user', 'manager'] and str(r.get('branch_id')) in user_allowed_branches)
                             if can_crud:
-                                c_edit, c_del = cols[8].columns(2, gap="small")
+                                c_edit, c_del = cols[7].columns(2, gap="small")
                                 if c_edit.button("✏️", key=f"e3_desk_{rec_id}", help="แก้ไขข้อมูล", use_container_width=True): update_record_dialog_t3(r, pk_col_t3)
                                 if c_del.button("🗑️", key=f"d3_desk_{rec_id}", help="ลบรายการ", use_container_width=True): delete_record_dialog_t3(r, pk_col_t3)
-                            else: cols[8].write("-")
+                            else: cols[7].write("-")
                             st.markdown("<hr style='margin:0; border-color:#F1F5F9;'>", unsafe_allow_html=True)
-
+                            
                 # =========================================================
                 # 📱 MOBILE VIEW: แสดงตารางแบบใหม่
                 # =========================================================
