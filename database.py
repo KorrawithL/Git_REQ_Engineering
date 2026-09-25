@@ -4,16 +4,23 @@ import streamlit as st
 import os
 from dotenv import load_dotenv
 
-# 🪄 โหลดตัวแปรจากไฟล์ .env (มีผลเฉพาะตอนรันในเครื่องตัวเอง)
+# โหลดตัวแปรจากไฟล์ .env (มีผลเฉพาะตอนรันในเครื่องตัวเอง)
 load_dotenv()
 
 def get_db_connection():
+    # 💡 ท่านี้จะรองรับทั้งการรันในเครื่อง (.env) และรันบนคลาวด์ (st.secrets)
+    db_host = os.getenv("DB_HOST") or st.secrets.get("DB_HOST")
+    db_port = int(os.getenv("DB_PORT") or st.secrets.get("DB_PORT", 4000))
+    db_user = os.getenv("DB_USER") or st.secrets.get("DB_USER")
+    db_pass = os.getenv("DB_PASSWORD") or st.secrets.get("DB_PASSWORD")
+    db_name = os.getenv("DB_NAME") or st.secrets.get("DB_NAME")
+
     conn = pymysql.connect(
-        host=os.getenv("DB_HOST"),
-        port=int(os.getenv("DB_PORT", 4000)),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        database=os.getenv("DB_NAME"),
+        host=db_host,
+        port=db_port,
+        user=db_user,
+        password=db_pass,
+        database=db_name,
         charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor
     )   

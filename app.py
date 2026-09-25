@@ -411,7 +411,6 @@ check_session_timeout()
 # -----------------------------------------------------------------------------
 if not st.session_state.get('logged_in'):
     if st.session_state.get('page') == 'register':
-        
         render_register_page()
             
     # 🔥 1. หน้าจอคั่นเวลาหลังจากกด Login ถูกต้อง (แยกออกมา ไม่ทำให้จอบัคขาว) 🔥
