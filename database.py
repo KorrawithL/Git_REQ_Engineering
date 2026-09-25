@@ -1,19 +1,22 @@
 import pymysql
 import hashlib
 import streamlit as st
+import os
+from dotenv import load_dotenv
 
-# 🔌 ฟังก์ชันเชื่อมต่อฐานข้อมูล
-def get_db_connection(ttl=600):
-    # 1. สร้างตัวแปร conn มารับค่าการเชื่อมต่อ (เอาคำว่า return ออกไปก่อน)
+# 🪄 โหลดตัวแปรจากไฟล์ .env (มีผลเฉพาะตอนรันในเครื่องตัวเอง)
+load_dotenv()
+
+def get_db_connection():
     conn = pymysql.connect(
-        host='gateway01.ap-southeast-1.prod.aws.tidbcloud.com',      # หรือใช้ 'localhost' เพื่อชี้มาที่เครื่องตัวเอง
-        port=4000,                                                   # Port มาตรฐานของ MySQL/MariaDB บนเครื่อง (ปรับเป็น 3307 ได้หากตั้งค่าไว้)
-        user='2mbHs86f3hLpHFz.root',                                 # User ปกติของเครื่อง Local มักจะเป็น 'root'
-        password='cJaPr62UlEdMdvs6',                                 # รหัสผ่าน MySQL บนเครื่องของคุณ (ถ้าไม่มีให้ใส่ '')
-        database='Woodwork_Engineering_Records_System',              # ชื่อฐานข้อมูลภายในเครื่อง
+        host=os.getenv("DB_HOST"),
+        port=int(os.getenv("DB_PORT", 4000)),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        database=os.getenv("DB_NAME"),
         charset='utf8mb4',
         cursorclass=pymysql.cursors.DictCursor
-    )
+    )   
 
     # 2. 🌟 บังคับตั้งค่าโซนเวลา UTC+7 ทันทีหลังเชื่อมต่อเสร็จ 🌟
     with conn.cursor() as cur:

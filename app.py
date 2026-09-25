@@ -14,6 +14,7 @@ from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
 from all_reports import render_all_reports_module
 from addMachines import render_add_new_equipment
+from auth import render_register_page
 
 # =============================================================================
 # 🚀 1. ฟังก์ชันดึงข้อมูลสาขาจาก Database (เพิ่ม show_spinner=False ซ่อนข้อความโหลด)
@@ -411,63 +412,7 @@ check_session_timeout()
 if not st.session_state.get('logged_in'):
     if st.session_state.get('page') == 'register':
         
-        position_list = ["-- กรุณาเลือกตำแหน่ง --"]
-        try:
-            conn = get_db_connection()
-            with conn.cursor() as cur:
-                cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY pos ASC")
-                for r in cur.fetchall():
-                    if r['pos']: position_list.append(r['pos'].strip())
-            conn.close()
-        except Exception: pass
-
-        st.title("📝 ลงทะเบียนสมาชิกใหม่แยกตามสาขา")
-        st.write("---")
-        with st.form("register_form", clear_on_submit=True):
-            st.markdown("#### 👤 ข้อมูลบัญชีผู้ใช้งาน")
-            col_u1, col_u2 = st.columns(2)
-            with col_u1: reg_user = st.text_input("กำหนด User ID (Username) *")
-            with col_u2: reg_pass = st.text_input("กำหนด Password *", type="password")
-            
-            st.markdown("#### 📋 ข้อมูลส่วนตัว")
-            col_p1, col_p2 = st.columns(2)
-            with col_p1: reg_fullname = st.text_input("ชื่อ-นามสกุล *")
-            with col_p2: reg_position = st.selectbox("ตำแหน่ง *", options=position_list) 
-            
-            col_c1, col_c2 = st.columns(2)
-            with col_c1: reg_email = st.text_input("E-mail")
-            with col_c2: reg_phone = st.text_input("เบอร์โทรศัพท์")
-            
-            st.markdown("#### 🏢 ข้อมูลสังกัด")
-            branch_dict = get_branch_dict_from_db()
-            reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ *", options=list(branch_dict.keys()))
-            reg_branch_id = branch_dict[reg_branch_label]
-            
-            st.write("")
-            if st.form_submit_button("💥 ลงทะเบียนบัญชี", use_container_width=True):
-                if not reg_user or not reg_pass or not reg_fullname or reg_position == "-- กรุณาเลือกตำแหน่ง --": 
-                    st.error("⚠️ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน และเลือกตำแหน่ง")
-                else:
-                    try:
-                        conn = get_db_connection()
-                        with conn.cursor() as cursor:
-                            cursor.execute("SELECT user_id FROM system_users WHERE CONVERT(username USING utf8mb4) = CONVERT(%s USING utf8mb4)", (reg_user,))
-                            if cursor.fetchone(): st.error("❌ User ID นี้มีผู้ใช้งานในระบบแล้ว")
-                            else:
-                                sql = """INSERT INTO system_users (username, password_hash, full_name, position, email, phone_number, branch_id, Role_tab, allowed_tabs, status) 
-                                         VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, 'user', '', 'active')"""
-                                cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_fullname, reg_position, reg_email, reg_phone, reg_branch_id))
-                                conn.commit()
-                                st.success("🎉 ลงทะเบียนสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...")
-                                st.session_state.page = "login"
-                                time.sleep(1.2)
-                                st.rerun()
-                        conn.close()
-                    except Exception as e: st.error(f"เกิดข้อผิดพลาดในการลงทะเบียน: {e}")
-                    
-        if st.button("⬅️ กลับไปหน้าเข้าสู่ระบบ (Login)", use_container_width=True):
-            st.session_state.page = "login"
-            st.rerun()
+        render_register_page()
             
     # 🔥 1. หน้าจอคั่นเวลาหลังจากกด Login ถูกต้อง (แยกออกมา ไม่ทำให้จอบัคขาว) 🔥
     elif st.session_state.get('show_login_success'):

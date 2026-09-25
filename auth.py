@@ -57,6 +57,8 @@ def render_login_page():
         st.rerun()
 
 def render_register_page():
+    import os # เพิ่มการ import os สำหรับเช็คไฟล์รูปภาพ
+    
     # 🎯 โหลดรายการตำแหน่งเตรียมไว้
     position_list = ["-- กรุณาเลือกตำแหน่ง --"]
     try:
@@ -68,7 +70,62 @@ def render_register_page():
         conn.close()
     except Exception: pass
 
-    st.title("📝 ลงทะเบียนสมาชิกใหม่แยกตามสาขา")
+    # 🎨 CSS สำหรับตกแต่งปุ่มให้ตรงกับธีมหลักของระบบ (ปลอดภัย ไม่ทำให้จอพัง)
+    st.markdown("""
+    <style>
+    /* ตกแต่งปุ่มลงทะเบียนให้เป็นสีส้ม (สีหลักของระบบ Work Wood) */
+    div[data-testid="stFormSubmitButton"] > button {
+        background: linear-gradient(135deg, #D97706 0%, #B45309 100%) !important;
+        color: #FFFFFF !important;
+        border: none !important;
+        border-radius: 8px !important;
+        padding: 10px !important;
+        font-weight: 700 !important;
+        font-size: 16px !important;
+        box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3) !important;
+        transition: all 0.3s ease !important;
+        width: 100% !important;
+    }
+    div[data-testid="stFormSubmitButton"] > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 15px rgba(217, 119, 6, 0.4) !important;
+    }
+    
+    /* ตกแต่งปุ่มย้อนกลับให้เป็นโทนสีระบบ */
+    .back-btn-container div.stButton > button {
+        background-color: #F1F5F9 !important;
+        color: #475569 !important;
+        border: 1px solid #CBD5E1 !important;
+        border-radius: 8px !important;
+        padding: 10px !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        width: 100% !important;
+    }
+    .back-btn-container div.stButton > button:hover {
+        background-color: #E2E8F0 !important;
+        color: #1E293B !important;
+        border-color: #94A3B8 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # 🌟 ส่วน Header: ใส่ Logo.png และข้อความ WOODWORK
+    col_logo, col_title = st.columns([1.2, 8.8])
+    with col_logo:
+        # ใช้ try-except ป้องกันกรณีที่ระบบหาไฟล์ Logo.png ไม่เจอ จะได้ไม่ Error
+        try:
+            if os.path.exists("Logo.png"):
+                st.image("Logo.png", width=60)
+            else:
+                st.markdown("<div style='text-align:center; font-size: 40px; margin-top: -10px;'>🪵</div>", unsafe_allow_html=True)
+        except:
+            st.markdown("<div style='text-align:center; font-size: 40px; margin-top: -10px;'>🪵</div>", unsafe_allow_html=True)
+            
+    with col_title:
+        st.markdown("<h1 style='margin: 0; margin-top: -5px; color: #333333; font-weight: 800;'>WOODWORK</h1>", unsafe_allow_html=True)
+        st.markdown("<p style='margin: 0; color: #64748B; font-size: 15px; margin-top: -5px;'>ลงทะเบียนสมาชิกใหม่แยกตามสาขา</p>", unsafe_allow_html=True)
+
     st.write("---")
     
     with st.form("register_form", clear_on_submit=True):
@@ -80,17 +137,23 @@ def render_register_page():
         st.markdown("#### 📋 ข้อมูลส่วนตัว")
         col_p1, col_p2 = st.columns(2)
         with col_p1: reg_fullname = st.text_input("ชื่อ-นามสกุล *")
-        with col_p2: reg_position = st.selectbox("ตำแหน่ง *", options=position_list) # 🎯 เปลี่ยนเป็น Dropdown
+        with col_p2: 
+            # 🌟 ตำแหน่งงาน (Position) เปลี่ยนเป็นแบบ Dropdown (Selectbox)
+            reg_position = st.selectbox("ตำแหน่งงาน (Position) *", options=position_list) 
         
         col_c1, col_c2 = st.columns(2)
-        with col_c1: reg_email = st.text_input("E-mail")
-        with col_c2: reg_phone = st.text_input("เบอร์โทรศัพท์")
+        with col_c1: reg_email = st.text_input("E-mail (ถ้ามี)")
+        with col_c2: reg_phone = st.text_input("เบอร์โทรศัพท์ (ถ้ามี)")
         
         st.markdown("#### 🏢 ข้อมูลสังกัด")
         reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ *", options=list(branch_dict.keys()))
         reg_branch_id = branch_dict[reg_branch_label]
         
-        btn_reg = st.form_submit_button("💥 ลงทะเบียนบัญชี")
+        st.write("") 
+        # 🪄 ปุ่มลงทะเบียน (สีส้ม) จะถูกบีบให้กระชับและอยู่ตรงกลาง
+        col_btn_reg1, col_btn_reg2, col_btn_reg3 = st.columns([1, 2, 1])
+        with col_btn_reg2:
+            btn_reg = st.form_submit_button("💥 ยืนยันและลงทะเบียนบัญชี", use_container_width=True)
         
         if btn_reg:
             if not reg_user or not reg_pass or not reg_fullname or reg_position == "-- กรุณาเลือกตำแหน่ง --":
@@ -121,6 +184,11 @@ def render_register_page():
                     if conn and conn.open:
                         conn.close()
     
-    if st.button("⬅️ กลับไปหน้าเข้าสู่ระบบ (Login)"):
-        st.session_state.page = "login"
-        st.rerun()
+    st.write("")
+    # 🪄 ปุ่มกลับไปหน้าเข้าสู่ระบบ จะถูกบังคับสไตล์ด้วย class back-btn-container
+    st.markdown('<div class="back-btn-container"></div>', unsafe_allow_html=True)
+    col_btn_log1, col_btn_log2, col_btn_log3 = st.columns([1, 2, 1])
+    with col_btn_log2:
+        if st.button("⬅️ กลับไปหน้าเข้าสู่ระบบ (Login)", use_container_width=True):
+            st.session_state.page = "login"
+            st.rerun()

@@ -141,7 +141,7 @@ def render_admin_user_management():
             st.session_state[t4_key] = ("4" in current_user_tabs)
 
         def on_select_all():
-            val = st.session_state[sa_key]
+            val = st.session_state.get(sa_key, False)
             st.session_state[t1_key] = val
             st.session_state[t2_key] = val
             st.session_state[t3_key] = val
