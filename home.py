@@ -98,7 +98,7 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     welcome_html = f"""
     <div style="background-color: #FCFBF8; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #D6D3D1; border-left: 6px solid #D97706; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);">
         <h3 class='welcome-title' style="color: #D97706; margin-top: 0; font-weight: 800; margin-bottom: 8px;">😊 ยินดีต้อนรับเข้าสู่ระบบ</h3>
-        <p class='welcome-desc' style="color: #666666; margin-bottom: 15px;">สวัสดีคุณ <strong style="color: #333333;">{disp_name}</strong> — เลือกงานจากเมนูด้านซ้ายหรือดูสรุปข้อมูลด้านล่างได้เลยครับ</p>
+        <p class='welcome-desc' style="color: #666666; margin-bottom: 15px;">สวัสดีคุณ <strong style="color: #333333;">{disp_name}</strong></p>
         <div class='welcome-details' style="color: #333333; line-height: 1.8;">
             <div><span style="font-weight: 600; color: #64748B;">👤 กลุ่มสิทธิ์:</span> {role_th}</div>
             <div><span style="font-weight: 600; color: #64748B;">🏢 สาขา:</span> {current_branch}</div>
