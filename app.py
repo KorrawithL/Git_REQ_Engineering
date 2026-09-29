@@ -559,6 +559,10 @@ else:
     # 🌟 เตรียมรายการเมนูหลัก 
     # =========================================================================
     report_menu_label = "📑 รายงานรวม (All Report)"
+
+    # 🌟 บรรทัดนี้สำคัญมาก! ต้องประกาศตัวแปรก่อนนำไปใช้เช็คเงื่อนไข
+    user_allowed_tabs = st.session_state.get('allowed_tabs', [])
+
     if current_role == 'admin':
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "⚙️ จัดการผู้ใช้และสิทธิ์", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
     elif current_role == 'reporter':
@@ -566,7 +570,8 @@ else:
     else:
         report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label]
-        if current_role == 'manager':
+        # 🌟 เช็คว่าเป็น manager "และ" ได้รับสิทธิ์เข้าถึงแท็บ 5 (จัดการอุปกรณ์) ด้วยเท่านั้น
+        if current_role == 'manager' and "5" in user_allowed_tabs:
             main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
 
     # =========================================================================

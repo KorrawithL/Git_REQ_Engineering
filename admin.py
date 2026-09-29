@@ -131,6 +131,7 @@ def render_admin_user_management():
         t2_key = "t2_edit"
         t3_key = "t3_edit"
         t4_key = "t4_edit"
+        t5_key = "t5_edit"
 
         if st.session_state.get('loaded_edit_user') != target_id:
             st.session_state['loaded_edit_user'] = target_id
@@ -139,6 +140,7 @@ def render_admin_user_management():
             st.session_state[t2_key] = ("2" in current_user_tabs)
             st.session_state[t3_key] = ("3" in current_user_tabs)
             st.session_state[t4_key] = ("4" in current_user_tabs)
+            st.session_state[t5_key] = ("5" in current_user_tabs)
 
         def on_select_all():
             val = st.session_state.get(sa_key, False)
@@ -146,6 +148,7 @@ def render_admin_user_management():
             st.session_state[t2_key] = val
             st.session_state[t3_key] = val
             st.session_state[t4_key] = val
+            st.session_state[t5_key] = val
 
         def on_tab_change():
             if st.session_state[t1_key] and st.session_state[t2_key] and st.session_state[t3_key] and st.session_state[t4_key]:
@@ -204,6 +207,9 @@ def render_admin_user_management():
             with cb_col1:
                 st.checkbox("⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์", key=t1_key, on_change=on_tab_change)
                 st.checkbox("🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ", key=t2_key, on_change=on_tab_change)
+                # 🌟 เพิ่มเงื่อนไขโชว์หน้า 5 เฉพาะตอนที่เลือก Role เป็น manager
+                if edit_role == "manager":
+                    st.checkbox("🛠️ หน้า 5: จัดการข้อมูลอุปกรณ์", key=t5_key)
             with cb_col2:
                 st.checkbox("💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์", key=t3_key, on_change=on_tab_change)
                 st.checkbox("🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)", key=t4_key, on_change=on_tab_change)
@@ -230,6 +236,9 @@ def render_admin_user_management():
                 if st.session_state[t2_key]: allowed_tabs_list.append("2")
                 if st.session_state[t3_key]: allowed_tabs_list.append("3")
                 if st.session_state[t4_key]: allowed_tabs_list.append("4")
+                # 🌟 เพิ่มดักจับการบันทึกหน้า 5
+                if edit_role == "manager" and st.session_state.get(t5_key): 
+                    allowed_tabs_list.append("5")
                 
                 allowed_tabs_str = ",".join(allowed_tabs_list)
                 
