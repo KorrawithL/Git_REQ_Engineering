@@ -257,7 +257,7 @@ def render_add_new_equipment():
                 e_c1, e_c2, e_c3 = st.columns(3)
                 with e_c1:
                     edit_name = st.text_input("แก้ไข ชื่อ/รหัส", value=sel_data['ชื่อ/รหัส'])
-                    status_opts = ["🟢 ใช้งานปกติ (Active)", "🔴 ระงับการใช้งาน (Disabled)"]
+                    status_opts = ["▶️ ใช้งานปกติ (Active)", "🔴 ระงับการใช้งาน (Disabled)"]
                     default_status = 0 if sel_data['is_active'] == 1 else 1
                     edit_status = st.selectbox("สถานะการใช้งาน", options=status_opts, index=default_status)
 
@@ -303,7 +303,7 @@ def render_add_new_equipment():
                     if st.form_submit_button("💾 อัปเดตข้อมูล (Update)", use_container_width=True):
                         conn = None
                         try:
-                            new_is_active = 1 if "🟢" in edit_status else 0
+                            new_is_active = 1 if "▶️" in edit_status else 0
                             conn = get_db_connection()
                             with conn.cursor() as cur:
                                 if is_machine_edit:

@@ -1646,6 +1646,17 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
         header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
+
+        /* 1. บังคับให้ข้อมูลในแถวแนวนอน (st.columns) อยู่กึ่งกลางแนวตั้งพอดีกับปุ่ม */
+        div[data-testid="stHorizontalBlock"] {
+            align-items: center !important;
+            padding-top: 5px !important;
+        }
+
+        /* 2. ลบระยะห่างด้านล่างของตัวหนังสือทิ้ง เพื่อไม่ให้ขยับเบี้ยว */
+        div[data-testid="stHorizontalBlock"] p {
+            margin-bottom: 0px !important;
+        }
         
         /* 📱 ระบบซ่อน/โชว์ อัจฉริยะ (Dual View) */
         @media (min-width: 769px) {
@@ -1735,8 +1746,8 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
                     header_cols = st.columns([0.5, 1.1, 1.0, 1.0, 0.8, 1.1, 1.3, 1.2])
                     headers = ["No.", "วันที่", "สาขา", "ชื่อเครื่องจักร", "จำนวน", "ชม.ทำงาน", "ชม.เบรกดาวน์", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                    for col, header in zip(header_cols, headers): col.markdown(f"<div style='padding-top: 10px; padding-bottom: 5px;'><span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='height: 12px;'></div><hr style='margin: 0; border-color: #E2E8F0;'><div style='height: 15px;'></div>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
                         start_num = (st.session_state.get("rep1_page", 1) - 1) * st.session_state.get("rep1_rows", 15)
@@ -1849,8 +1860,8 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
                     header_cols = st.columns([0.5, 1.0, 1.1, 1.1, 1.0, 1.0, 1.0, 1.2])
                     headers = ["No.", "วันที่", "สาขา/ประเภท", "ทะเบียนรถ", "ลิตร", "ชม.ทำงาน", "ลิตร/ชม.", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                    for col, header in zip(header_cols, headers): col.markdown(f"<div style='padding-top: 10px; padding-bottom: 5px;'><span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='height: 12px;'></div><hr style='margin: 0; border-color: #E2E8F0;'><div style='height: 15px;'></div>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
                         start_num = (st.session_state.get("rep2_page", 1) - 1) * st.session_state.get("rep2_rows", 15)
@@ -1964,8 +1975,8 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     # ปรับสัดส่วนคอลัมน์ใหม่ (ลบหมายเหตุออก เหลือ 8 คอลัมน์)
                     header_cols = st.columns([0.5, 1.2, 1.0, 1.0, 1.0, 1.0, 1.0, 1.2])
                     headers = ["No.", "วันที่", "สาขา", "ทั้งหมด(ครั้ง)", "ตก(ครั้ง)", "ตก PM", "ตกนอก PM", "จัดการ"]
-                    for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span>", unsafe_allow_html=True)
-                    st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                    for col, header in zip(header_cols, headers): col.markdown(f"<div style='padding-top: 10px; padding-bottom: 5px;'><span style='color:#64748B; font-weight:bold; font-size:14px;'>{header}</span></div>", unsafe_allow_html=True)
+                    st.markdown("<div style='height: 12px;'></div><hr style='margin: 0; border-color: #E2E8F0;'><div style='height: 15px;'></div>", unsafe_allow_html=True)
 
                     with st.container(height=380, border=False):
                         start_num = (st.session_state.get("rep3_page", 1) - 1) * st.session_state.get("rep3_rows", 15)
@@ -2085,7 +2096,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                             header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
                             headers = ["No.", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
                             for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
-                            st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                            st.markdown("<hr style='margin: 0.5rem 0 20px 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                             with st.container(height=380, border=False):
                                 start_num = (st.session_state.get("rep4_ov_page", 1) - 1) * st.session_state.get("rep4_ov_rows", 15)
@@ -2161,7 +2172,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
                         headers = ["No.", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
                         for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
-                        st.markdown("<hr style='margin: 0.2rem 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
+                        st.markdown("<hr style='margin: 0.5rem 0 20px 0; border-color: #E2E8F0;'>", unsafe_allow_html=True)
 
                         with st.container(height=380, border=False):
                             start_num = (st.session_state.get(f"{session_prefix}_page", 1) - 1) * st.session_state.get(f"{session_prefix}_rows", 15)
