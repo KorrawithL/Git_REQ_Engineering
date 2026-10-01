@@ -140,8 +140,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     if m_qty is None or m_work_hours is None or m_break_hours is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                     # 🌟 Validation: ดักจับกฎ 24 ชั่วโมง
-                    elif (m_work_hours + m_break_hours) > 24.0:
-                        st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ต้องไม่เกิน 24 ชั่วโมงต่อวันครับ")
+                    # 🌟 Validation: ดักจับกฎ 24 ชั่วโมง x จำนวนเครื่อง
+                    elif (m_work_hours + m_break_hours) > (m_qty * 24.0):
+                        max_hrs = m_qty * 24.0
+                        total_hrs = m_work_hours + m_break_hours
+                        st.error(f"⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ({total_hrs} ชม.) เกินกำหนด ต้องไม่เกิน {max_hrs} ชม. (สำหรับเครื่องจักร {m_qty} เครื่อง)")
                     else:
                         # 🌟 Feedback: แสดงวงแหวนโหลดระหว่างเซฟ
                         with st.spinner("กำลังบันทึกข้อมูล..."):

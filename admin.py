@@ -107,10 +107,10 @@ def render_admin_user_management():
                 'ตำแหน่ง': u.get('position') or '-',
                 'E-mail': u.get('email') or '-',
                 'เบอร์โทร': u.get('phone_number') or '-',
-                'ชื่อสาขา (หลัก)': u['branch_name'], 
-                'ระดับสิทธิ์ (Role_tab)': u['Role_tab'],
-                'แท็บที่เข้าถึงได้': u['allowed_tabs'],
-                'สาขาที่มีสิทธิ์ (เพิ่มเติม)': get_extra_branches_display(u['additional_branches']),
+                'ชื่อสาขา (ณ ที่สมัคร)': u['branch_name'], 
+                'ระดับสิทธิ์': u['Role_tab'],
+                'หน้ารายการที่เข้าถึงได้': u['allowed_tabs'],
+                'สาขาที่มีสิทธิ์เข้าถึง': get_extra_branches_display(u['additional_branches']),
                 'สถานะบัญชี': u['status']
             })
             

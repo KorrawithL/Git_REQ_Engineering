@@ -107,7 +107,11 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-setup_pwa()
+# setup_pwa()
+
+if not st.session_state.get('pwa_ready'):
+    setup_pwa()
+    st.session_state['pwa_ready'] = True
 
 # 🚀 🌟 วาง CSS หลักสำหรับแต่งหน้าจอ ไว้บนสุดเพื่อแก้ปัญหาหน้าจอสีขาว 🌟 🚀
 st.markdown("""
@@ -263,6 +267,22 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
         text-overflow: clip !important;
         display: inline-block !important;
     }
+
+    /* ซ่อนพื้นที่ของ iframe ที่ไม่มี UI (cookie / PWA) ไม่ให้กินที่หรือกระพริบ */
+    div[data-testid="stElementContainer"]:has(iframe[height="0"]),
+    div.element-container:has(iframe[height="0"]) {
+        position: absolute !important;
+        width: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    /* ไม่ให้เนื้อหาเก่าจางลงระหว่างโหลด (ลดอาการกระพริบ) */
+    [data-stale="true"] { opacity: 1 !important; transition: none !important; }
 
 </style>
 """, unsafe_allow_html=True)
@@ -639,7 +659,7 @@ else:
     # =========================================================================
 
     # 🌟 สร้าง Key เพื่อเช็คว่า "เพิ่งมีการเปลี่ยนหน้า Tab" หรือไม่
-    current_view_state = f"{selected_main}_{sub_menu_entry}_{sub_menu_report}"
+    current_view_state = f"{selected_main}"
 
     # =========================================================================
     # 🌟 พื้นที่แสดงผลหลัก (ระบบโหลดข้อมูลจริง Real-time)
@@ -653,10 +673,10 @@ else:
     is_changing_page = (st.session_state.get('last_view_state') != current_view_state)
 
     if is_changing_page:
-        # 🪄 ดรอปม่านหน้าจอ Loading ลงมาบังไว้ก่อน (ความสูง 100vh จะดันเนื้อหาจริงไปแอบไว้ข้างล่าง)
+        # ดรอปม่านหน้าจอ Loading แบบ Overlay (ลอยทับหน้าจอ ไม่ดันเนื้อหา ทำให้หน้าไม่เด้งขึ้น)
         loading_box.markdown("""
-            <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif; height: 100vh;'>
-                <h1 style='color:#D97706; font-weight:800; font-size:35px;'>กำลังเตรียมข้อมูล...</h1>
+            <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
+                <h1 style='color:#D97706; font-weight:800; font-size:35px; margin-bottom: 5px;'>กำลังเตรียมข้อมูล...</h1>
                 <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
                 <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                 <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>

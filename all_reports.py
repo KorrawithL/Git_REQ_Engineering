@@ -220,8 +220,12 @@ def update_record_dialog_t1(row_data, pk_col):
     e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
     
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
-        if (e_work + e_break) > 24.0:
-            st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ต้องไม่เกิน 24 ชั่วโมงต่อวันครับ")
+        # คำนวณลิมิตชั่วโมงตามจำนวนเครื่อง
+        max_hours = e_qty * 24.0
+        total_hrs = e_work + e_break
+        
+        if total_hrs > max_hours:
+            st.error(f"⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ({total_hrs} ชม.) เกินกำหนด ต้องไม่เกิน {max_hours} ชม. (สำหรับเครื่องจักร {e_qty} เครื่อง)")
             return
         with st.spinner("กำลังบันทึกข้อมูล..."):
             try:
