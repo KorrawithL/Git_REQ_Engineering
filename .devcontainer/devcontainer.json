@@ -1,6 +1,5 @@
 {
   "name": "Python 3",
-  // Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
   "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bookworm",
   "customizations": {
     "codespaces": {
@@ -23,11 +22,15 @@
   },
   "portsAttributes": {
     "8501": {
-      "label": "Application",
+      "label": "Main System",
       "onAutoForward": "openPreview"
+    },
+    "8502": {
+      "label": "Test System",
+      "onAutoForward": "ignore"
     }
   },
   "forwardPorts": [
-    8501
+    8501, 8502
   ]
 }

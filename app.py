@@ -284,6 +284,11 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
     /* ไม่ให้เนื้อหาเก่าจางลงระหว่างโหลด (ลดอาการกระพริบ) */
     [data-stale="true"] { opacity: 1 !important; transition: none !important; }
 
+    /* บังคับให้ปฏิทิน Native ของเบราว์เซอร์แสดงผลเป็นพื้นหลังสีขาวเสมอ */
+    :root { color-scheme: light !important; }
+    input[type="date"] { color-scheme: light !important; }
+    ::-webkit-calendar-picker-indicator { background-color: #FFFFFF !important; border-radius: 4px; }
+
 </style>
 """, unsafe_allow_html=True)
 
