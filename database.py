@@ -25,7 +25,8 @@ def get_db_engine():
         db_url, 
         pool_size=10, 
         max_overflow=20, 
-        pool_recycle=3600
+        pool_recycle=1800,        # ลดเวลาแอบรีเซ็ตท่อเหลือ 30 นาที (1800 วินาที)
+        pool_pre_ping=True        # 🌟 พระเอกของงานนี้: เคาะเทสสายก่อนใช้งาน ถ้าสายหลุดให้ต่อใหม่ทันที!
     )
     return engine
 
