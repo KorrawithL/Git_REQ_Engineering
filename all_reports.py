@@ -212,7 +212,7 @@ def update_record_dialog_t1(row_data, pk_col):
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
         e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
     with col2:
         e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), min_value=0.0, format="%.2f")
@@ -301,7 +301,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
         e_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
     with col2:
         e_work = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
@@ -350,7 +350,7 @@ def update_record_dialog_t3(row_data, pk_col):
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-            
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))    
         e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0))
     with col2:
         e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0))
@@ -410,7 +410,7 @@ def update_record_dialog_t4(row_data, pk_col):
     with c_top2: e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
     c1, c2, c3 = st.columns(3)
     with c1:
         st.write(" ")
@@ -465,7 +465,7 @@ def update_record_dialog_oven(row_data, pk_col):
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')))
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
     
     c1, c2, c3 = st.columns(3)
     with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}")
