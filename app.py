@@ -121,7 +121,7 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# setup_pwa()
+setup_pwa()
 
 if not st.session_state.get('pwa_ready'):
     setup_pwa()
