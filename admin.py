@@ -10,7 +10,7 @@ def render_admin_user_management():
         <style>
         /* ซ่อนแถบ Header หลักของ Streamlit */
         header[data-testid="stHeader"] { display: none !important; }
-        header { visibility: hidden !important; }
+        #header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
         
         /* ขยับคอนเทนต์ (พื้นที่สีน้ำเงิน) ขึ้นไปชิดขอบบนสุดแทน */

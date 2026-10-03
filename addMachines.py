@@ -28,7 +28,7 @@ def render_add_new_equipment():
     st.markdown("""
         <style>
         header[data-testid="stHeader"] { display: none !important; }
-        header { visibility: hidden !important; }
+        #header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
         </style>

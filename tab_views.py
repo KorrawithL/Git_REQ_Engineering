@@ -1,6 +1,7 @@
 import streamlit as st
 import pymysql
 import time
+import pandas as pd
 from datetime import datetime
 from database import get_db_connection, log_activity
 from config import branch_dict
@@ -24,7 +25,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
         <style>
         /* ซ่อนแถบ Header หลักของ Streamlit */
         header[data-testid="stHeader"] { display: none !important; }
-        header { visibility: hidden !important; }
+        #header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
         
         /* ขยับคอนเทนต์ (พื้นที่สีน้ำเงิน) ขึ้นไปชิดขอบบนสุดแทน */
@@ -81,8 +82,8 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         t1_branch_invalid = False
                 
                 with c_top2:
-                    # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
-                    m_date = st.date_input("วันที่", value=datetime.now(), max_value=datetime.now(), key="m_date", disabled=t1_branch_invalid)
+                    # จุดที่ 1 (Tab 1)
+                    m_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="m_date", disabled=t1_branch_invalid)
 
                 machine_dict = {}
                 conn = None 
@@ -198,8 +199,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         t2_branch_invalid = False
                 with c_top2:
                     # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
-                    f_date = st.date_input("วันที่", value=datetime.now(), max_value=datetime.now(), key="f_date", disabled=t2_branch_invalid)
-
+                    f_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="f_date", disabled=t2_branch_invalid)
                 all_engines_filtered = []
                 conn = None
                 if not t2_branch_invalid:
@@ -323,7 +323,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         t3_branch_invalid = False
                 with c_top2:
                     # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
-                    p_date = st.date_input("วันที่", value=datetime.now(), max_value=datetime.now(), key="p_date", disabled=t3_branch_invalid)
+                    p_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="p_date", disabled=t3_branch_invalid)
 
                 has_t3_record = False
                 conn = None
@@ -420,7 +420,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             t4_ov_invalid = False
                     with c_top2:
                         # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
-                        bf_date_1 = st.date_input("วันที่", value=datetime.now(), max_value=datetime.now(), key="bf_dt1", disabled=t4_ov_invalid)
+                        bf_date_1 = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="bf_dt1", disabled=t4_ov_invalid)
 
                     has_t4_ov_record = False
                     conn = None
@@ -499,7 +499,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             t4_bf_invalid = False
                     with c_top2:
                         # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
-                        bf_date_2 = st.date_input("วันที่", value=datetime.now(), max_value=datetime.now(), key="bf_dt2", disabled=t4_bf_invalid)
+                        bf_date_2 = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="bf_dt2", disabled=t4_bf_invalid)
 
                     boiler_options = []
                     conn = None

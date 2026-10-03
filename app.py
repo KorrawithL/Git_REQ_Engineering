@@ -1,7 +1,21 @@
+import os
+import tempfile
+
+# ==========================================
+# 🌟 โค้ดแก้ปัญหา PermissionError (Error 13) ของ Windows Services
+# สั่งให้ระบบสร้างไฟล์ชั่วคราวในโฟลเดอร์ 'temp' ภายในโปรเจกต์แทน C:\WINDOWS\TEMP
+# ==========================================
+custom_temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
+os.makedirs(custom_temp_dir, exist_ok=True) 
+
+os.environ['TEMP'] = custom_temp_dir
+os.environ['TMP'] = custom_temp_dir
+tempfile.tempdir = custom_temp_dir
+# ==========================================
+
 import streamlit as st
 import streamlit.components.v1 as components
 import time
-import os
 import pandas as pd
 import numpy as np
 import altair as alt
@@ -283,6 +297,11 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
 
     /* ไม่ให้เนื้อหาเก่าจางลงระหว่างโหลด (ลดอาการกระพริบ) */
     [data-stale="true"] { opacity: 1 !important; transition: none !important; }
+
+    /* บังคับให้ปฏิทิน Native ของเบราว์เซอร์แสดงผลเป็นพื้นหลังสีขาวเสมอ */
+    :root { color-scheme: light !important; }
+    input[type="date"] { color-scheme: light !important; }
+    ::-webkit-calendar-picker-indicator { background-color: #FFFFFF !important; border-radius: 4px; }
 
 </style>
 """, unsafe_allow_html=True)
