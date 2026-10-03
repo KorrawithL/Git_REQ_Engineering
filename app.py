@@ -1,7 +1,21 @@
+import os
+import tempfile
+
+# ==========================================
+# 🌟 โค้ดแก้ปัญหา PermissionError (Error 13) ของ Windows Services
+# สั่งให้ระบบสร้างไฟล์ชั่วคราวในโฟลเดอร์ 'temp' ภายในโปรเจกต์แทน C:\WINDOWS\TEMP
+# ==========================================
+custom_temp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'temp')
+os.makedirs(custom_temp_dir, exist_ok=True) 
+
+os.environ['TEMP'] = custom_temp_dir
+os.environ['TMP'] = custom_temp_dir
+tempfile.tempdir = custom_temp_dir
+# ==========================================
+
 import streamlit as st
 import streamlit.components.v1 as components
 import time
-import os
 import pandas as pd
 import numpy as np
 import altair as alt
@@ -677,28 +691,7 @@ else:
     # 🎯 1. เช็คว่าเพิ่งเปลี่ยนหน้ามาใหม่ใช่ไหม? 
     is_changing_page = (st.session_state.get('last_view_state') != current_view_state)
 
-    if is_changing_page:
-        # ดรอปม่านหน้าจอ Loading แบบ Overlay (ลอยทับหน้าจอ ไม่ดันเนื้อหา ทำให้หน้าไม่เด้งขึ้น)
-        loading_box.markdown("""
-            <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
-                <h1 style='color:#D97706; font-weight:800; font-size:35px; margin-bottom: 5px;'>กำลังเตรียมข้อมูล...</h1>
-                <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังดึงข้อมูลสำหรับหน้านี้</p>
-                <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #D97706; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-                <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # 🪄 ท่าไม้ตายล้างกราฟค้างเดิม
-        ui_flusher = st.empty()
-        with ui_flusher:
-            st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
-            
-        # บังคับให้ Streamlit โชว์ม่าน Loading ให้ผู้ใช้เห็นทันทีก่อนเริ่มประมวลผลของหนัก
-        time.sleep(0.1) 
-        ui_flusher.empty()
-        
-        # อัปเดตสถานะว่าเปลี่ยนหน้าแล้ว
-        st.session_state['last_view_state'] = current_view_state
+    
 
     # 🎯 2. สั่งรันเนื้อหาจริง (โค้ดจะดึงข้อมูล Database และสร้างตารางอยู่เบื้องหลังม่าน Loading)
     with main_view.container():
