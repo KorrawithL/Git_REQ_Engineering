@@ -121,7 +121,12 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# setup_pwa()
+# เช็คว่ารันอยู่ในโฟลเดอร์ที่ชื่อมีคำว่า test หรือไม่
+current_path = os.path.dirname(os.path.abspath(__file__))
+if "_test" in current_path.lower():
+    st.error("🚧 **TEST ENVIRONMENT:** คุณกำลังใช้งานระบบจำลองเพื่อการทดสอบ ข้อมูลหน้าหน้านี้จะไม่กระทบกับระบบจริง")
+
+setup_pwa()
 
 if not st.session_state.get('pwa_ready'):
     setup_pwa()
@@ -352,20 +357,30 @@ if 'app_init' not in st.session_state:
 # =========================================================================
 
 def perform_logout(message=None):
-    # 🌟 1. ล้างข้อมูลในหน่วยความจำทั้งหมดให้สะอาดกริ๊บ
+    # 🌟 1. ดรอปม่านหน้าจอ "กำลังออกจากระบบ..." ลอยทับทุกอย่างบนหน้าจอ
+    st.markdown("""
+        <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
+            <h1 style='color:#EF4444; font-weight:800; font-size:38px; margin-bottom: 5px;'>กำลังออกจากระบบ...</h1>
+            <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังเคลียร์ข้อมูลการเชื่อมต่อของคุณ</p>
+            <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #EF4444; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # 🌟 2. ถ่วงเวลา 1.5 วินาที เพื่อให้ผู้ใช้เห็นหน้าจอนี้ก่อนที่ระบบจะตัดการทำงาน
+    time.sleep(1.5)
+
+    # 🌟 3. ล้างข้อมูลในหน่วยความจำทั้งหมดให้สะอาดกริ๊บ
     st.session_state.clear()
     
-    # 🌟 2. ปักธงป้องกัน "คุกกี้ผีหลอก"
+    # 🌟 4. ปักธงป้องกัน "คุกกี้ผีหลอก"
     st.session_state['just_logged_out'] = True
     
-    # 🌟 3. สั่งทำลายคุกกี้
+    # 🌟 5. สั่งทำลายคุกกี้
     safe_remove_cookie("auth_user")
     
     if message:
         st.warning(message)
-        
-    # 🌟 4. หน่วงเวลาให้เบราว์เซอร์ลบคุกกี้ให้เสร็จจริงๆ (ครึ่งวินาที)
-    time.sleep(0.5)
 
 def restore_session_from_cookie():
     # 🌟 ดักจับคุกกี้ผีหลอก: ถ้าเพิ่งกดออกจากระบบ ให้ข้ามการอ่านคุกกี้ไปเลย!
