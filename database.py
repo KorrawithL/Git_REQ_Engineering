@@ -10,17 +10,15 @@ load_dotenv()
 # 🌟 1. สร้าง Connection Pool ด้วย SQLAlchemy
 @st.cache_resource
 def get_db_engine():
-    # 💡 ระบบหลักดึงข้อมูลจาก .env หรือ st.secrets เพื่อความปลอดภัย
-    db_host = os.getenv("DB_HOST") or st.secrets.get("DB_HOST")
-    db_port = int(os.getenv("DB_PORT") or st.secrets.get("DB_PORT", 4000))
-    db_user = os.getenv("DB_USER") or st.secrets.get("DB_USER")
-    db_pass = os.getenv("DB_PASSWORD") or st.secrets.get("DB_PASSWORD")
-    db_name = os.getenv("DB_NAME") or st.secrets.get("DB_NAME")
-
-    # URL Format: mysql+pymysql://user:pass@host:port/dbname
+    db_user = 'root'
+    db_pass = ''
+    db_host = '127.0.0.1'
+    db_port = 3306
+    db_name = 'woodwork_engineering_records_system'
+    
     db_url = f"mysql+pymysql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}?charset=utf8mb4"
     
-    # ปล่อยให้ SQLAlchemy เช็คระบบพื้นฐานได้ปกติ (เอา connect_args ออกเพื่อแก้บัค Error 0)
+    # ถอดคำสั่งบังคับ DictCursor ออกจากตรงนี้ ปล่อยให้ SQLAlchemy เช็คระบบพื้นฐานได้ปกติ
     engine = create_engine(
         db_url, 
         pool_size=10, 
