@@ -417,22 +417,24 @@ def update_record_dialog_t4(row_data, pk_col):
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
+    
+    # --- แถวที่ 1 ---
     c1, c2, c3 = st.columns(3)
-    with c1:
-        st.write(" ")
-        e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, value=float(row_data.get('sawdust_weight') or 0.0))
-        e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, value=float(row_data.get('wood_weight') or 0.0))
-        e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, value=float(row_data.get('waste_wood_weight') or 0.0))
-    with c2:
-        st.write(" ")
-        e_saw_p = st.number_input("ราคาขี้เลื่อย", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0))
-        e_wood_p = st.number_input("ราคาปีกไม้", min_value=0.0, value=float(row_data.get('wood_price') or 0.0))
-        e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
-    with c3:
-        st.write(" ")
-        e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.0, value=float(row_data.get('steam_production') or 1.0))
-        e_hrs = st.number_input("ชม.ทำงาน", min_value=0.0, value=float(row_data.get('working_hours') or 1.0))
+    with c1: e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, value=float(row_data.get('sawdust_weight') or 0.0))
+    with c2: e_saw_p = st.number_input("ราคาขี้เลื่อย", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0))
+    with c3: e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.0, value=float(row_data.get('steam_production') or 1.0))
 
+    # --- แถวที่ 2 ---
+    c4, c5, c6 = st.columns(3)
+    with c4: e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, value=float(row_data.get('wood_weight') or 0.0))
+    with c5: e_wood_p = st.number_input("ราคาปีกไม้", min_value=0.0, value=float(row_data.get('wood_price') or 0.0))
+    with c6: e_hrs = st.number_input("ชม.ทำงาน", min_value=0.0, value=float(row_data.get('working_hours') or 1.0))
+
+    # --- แถวที่ 3 ---
+    c7, c8, c9 = st.columns(3)
+    with c7: e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, value=float(row_data.get('waste_wood_weight') or 0.0))
+    with c8: e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
+    
     btn_disabled = (e_boiler == "-- ไม่มีข้อมูลบอยเลอร์ --")
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
         if e_hrs > 24.0:
@@ -1475,8 +1477,20 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             bn, dt = str(r.get('branch_name') or '-'), r['record_date']
             k = (bn, dt)
             if k not in master_summary: master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
-            master_summary[k]['sw'] += float(r.get('sawdust_weight') or 0); master_summary[k]['ww'] += float(r.get('wood_weight') or 0); master_summary[k]['www'] += float(r.get('waste_wood_weight') or 0)
-            master_summary[k]['sp'] += float(r.get('sawdust_price') or 0); master_summary[k]['wp'] += float(r.get('wood_price') or 0); master_summary[k]['wwp'] += float(r.get('waste_wood_price') or 0)
+            # ดึงค่าน้ำหนัก (ตัน)
+            w_sw = float(r.get('sawdust_weight') or 0)
+            w_ww = float(r.get('wood_weight') or 0)
+            w_www = float(r.get('waste_wood_weight') or 0)
+            
+            # บันทึกน้ำหนักรวม
+            master_summary[k]['sw'] += w_sw
+            master_summary[k]['ww'] += w_ww
+            master_summary[k]['www'] += w_www
+            
+            # 🌟 แก้ไข: สูตรคำนวณเงิน = น้ำหนัก(ตัน) * ราคาที่กรอก
+            master_summary[k]['sp'] += (w_sw * float(r.get('sawdust_price') or 0))
+            master_summary[k]['wp'] += (w_ww * float(r.get('wood_price') or 0))
+            master_summary[k]['wwp'] += (w_www * float(r.get('waste_wood_price') or 0))
             master_summary[k]['stm'] += float(r.get('steam_production') or 0); master_summary[k]['hrs'] += float(r.get('working_hours') or 0)
 
     for o in oven_raw_filtered:
@@ -1594,7 +1608,10 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             date_str = f"{dt.day:02d}/{dt.month:02d}/{(dt.year+543)%100}({b_short})"
             
             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0), float(r.get('wood_weight') or 0), float(r.get('waste_wood_weight') or 0)
-            s_p, w_p, ww_p = float(r.get('sawdust_price') or 0), float(r.get('wood_price') or 0), float(r.get('waste_wood_price') or 0)
+            # 🌟 แก้ไข: สูตรคำนวณเงิน = น้ำหนัก(ตัน) * ราคาที่กรอก
+            s_p = s_w * float(r.get('sawdust_price') or 0)
+            w_p = w_w * float(r.get('wood_price') or 0)
+            ww_p = ww_w * float(r.get('waste_wood_price') or 0)
             stm, hrs = float(r.get('steam_production') or 0), float(r.get('working_hours') or 0)
             t_w, t_p = (s_w + w_w + ww_w), (s_p + w_p + ww_p)
             stm_hr = stm / hrs if hrs > 0 else 0
@@ -2111,7 +2128,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         # 🖥️ DESKTOP VIEW
                         with st.container():
                             st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
-                            header_cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                            header_cols = st.columns([0.5, 0.8, 0.5, 1.0, 1.0, 1.0, 1.1])
                             headers = ["No.", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
                             for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                             st.markdown("<div style='height: 20px;'></div><hr style='margin: 0; border-color: #E2E8F0;'><div style='height: 15px;'></div>", unsafe_allow_html=True)
@@ -2121,7 +2138,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                                 for i, r in enumerate(paginated_ov):
                                     seq_num = start_num + i + 1
                                     rec_id = r[pk_col_ov]
-                                    cols = st.columns([0.5, 1.0, 1.0, 1.2, 1.2, 1.4, 1.1])
+                                    cols = st.columns([0.5, 0.8, 0.5, 1.0, 1.0, 1.0, 1.1])
                                     cols[0].write(str(seq_num))
                                     cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                                     cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
@@ -2187,7 +2204,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                     # 🖥️ DESKTOP VIEW
                     with st.container():
                         st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
-                        header_cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                        header_cols = st.columns([0.5, 1.0, 0.8, 1.0, 1.0, 0.9, 1.0, 1.1])
                         headers = ["No.", "วันที่", "สาขา", "เชื้อเพลิงรวม(ตัน)", "ผลิตไอน้ำ(ตัน)", "ชม.ทำงาน", "ผลงาน(กก./ตัน)", "จัดการ"]
                         for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                         st.markdown("<div style='height: 20px;'></div><hr style='margin: 0; border-color: #E2E8F0;'><div style='height: 15px;'></div>", unsafe_allow_html=True)
@@ -2200,7 +2217,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                                 s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0.0), float(r.get('wood_weight') or 0.0), float(r.get('waste_wood_weight') or 0.0)
                                 tot_w = s_w + w_w + ww_w
                                 s_prod = float(r.get('steam_production') or 1.0)
-                                cols = st.columns([0.5, 1.0, 0.8, 1.4, 1.3, 1.1, 1.4, 1.1])
+                                cols = st.columns([0.5, 1.0, 0.8, 1.0, 1.0, 0.9, 1.0, 1.1])
                                 cols[0].write(str(seq_num))
                                 cols[1].write(pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-')
                                 cols[2].markdown(f"<span class='branch-badge'>{r.get('branch_name') or '-'}</span>", unsafe_allow_html=True)
