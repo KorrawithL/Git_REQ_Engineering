@@ -298,14 +298,20 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}")
         with c_sel3: st.text_input("🏷️ 3. ทะเบียนรถ", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}")
 
+    # 🌟 ปรับ Layout หน้าต่างแก้ไขใหม่ให้สมดุล
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
+    
+    # แบ่งเป็น 3 ช่องเท่าๆ กันสำหรับข้อมูลตัวเลขและวันที่
+    c_r1, c_r2, c_r3 = st.columns(3)
+    with c_r1:
         e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
-        e_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
-    with col2:
-        e_work = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
-        e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}")
+    with c_r2:
+        e_work = st.number_input("ชม.ทำงาน *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
+    with c_r3:
+        e_liters = st.number_input("น้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
+        
+    # ดันช่องหมายเหตุลงมาอยู่ด้านล่างสุดและให้กินพื้นที่แนวยาวเต็ม 100%
+    e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}", height=80)
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
         if e_work > 24.0:
@@ -887,45 +893,54 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
 
     real_type_map = {}
     for r in raw_data:
-        code, b_name, t_name = str(r.get('engine_code') or '').strip(), str(r.get('branch_name') or '').strip(), str(r.get('type_name') or '').strip()
+        code, b_name = str(r.get('engine_code') or '').strip(), str(r.get('branch_name') or '').strip()
+        t_name = str(r.get('type_name') or 'TOYOTA').strip() # 🌟 ดึงประเภทรถออกมา
+        
         if b_id_t2 in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"] and b_name:
             try: b_short = b_name.split("สาขา ")[1].split()[0]
             except: b_short = b_name
-            k = f"{code}_{b_short}".lower()
-        else: k = code.lower()
-        if t_name: real_type_map[k] = t_name
+            k = f"{t_name}_{code}_{b_short}".lower() # 🌟 เอาประเภทรถไปผูกติดกับกุญแจ
+        else: 
+            k = f"{t_name}_{code}".lower() # 🌟 เอาประเภทรถไปผูกติดกับกุญแจ
+        real_type_map[k] = t_name
 
     seen_keys, all_engines_config = set(), []
     if engines_list:
         for eng in engines_list:
             code, b_name = str(eng.get('engine_code') or '').strip(), str(eng.get('branch_name') or '').strip()
+            t_name = str(eng.get('type_name') or 'TOYOTA').strip() # 🌟 ดึงประเภทรถออกมา
+            
             if b_id_t2 in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"] and b_name:
                 try: b_short = b_name.split("สาขา ")[1].split()[0]
                 except: b_short = b_name
-                eng_key, title_name = f"{code}_{b_short}", f"{code} [{b_short}]"
-            else: eng_key, title_name = code, code
+                eng_key, title_name = f"{t_name}_{code}_{b_short}", f"{code} [{b_short}]" # 🌟 แยก Key ตามประเภท
+            else: 
+                eng_key, title_name = f"{t_name}_{code}", code # 🌟 แยก Key ตามประเภท
+            
             if not code or eng_key.lower() in seen_keys: continue
             seen_keys.add(eng_key.lower())
-            type_nm = real_type_map.get(eng_key.lower()) or str(eng.get('type_name') or 'TOYOTA')
+            
+            type_nm = real_type_map.get(eng_key.lower()) or t_name
             hex_color = "FFC000" if "tck" in type_nm.lower() else "FF0000"
             all_engines_config.append({"key": eng_key, "code": code, "title": title_name, "brand": type_nm, "branch": b_name, "hex": hex_color})
 
     start_dt = pd.to_datetime(start_date_str)
     days_in_month = calendar.monthrange(start_dt.year, start_dt.month)[1]
     
-    # 🌟 เพิ่ม 'rem' สำหรับเก็บหมายเหตุของรถยนต์
     matrix_data = {d: {e['key']: {'liters': 0.0, 'hours': 0.0, 'rem': '', 'has_data': False} for e in all_engines_config} for d in range(1, days_in_month + 1)}
     
     for r in raw_data:
         d_num = pd.to_datetime(r['record_date']).day
         e_code, b_name = str(r.get('engine_code') or '').strip(), str(r.get('branch_name') or '').strip()
+        t_name = str(r.get('type_name') or 'TOYOTA').strip() # 🌟 ดึงประเภทรถออกมา
         rem = str(r.get('remark') or '').strip()
         
         if b_id_t2 in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"] and b_name:
             try: b_short = b_name.split("สาขา ")[1].split()[0]
             except: b_short = b_name
-            match_key = f"{e_code}_{b_short}"
-        else: match_key = e_code
+            match_key = f"{t_name}_{e_code}_{b_short}" # 🌟 วิ่งหากุญแจที่ตรงกับประเภทรถ
+        else: 
+            match_key = f"{t_name}_{e_code}" # 🌟 วิ่งหากุญแจที่ตรงกับประเภทรถ
             
         for e in all_engines_config:
             if e['key'].lower() == match_key.lower():
@@ -933,7 +948,6 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 matrix_data[d_num][e['key']]['hours'] += float(r.get('working_hours') or 0.0)
                 matrix_data[d_num][e['key']]['has_data'] = True
                 
-                # 🌟 เก็บหมายเหตุ ถ้ามี
                 if rem and rem != '-' and rem.lower() != 'none':
                     if matrix_data[d_num][e['key']]['rem']:
                         matrix_data[d_num][e['key']]['rem'] += f", {rem}"
