@@ -481,7 +481,7 @@ if not st.session_state.get('logged_in'):
         # ปรับสถานะเป็นเข้าสู่ระบบจริง แล้วสั่งวาร์ปไป Dashboard
         st.session_state['logged_in'] = True
         del st.session_state['show_login_success']
-        time.sleep(0.7)
+        time.sleep(1.5)
         st.rerun()
 
     else:
