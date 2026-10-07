@@ -51,7 +51,16 @@ def get_dashboard_data(user_branch_id):
             res = cur.fetchone()
             if res and res['drops']: data["boiler_drop"] = int(res['drops'])
 
-            # กราฟเชื้อเพลิง
+            # ==========================================
+            # 🌟 สร้างโครงสร้างปฏิทิน 7 วันย้อนหลังรอไว้ก่อน
+            # ==========================================
+            today = pd.Timestamp.today().normalize()
+            date_range = pd.date_range(end=today, periods=7)
+            df_template = pd.DataFrame({'วันที่': date_range})
+
+            # ------------------------------------------
+            # 📉 กราฟเชื้อเพลิง
+            # ------------------------------------------
             cur.execute("""
                 SELECT DATE(record_date) AS log_date, SUM(fuel_liters) AS total_liters
                 FROM fuel_records  
@@ -59,14 +68,25 @@ def get_dashboard_data(user_branch_id):
                 GROUP BY DATE(record_date) ORDER BY DATE(record_date) ASC
             """, (user_branch_id,))
             fuel_rows = cur.fetchall()
+            
+            df_fuel_full = df_template.copy()
             if fuel_rows:
-                df_fuel = pd.DataFrame(fuel_rows)
-                df_fuel['วันที่'] = pd.to_datetime(df_fuel['log_date']).dt.strftime('%d/%m/%Y')
-                df_fuel['ปริมาณเชื้อเพลิง (ลิตร)'] = df_fuel['total_liters'].astype(float)
-                df_fuel = df_fuel[['วันที่', 'ปริมาณเชื้อเพลิง (ลิตร)']].set_index('วันที่')
-                data["fuel_chart_df"] = df_fuel
+                df_f = pd.DataFrame(fuel_rows)
+                df_f['วันที่'] = pd.to_datetime(df_f['log_date'])
+                df_f['ปริมาณเชื้อเพลิง (ลิตร)'] = df_f['total_liters'].astype(float)
+                
+                # เอาข้อมูลจาก DB มาเสียบเข้าปฏิทิน 7 วัน (LEFT JOIN)
+                df_fuel_full = pd.merge(df_fuel_full, df_f[['วันที่', 'ปริมาณเชื้อเพลิง (ลิตร)']], on='วันที่', how='left')
+            else:
+                df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'] = 0.0
+                
+            # วันไหนไม่มีข้อมูล (NaN) ให้แทนค่าด้วย 0.0
+            df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'] = df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'].fillna(0.0)
+            data["fuel_chart_df"] = df_fuel_full
 
-            # กราฟแรงดัน
+            # ------------------------------------------
+            # 🚀 กราฟแรงดัน
+            # ------------------------------------------
             cur.execute("""
                 SELECT DATE(record_date) AS log_date, SUM(total_drop) AS total_drops
                 FROM boiler_pressure_records 
@@ -74,12 +94,21 @@ def get_dashboard_data(user_branch_id):
                 GROUP BY DATE(record_date) ORDER BY DATE(record_date) ASC
             """, (user_branch_id,))
             pres_rows = cur.fetchall()
+            
+            df_pres_full = df_template.copy()
             if pres_rows:
-                df_pres = pd.DataFrame(pres_rows)
-                df_pres['วันที่'] = pd.to_datetime(df_pres['log_date']).dt.strftime('%d/%m/%Y')
-                df_pres['จำนวนครั้งที่ตก'] = df_pres['total_drops'].astype(float) 
-                df_pres = df_pres[['วันที่', 'จำนวนครั้งที่ตก']].set_index('วันที่')
-                data["pressure_chart_df"] = df_pres
+                df_p = pd.DataFrame(pres_rows)
+                df_p['วันที่'] = pd.to_datetime(df_p['log_date'])
+                df_p['จำนวนครั้งที่ตก'] = df_p['total_drops'].astype(float)
+                
+                # เอาข้อมูลจาก DB มาเสียบเข้าปฏิทิน 7 วัน (LEFT JOIN)
+                df_pres_full = pd.merge(df_pres_full, df_p[['วันที่', 'จำนวนครั้งที่ตก']], on='วันที่', how='left')
+            else:
+                df_pres_full['จำนวนครั้งที่ตก'] = 0.0
+                
+            # วันไหนไม่มีข้อมูล (NaN) ให้แทนค่าด้วย 0.0
+            df_pres_full['จำนวนครั้งที่ตก'] = df_pres_full['จำนวนครั้งที่ตก'].fillna(0.0)
+            data["pressure_chart_df"] = df_pres_full
 
     except Exception as e:
         st.error(f"⚠️ พบข้อผิดพลาดในการดึงข้อมูลแสดงกราฟ: {e}")
@@ -115,7 +144,7 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     with col1:
         with st.container(border=True): st.metric("⚙️ เครื่องจักรทำงาน (วันนี้)", f"{db_data['active_machines']} เครื่อง")
     with col2:
-        with st.container(border=True): st.metric("⚠️ แจ้งซ่อม (ค้างซ่อม)", f"{db_data['breakdown_count']} รายการ")
+        with st.container(border=True): st.metric("⚠️️ แจ้งซ่อม (ค้างซ่อม)", f"{db_data['breakdown_count']} รายการ")
     col3, col4 = st.columns(2)
     with col3:
         with st.container(border=True): st.metric("🚚 เชื้อเพลิง 7 วัน (ลิตร)", fuel_display)
@@ -125,27 +154,30 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     st.markdown("<br>", unsafe_allow_html=True)
 
     c_chart1, c_chart2 = st.columns(2)
+    
+    # ---------------- กราฟที่ 1: เชื้อเพลิง ----------------
     with c_chart1:
         st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>📉 ปริมาณเชื้อเพลิง (7 วัน)</h4>", unsafe_allow_html=True)
         with st.container(border=True):
             if not db_data["fuel_chart_df"].empty:
                 df_f = db_data["fuel_chart_df"].reset_index()
-                area_f = alt.Chart(df_f).mark_area(interpolate='monotone', color='#6366F1', opacity=0.15).encode(x=alt.X('วันที่:O', axis=alt.Axis(labelAngle=-45, grid=False, title=None)), y=alt.Y('ปริมาณเชื้อเพลิง (ลิตร):Q', axis=alt.Axis(grid=True, gridColor='#E8E3DD', title=None)))
-                line_f = alt.Chart(df_f).mark_line(interpolate='monotone', color='#6366F1', strokeWidth=3).encode(x='วันที่:O', y='ปริมาณเชื้อเพลิง (ลิตร):Q')
-                points_f = alt.Chart(df_f).mark_circle(size=80, color='#FCFBF8', stroke='#6366F1', strokeWidth=2).encode(x='วันที่:O', y='ปริมาณเชื้อเพลิง (ลิตร):Q', tooltip=[alt.Tooltip('วันที่', title='วันที่'), alt.Tooltip('ปริมาณเชื้อเพลิง (ลิตร)', title='ลิตร')])
+                area_f = alt.Chart(df_f).mark_area(interpolate='monotone', color='#6366F1', opacity=0.15).encode(x=alt.X('วันที่:T', axis=alt.Axis(labelAngle=-45, grid=False, title=None, format='%d/%m/%Y')), y=alt.Y('ปริมาณเชื้อเพลิง (ลิตร):Q', axis=alt.Axis(grid=True, gridColor='#E8E3DD', title=None)))
+                line_f = alt.Chart(df_f).mark_line(interpolate='monotone', color='#6366F1', strokeWidth=3).encode(x='วันที่:T', y='ปริมาณเชื้อเพลิง (ลิตร):Q')
+                points_f = alt.Chart(df_f).mark_circle(size=80, color='#FCFBF8', stroke='#6366F1', strokeWidth=2).encode(x='วันที่:T', y='ปริมาณเชื้อเพลิง (ลิตร):Q', tooltip=[alt.Tooltip('วันที่:T', title='วันที่', format='%d/%m/%Y'), alt.Tooltip('ปริมาณเชื้อเพลิง (ลิตร):Q', title='ลิตร')])
                 chart_f = (area_f + line_f + points_f).configure(font='"TH Sarabun PSK", Sarabun, sans-serif').configure_view(strokeWidth=0).configure_axis(domain=False, tickColor='transparent', labelColor='#666666', labelFontSize=14)
                 st.altair_chart(chart_f, use_container_width=True)
             else:
                 st.info("📊 ยังไม่มีข้อมูลปริมาณเชื้อเพลิงใน 7 วันล่าสุด")
             
+    # ---------------- กราฟที่ 2: แรงดันตก ----------------
     with c_chart2:
         st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>🚀 แรงดันไอน้ำตกสะสม (7 วัน)</h4>", unsafe_allow_html=True)
         with st.container(border=True):
             if not db_data["pressure_chart_df"].empty:
                 df_p = db_data["pressure_chart_df"].reset_index()
-                area_p = alt.Chart(df_p).mark_area(interpolate='monotone', color='#F59E0B', opacity=0.15).encode(x=alt.X('วันที่:O', axis=alt.Axis(labelAngle=-45, grid=False, title=None)), y=alt.Y('จำนวนครั้งที่ตก:Q', axis=alt.Axis(grid=True, gridColor='#E8E3DD', title=None)))
-                line_p = alt.Chart(df_p).mark_line(interpolate='monotone', color='#F59E0B', strokeWidth=3).encode(x='วันที่:O', y='จำนวนครั้งที่ตก:Q')
-                points_p = alt.Chart(df_p).mark_circle(size=80, color='#FCFBF8', stroke='#F59E0B', strokeWidth=2).encode(x='วันที่:O', y='จำนวนครั้งที่ตก:Q', tooltip=[alt.Tooltip('วันที่', title='วันที่'), alt.Tooltip('จำนวนครั้งที่ตก', title='ครั้ง')])
+                area_p = alt.Chart(df_p).mark_area(interpolate='monotone', color='#F59E0B', opacity=0.15).encode(x=alt.X('วันที่:T', axis=alt.Axis(labelAngle=-45, grid=False, title=None, format='%d/%m/%Y')), y=alt.Y('จำนวนครั้งที่ตก:Q', axis=alt.Axis(grid=True, gridColor='#E8E3DD', title=None)))
+                line_p = alt.Chart(df_p).mark_line(interpolate='monotone', color='#F59E0B', strokeWidth=3).encode(x='วันที่:T', y='จำนวนครั้งที่ตก:Q')
+                points_p = alt.Chart(df_p).mark_circle(size=80, color='#FCFBF8', stroke='#F59E0B', strokeWidth=2).encode(x='วันที่:T', y='จำนวนครั้งที่ตก:Q', tooltip=[alt.Tooltip('วันที่:T', title='วันที่', format='%d/%m/%Y'), alt.Tooltip('จำนวนครั้งที่ตก:Q', title='ครั้ง')])
                 chart_p = (area_p + line_p + points_p).configure(font='"TH Sarabun PSK", Sarabun, sans-serif').configure_view(strokeWidth=0).configure_axis(domain=False, tickColor='transparent', labelColor='#666666', labelFontSize=14)
                 st.altair_chart(chart_p, use_container_width=True)
             else:

@@ -443,7 +443,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     with c_ov1:
                         oven_qty = st.number_input("จำนวนเตาที่อบ (เตา) *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนเตา", disabled=is_t4_ov_disabled, key=f"t4_ov_{rk4}")
                     with c_ov2:
-                        wood_out = st.number_input("ไม้อบออก (ลบ.ฟ.) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณ", disabled=is_t4_ov_disabled, key=f"t4_wo_{rk4}")
+                        wood_out = st.number_input("ไม้เข้าอบ (ลบ.ฟ.) *", min_value=0.0, step=0.001, format="%.3f", value=None, placeholder="ระบุปริมาณ", disabled=is_t4_ov_disabled, key=f"t4_wo_{rk4}")
                     with c_ov3:
                         avg_pressure = st.number_input("แรงดันปลายทางเฉลี่ย *", min_value=0.0, step=0.1, value=None, placeholder="ระบุแรงดัน", disabled=is_t4_ov_disabled, key=f"t4_avgp_{rk4}")
 
@@ -547,7 +547,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     with c1:
                         st.write("**📦 ส่วนที่ 4.1: เชื้อเพลิงที่ใช้ (ตัน/วัน)**")
                         saw_w = st.number_input("น้ำหนักขี้เลื่อย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักขี้เลื่อย", disabled=disable_t4_inputs, key=f"t4_sw_{rk4}")
-                        wood_w = st.number_input("น้ำหนักปีกไม้ (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักปีกไม้", disabled=disable_t4_inputs, key=f"t4_ww_{rk4}")
+                        wood_w = st.number_input("น้ำหนักปีกไม้ (ตัน) *", min_value=0.0, step=0.001, format="%.3f", value=None, placeholder="ระบุน้ำหนักปีกไม้", disabled=disable_t4_inputs, key=f"t4_ww_{rk4}")
                         waste_wood_w = st.number_input("น้ำหนักเศษไม้เสีย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักเศษไม้เสีย", disabled=disable_t4_inputs, key=f"t4_www_{rk4}")
                     with c2:
                         st.write("**💰 ส่วนที่ 4.2: ราคาเชื้อเพลิง (ต่อตัน)**")
