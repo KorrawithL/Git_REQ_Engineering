@@ -121,6 +121,11 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
+# เช็คว่ารันอยู่ในโฟลเดอร์ที่ชื่อมีคำว่า test หรือไม่
+current_path = os.path.dirname(os.path.abspath(__file__))
+if "_test" in current_path.lower():
+    st.error("🚧 **TEST ENVIRONMENT:** คุณกำลังใช้งานระบบจำลองเพื่อการทดสอบ ข้อมูลหน้าหน้านี้จะไม่กระทบกับระบบจริง")
+
 setup_pwa()
 
 if not st.session_state.get('pwa_ready'):
@@ -324,11 +329,39 @@ def safe_set_cookie(name, value, max_age):
 
 def safe_remove_cookie(name):
     try:
-        if getattr(controller, '_CookieController__cookies', None) is None:
-            controller._CookieController__cookies = {}
+        # 🌟 เพิ่มความดุดัน: บังคับเขียนทับคุกกี้ให้เป็นค่าว่างและหมดอายุทันที (max_age=0)
+        controller.set(name, "", max_age=0)
+        if getattr(controller, '_CookieController__cookies', None) is not None:
+            controller._CookieController__cookies[name] = None
         controller.remove(name)
     except Exception:
         pass
+
+def perform_logout(message=None):
+    # 🌟 1. สั่งทำลายคุกกี้ก่อนเป็นอันดับแรกสุด! เพื่อให้เบราว์เซอร์รับคำสั่งทันเวลา
+    safe_remove_cookie("auth_user")
+    
+    # 🌟 2. ดรอปม่านหน้าจอ "กำลังออกจากระบบ..." ลอยทับทุกอย่างบนหน้าจอ
+    st.markdown("""
+        <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
+            <h1 style='color:#EF4444; font-weight:800; font-size:38px; margin-bottom: 5px;'>กำลังออกจากระบบ...</h1>
+            <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังเคลียร์ข้อมูลการเชื่อมต่อของคุณ</p>
+            <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #EF4444; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+        </div>
+    """, unsafe_allow_html=True)
+    
+    # 🌟 3. ถ่วงเวลา 1.5 วินาที (จังหวะนี้สำคัญมาก คือช่วงเวลาให้เบราว์เซอร์ลบคุกกี้ออกจริงๆ)
+    time.sleep(1.5)
+
+    # 🌟 4. ล้างข้อมูลในหน่วยความจำทั้งหมดให้สะอาดกริ๊บ
+    st.session_state.clear()
+    
+    # 🌟 5. ปักธงป้องกัน "คุกกี้ผีหลอก" ในจังหวะโหลดใหม่
+    st.session_state['just_logged_out'] = True
+    
+    if message:
+        st.warning(message)
 
 def safe_get_cookie(name):
     try:
@@ -350,32 +383,6 @@ if 'app_init' not in st.session_state:
     time.sleep(2.5) # สั่งหยุดรอ 2.5 วินาที
     st.rerun() 
 # =========================================================================
-
-def perform_logout(message=None):
-    # 🌟 1. ดรอปม่านหน้าจอ "กำลังออกจากระบบ..." ลอยทับทุกอย่างบนหน้าจอ
-    st.markdown("""
-        <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 9999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
-            <h1 style='color:#EF4444; font-weight:800; font-size:38px; margin-bottom: 5px;'>กำลังออกจากระบบ...</h1>
-            <p style='color:#64748B; font-size:18px;'>กรุณารอสักครู่ ระบบกำลังเคลียร์ข้อมูลการเชื่อมต่อของคุณ</p>
-            <div style="margin: 20px auto; width: 45px; height: 45px; border: 5px solid #E8E3DD; border-top: 5px solid #EF4444; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # 🌟 2. ถ่วงเวลา 1.5 วินาที เพื่อให้ผู้ใช้เห็นหน้าจอนี้ก่อนที่ระบบจะตัดการทำงาน
-    time.sleep(1.5)
-
-    # 🌟 3. ล้างข้อมูลในหน่วยความจำทั้งหมดให้สะอาดกริ๊บ
-    st.session_state.clear()
-    
-    # 🌟 4. ปักธงป้องกัน "คุกกี้ผีหลอก"
-    st.session_state['just_logged_out'] = True
-    
-    # 🌟 5. สั่งทำลายคุกกี้
-    safe_remove_cookie("auth_user")
-    
-    if message:
-        st.warning(message)
 
 def restore_session_from_cookie():
     # 🌟 ดักจับคุกกี้ผีหลอก: ถ้าเพิ่งกดออกจากระบบ ให้ข้ามการอ่านคุกกี้ไปเลย!

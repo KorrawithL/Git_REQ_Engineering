@@ -136,7 +136,7 @@ def delete_record_dialog_oven(row_data, pk_col):
     rec_id = row_data[pk_col]
     st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
     st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
-    st.write(f"**จำนวนเตา:** {row_data.get('oven_qty')} เตา | **ไม้อบออก:** {row_data.get('wood_out_cubft')} ลบ.ฟ.")
+    st.write(f"**จำนวนเตา:** {row_data.get('oven_qty')} เตา | **ไม้เข้าอบ:** {row_data.get('wood_out_cubft')} ลบ.ฟ.")
     st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
@@ -420,21 +420,21 @@ def update_record_dialog_t4(row_data, pk_col):
     
     # --- แถวที่ 1 ---
     c1, c2, c3 = st.columns(3)
-    with c1: e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, value=float(row_data.get('sawdust_weight') or 0.0))
+    with c1: e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('sawdust_weight') or 0.0))
     with c2: e_saw_p = st.number_input("ราคาขี้เลื่อย", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0))
     with c3: e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.0, value=float(row_data.get('steam_production') or 1.0))
 
     # --- แถวที่ 2 ---
     c4, c5, c6 = st.columns(3)
-    with c4: e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, value=float(row_data.get('wood_weight') or 0.0))
+    with c4: e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('wood_weight') or 0.0))
     with c5: e_wood_p = st.number_input("ราคาปีกไม้", min_value=0.0, value=float(row_data.get('wood_price') or 0.0))
     with c6: e_hrs = st.number_input("ชม.ทำงาน", min_value=0.0, value=float(row_data.get('working_hours') or 1.0))
 
     # --- แถวที่ 3 ---
     c7, c8, c9 = st.columns(3)
-    with c7: e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, value=float(row_data.get('waste_wood_weight') or 0.0))
+    with c7: e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('waste_wood_weight') or 0.0))
     with c8: e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
-    
+        
     btn_disabled = (e_boiler == "-- ไม่มีข้อมูลบอยเลอร์ --")
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
         if e_hrs > 24.0:
@@ -477,7 +477,7 @@ def update_record_dialog_oven(row_data, pk_col):
     
     c1, c2, c3 = st.columns(3)
     with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}")
-    with c2: e_wd = st.number_input("แก้ไข ไม้อบออก (ลบ.ฟ.)", min_value=0.0, value=float(row_data.get('wood_out_cubft') or 0.0), key=f"e_ov_w_{rec_id}")
+    with c2: e_wd = st.number_input("แก้ไข ไม้เข้าอบ (ลบ.ฟ.)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('wood_out_cubft') or 0.0), key=f"e_ov_w_{rec_id}")
     with c3: e_pr = st.number_input("แก้ไข แรงดันปลายทางเฉลี่ย", min_value=0.0, value=float(row_data.get('avg_terminal_pressure') or 0.0), key=f"e_ov_p_{rec_id}")
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", key=f"e_ov_save_{rec_id}"):
@@ -1510,7 +1510,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
 
     ws_m = wb.create_sheet(title=f"สรุปรวม 1+2")
     ws_m.merge_cells("A1:AD1"); ws_m["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} บอยเลอร์ 1+2 เดือน {month_str} {year_buddhist}"; ws_m["A1"].font, ws_m["A1"].fill, ws_m["A1"].alignment = f_w, fill_blue, al_c
-    headers_m = [("A2:A3","วันที่"), ("B2:B3","จำนวน\nเตาที่อบ"), ("C2:C3","ไม้อบออก\n(ลบ.ฟ.)"), ("D2:F2","เชื้อเพลิงใช้(ตัน/วัน)"), ("G2:G3","รวมน.น.\nเชื้อเพลิง"), ("H2:K2","ค่าเชื้อเพลิง(บาท)"), ("L2:N2","ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)"), ("O2:R2","ผลิตไอน้ำ"), ("S2:U2","ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)"), ("V2:X2","แรงดันปลายทางเฉลี่ย"), ("Y2:AA2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)"), ("AB2:AD2","เชื้อเพลิงใช้(กก./ลบ.ฟ.)")]
+    headers_m = [("A2:A3","วันที่"), ("B2:B3","จำนวน\nเตาที่อบ"), ("C2:C3","ไม้เข้าอบ\n(ลบ.ฟ.)"), ("D2:F2","เชื้อเพลิงใช้(ตัน/วัน)"), ("G2:G3","รวมน.น.\nเชื้อเพลิง"), ("H2:K2","ค่าเชื้อเพลิง(บาท)"), ("L2:N2","ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)"), ("O2:R2","ผลิตไอน้ำ"), ("S2:U2","ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)"), ("V2:X2","แรงดันปลายทางเฉลี่ย"), ("Y2:AA2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)"), ("AB2:AD2","เชื้อเพลิงใช้(กก./ลบ.ฟ.)")]
     for cell_r, val in headers_m: ws_m.merge_cells(cell_r); ws_m[cell_r.split(":")[0]] = val
     h3_m = ["", "", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "", "ขี้เลื่อย", "ปีกไม้", "เศษไม้เสีย", "รวมเป็นเงิน", "STD", "ผลงาน", "ผลต่าง", "ตัน/วัน", "STD\nตัน/ชม.", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง", "STD", "ผลงาน", "ผลต่าง"]
     for idx, val in enumerate(h3_m, 1):
@@ -1518,7 +1518,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     for r_idx in [2, 3]:
         for c_idx in range(1, 31): c = ws_m.cell(row=r_idx, column=c_idx); c.font, c.alignment, c.border = f_b, al_c, tb
 
-    html_headers_m = """<tr><th rowspan="2">วันที่</th><th rowspan="2">จำนวน<br>เตาที่อบ</th><th rowspan="2">ไม้อบออก<br>(ลบ.ฟ.)</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวมน.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)</th><th colspan="4">ผลิตไอน้ำ</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)</th><th colspan="3">แรงดันปลายทางเฉลี่ย</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ลบ.ฟ.)</th></tr><tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>ตัน/วัน</th><th>STD<br>ตัน/ชม.</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>"""
+    html_headers_m = """<tr><th rowspan="2">วันที่</th><th rowspan="2">จำนวน<br>เตาที่อบ</th><th rowspan="2">ไม้เข้าอบ<br>(ลบ.ฟ.)</th><th colspan="3">เชื้อเพลิงใช้(ตัน/วัน)</th><th rowspan="2">รวมน.น.<br>เชื้อเพลิง</th><th colspan="4">ค่าเชื้อเพลิง(บาท)</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ลบ.ฟ.)</th><th colspan="4">ผลิตไอน้ำ</th><th colspan="3">ค่าเชื้อเพลิง(บาท/ตันไอน้ำ)</th><th colspan="3">แรงดันปลายทางเฉลี่ย</th><th colspan="3">เชื้อเพลิงใช้(กก./ตันไอน้ำ)</th><th colspan="3">เชื้อเพลิงใช้(กก./ลบ.ฟ.)</th></tr><tr><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>ขี้เลื่อย</th><th>ปีกไม้</th><th>เศษไม้เสีย</th><th>รวมเป็นเงิน</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>ตัน/วัน</th><th>STD<br>ตัน/ชม.</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th><th>STD</th><th>ผลงาน</th><th>ผลต่าง</th></tr>"""
 
     cur_row = 4; body_html_m = ""
     s_ov = s_wo = s_sw = s_ww = s_www = s_tw = s_sp = s_wp = s_wwp = s_tp = s_stm = s_hrs = s_prs = s_pcnt = 0
@@ -1541,7 +1541,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         act_kg_ton = (tw * 1000) / v['stm'] if v['stm'] > 0 else 0
         act_kg_cub = (tw * 1000) / v['wood'] if v['wood'] > 0 else 0
         
-        vals = [date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp, std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub, v['stm'], std_stm_hr, act_stm_hr, act_stm_hr - std_stm_hr, std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton, std['avg_p'], avg_p, avg_p - std['avg_p'], std['kg_ton'], act_kg_ton, std['kg_ton'] - act_kg_ton, std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub]
+        vals = [date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp, std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub, v['stm'], std_stm_hr, act_stm_hr, std_stm_hr - act_stm_hr, std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton, std['avg_p'], avg_p, avg_p - std['avg_p'], std['kg_ton'], act_kg_ton, std['kg_ton'] - act_kg_ton, std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub]
         s_ov+=v['oven']; s_wo+=v['wood']; s_sw+=v['sw']; s_ww+=v['ww']; s_www+=v['www']; s_tw+=tw; s_sp+=v['sp']; s_wp+=v['wp']; s_wwp+=v['wwp']; s_tp+=tp; s_stm+=v['stm']; s_hrs+=v['hrs']; s_prs+=v['press']; s_pcnt+=v['press_cnt']
 
         body_html_m += "<tr>"
@@ -1551,11 +1551,24 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             c.font = f_red if is_diff_col and val < 0 else f_n
             if is_std_col: c.fill, c.font = fill_green, f_w
             elif idx in [2, 3, 23]: c.fill = fill_yellow 
-            if isinstance(val, (int, float)): c.number_format = '#,##0.00'
+            
+            # 🌟 แปลงทศนิยม 3 ตำแหน่ง เฉพาะคอลัมน์ที่ 3-7 (ไม้เข้าอบ, เชื้อเพลิงตัน) สำหรับ Excel
+            if isinstance(val, (int, float)): 
+                c.number_format = '#,##0.000' if idx in [3, 4, 5, 6, 7] else '#,##0.00'
+                
             bg = "background-color:#00B050;color:white;" if is_std_col else ("background-color:#FFFF00;" if idx in [2, 3, 23] else "")
             tc = "color:red;" if is_diff_col and val < 0 else ""
             fw = "font-weight:bold;" if idx in [7,11] else ""
-            body_html_m += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else f'{val:,.2f}'}</td>"
+            
+            # 🌟 แปลงทศนิยม 3 ตำแหน่ง สำหรับตาราง HTML หน้าเว็บ
+            if idx in [3, 4, 5, 6, 7] and isinstance(val, (int, float)):
+                val_str = f"{val:,.3f}"
+            elif isinstance(val, (int, float)):
+                val_str = f"{val:,.2f}"
+            else:
+                val_str = val
+                
+            body_html_m += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else val_str}</td>"
         body_html_m += "</tr>"
         cur_row += 1
 
@@ -1567,15 +1580,28 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     avg_kg_ton = (s_tw * 1000) / s_stm if s_stm > 0 else 0
     avg_kg_cub = (s_tw * 1000) / s_wo if s_wo > 0 else 0
 
-    f1_vals = ["รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp, "", avg_p_cub, std['p_cubft'] - avg_p_cub, s_stm, sum_std_stm, avg_stm_hr, avg_stm_hr - sum_std_stm, "", avg_p_ton, std['p_ton'] - avg_p_ton, "", avg_press, avg_press - std['avg_p'], "", avg_kg_ton, std['kg_ton'] - avg_kg_ton, "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub]
+    f1_vals = ["รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp, "", avg_p_cub, std['p_cubft'] - avg_p_cub, s_stm, sum_std_stm, avg_stm_hr, std_stm_hr - avg_stm_hr, "", avg_p_ton, std['p_ton'] - avg_p_ton, "", avg_press, avg_press - std['avg_p'], "", avg_kg_ton, std['kg_ton'] - avg_kg_ton, "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub]
     f_html_m = "<tr style='font-weight:bold; background-color:#FCE4D6;'>"
     for idx, val in enumerate(f1_vals, 1):
         c = ws_m.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment, c.fill = tb, f_b, al_r if idx > 1 else al_c, fill_peach
         is_diff_col = idx in [14, 18, 21, 24, 27, 30]
         if is_diff_col and val != "" and val < 0: c.font = f_red
-        if isinstance(val, (int, float)): c.number_format = '#,##0.00'
+        
+        # 🌟 ผลรวมบรรทัดล่างสุด Excel
+        if isinstance(val, (int, float)): 
+            c.number_format = '#,##0.000' if idx in [3, 4, 5, 6, 7] else '#,##0.00'
+            
         tc = "color:red;" if is_diff_col and val != "" and val < 0 else ""
-        f_html_m += f"<td style='{tc}text-align:{'center' if idx==1 else 'right'};'>{val if val == '' or idx==1 else f'{val:,.2f}'}</td>"
+        
+        # 🌟 ผลรวมบรรทัดล่างสุด HTML
+        if val == '' or idx == 1:
+            val_str = val
+        elif idx in [3, 4, 5, 6, 7] and isinstance(val, (int, float)):
+            val_str = f"{val:,.3f}"
+        else:
+            val_str = f"{val:,.2f}"
+            
+        f_html_m += f"<td style='{tc}text-align:{'center' if idx==1 else 'right'};'>{val_str}</td>"
     f_html_m += "</tr>"
     for i in range(1, 31): ws_m.column_dimensions[get_column_letter(i)].width = 10
     ws_m.column_dimensions['A'].width = 14
@@ -1627,11 +1653,24 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 c = ws.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment = tb, (f_red if idx==15 and val<0 else f_n), (al_c if idx==1 else al_r)
                 if idx in [2, 3, 4, 10]: c.fill = fill_yellow
                 elif idx == 13: c.fill, c.font = fill_green, f_w
-                if isinstance(val, (int, float)): c.number_format = '#,##0.00'
+                
+                # 🌟 แปลงทศนิยม 3 ตำแหน่ง คอลัมน์น้ำหนักเชื้อเพลิง (Excel)
+                if isinstance(val, (int, float)): 
+                    c.number_format = '#,##0.000' if idx in [2, 3, 4, 5] else '#,##0.00'
+                    
                 bg = "background-color:#FFFF00;" if idx in [2,3,4,10] else ("background-color:#00B050;color:white;" if idx==13 else "")
                 tc = "color:red;" if idx==15 and val<0 else ""
                 fw = "font-weight:bold;" if idx in [5,9] else ""
-                body_html += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else f'{val:,.2f}'}</td>"
+                
+                # 🌟 แปลงทศนิยม 3 ตำแหน่ง คอลัมน์น้ำหนักเชื้อเพลิง (HTML)
+                if idx in [2, 3, 4, 5] and isinstance(val, (int, float)):
+                    val_str = f"{val:,.3f}"
+                elif isinstance(val, (int, float)):
+                    val_str = f"{val:,.2f}"
+                else:
+                    val_str = val
+                    
+                body_html += f"<td style='{bg}{tc}{fw}text-align:{'center' if idx==1 else 'right'};'>{val if idx==1 else val_str}</td>"
             body_html += "</tr>"
             cur_row += 1
 
@@ -1647,7 +1686,11 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         
         for idx in range(2, 16):
             val = f1_vals[idx-1]; c = ws.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment = tb, f_b, al_r
-            if isinstance(val, (int, float)): c.number_format = '#,##0.00'
+            
+            # 🌟 ผลรวมบรรทัดล่างสุด Excel
+            if isinstance(val, (int, float)): 
+                c.number_format = '#,##0.000' if idx in [2, 3, 4, 5] else '#,##0.00'
+                
             if idx == 9: c.font = f_red
             if idx == 11: c.fill = fill_yellow
             if idx == 14: c.font = f_bold_ul
@@ -1655,7 +1698,16 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             bg = "background-color:#FFFF00;" if idx==11 else ""
             tc = "color:red;" if idx==9 or (idx==15 and val<0) else ""
             ul = "text-decoration:underline;" if idx==14 else ""
-            footer_html += f"<td style='{bg}{tc}{ul}text-align:right;'>{f'{val:,.2f}' if isinstance(val, (int, float)) else ''}</td>"
+            
+            # 🌟 ผลรวมบรรทัดล่างสุด HTML
+            if not isinstance(val, (int, float)):
+                val_str = ""
+            elif idx in [2, 3, 4, 5]:
+                val_str = f"{val:,.3f}"
+            else:
+                val_str = f"{val:,.2f}"
+                
+            footer_html += f"<td style='{bg}{tc}{ul}text-align:right;'>{val_str}</td>"
         footer_html += "</tr>"
         
         for i in range(1, 16): ws.column_dimensions[get_column_letter(i)].width = 11
@@ -2129,7 +2181,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                         with st.container():
                             st.markdown('<div class="desktop-view-marker" style="display:none;"></div>', unsafe_allow_html=True)
                             header_cols = st.columns([0.5, 0.8, 0.5, 1.0, 1.0, 1.0, 1.1])
-                            headers = ["No.", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้อบออก(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
+                            headers = ["No.", "วันที่", "สาขา", "จำนวนเตา(เตา)", "ไม้เข้าอบ(ลบ.ฟ.)", "แรงดันเฉลี่ย", "จัดการ"]
                             for col, header in zip(header_cols, headers): col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:13px;'>{header}</span>", unsafe_allow_html=True)
                             st.markdown("<div style='height: 20px;'></div><hr style='margin: 0; border-color: #E2E8F0;'><div style='height: 15px;'></div>", unsafe_allow_html=True)
 
@@ -2167,7 +2219,7 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                                         "วันที่": pd.to_datetime(r.get('record_date')).strftime('%d-%m-%Y') if r.get('record_date') else '-',
                                         "สาขา": r.get('branch_name') or '-',
                                         "จำนวนเตา(เตา)": r.get('oven_qty') or 0,
-                                        "ไม้อบออก(ลบ.ฟ.)": f"{float(r.get('wood_out_cubft') or 0.0):.2f}",
+                                        "ไม้เข้าอบ(ลบ.ฟ.)": f"{float(r.get('wood_out_cubft') or 0.0):.2f}",
                                         "แรงดันเฉลี่ย": f"{float(r.get('avg_terminal_pressure') or 0.0):.2f}"
                                     })
                                 st.dataframe(pd.DataFrame(df_list), use_container_width=True, hide_index=True)
