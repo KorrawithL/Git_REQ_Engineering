@@ -1422,7 +1422,9 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
                 std['stm_mul'] = float(s_res.get('std_steam_multiplier', 0.1875))
                 std['p_ton'] = float(s_res.get('std_fuel_price_per_steam_ton', 240.00))
                 std['avg_p'] = float(s_res.get('std_avg_pressure', 3.00))
-                std['kg_ton'] = float(s_res.get('std_fuel_kg_per_steam_ton', 300.00))
+                std['kg_ton_b1'] = float(s_res.get('std_fuel_kg_per_ton_b1', 280.00))
+                std['kg_ton_b2'] = float(s_res.get('std_fuel_kg_per_ton_b2', 280.00))
+                std['kg_ton_b1_2'] = float(s_res.get('std_fuel_kg_per_ton_b1_2', 300.00))
                 std['kg_cubft'] = float(s_res.get('std_fuel_kg_per_cubft', 15.00))
 
             if b_id_t4 == "ทั้งหมด":
@@ -1536,12 +1538,13 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         avg_p = v['press'] / v['press_cnt'] if v['press_cnt'] > 0 else 0
         act_p_cub = tp / v['wood'] if v['wood'] > 0 else 0
         std_stm_hr = v['oven'] * std['stm_mul']
-        act_stm_hr = v['stm'] / v['hrs'] if v['hrs'] > 0 else 0
+        act_stm_hr = v['stm'] / 24.0  # 🌟 แก้ให้หารด้วย 24 ตายตัว
         act_p_ton = tp / v['stm'] if v['stm'] > 0 else 0
         act_kg_ton = (tw * 1000) / v['stm'] if v['stm'] > 0 else 0
         act_kg_cub = (tw * 1000) / v['wood'] if v['wood'] > 0 else 0
         
-        vals = [date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp, std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub, v['stm'], std_stm_hr, act_stm_hr, std_stm_hr - act_stm_hr, std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton, std['avg_p'], avg_p, avg_p - std['avg_p'], std['kg_ton'], act_kg_ton, std['kg_ton'] - act_kg_ton, std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub]
+        # แก้ในตัวแปร vals (แถวรายวัน)
+        vals = [date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp, std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub, v['stm'], std_stm_hr, act_stm_hr, std_stm_hr - act_stm_hr, std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton, std['avg_p'], avg_p, avg_p - std['avg_p'], std['kg_ton_b1_2'], act_kg_ton, std['kg_ton_b1_2'] - act_kg_ton, std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub]
         s_ov+=v['oven']; s_wo+=v['wood']; s_sw+=v['sw']; s_ww+=v['ww']; s_www+=v['www']; s_tw+=tw; s_sp+=v['sp']; s_wp+=v['wp']; s_wwp+=v['wwp']; s_tp+=tp; s_stm+=v['stm']; s_hrs+=v['hrs']; s_prs+=v['press']; s_pcnt+=v['press_cnt']
 
         body_html_m += "<tr>"
@@ -1574,13 +1577,18 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
 
     avg_p_cub = s_tp / s_wo if s_wo > 0 else 0
     sum_std_stm = s_ov * std['stm_mul']
-    avg_stm_hr = s_stm / s_hrs if s_hrs > 0 else 0
+    
+    # 🌟 นับจำนวนวันที่มีข้อมูล (ป้องกัน Error หาร 0 กรณีมีการกรอกข้อมูลไม่ครบ)
+    total_days = len(sorted_master_data)
+    avg_stm_hr = s_stm / (total_days * 24.0) if total_days > 0 else 0
+    
     avg_p_ton = s_tp / s_stm if s_stm > 0 else 0
     avg_press = s_prs / s_pcnt if s_pcnt > 0 else 0
     avg_kg_ton = (s_tw * 1000) / s_stm if s_stm > 0 else 0
     avg_kg_cub = (s_tw * 1000) / s_wo if s_wo > 0 else 0
 
-    f1_vals = ["รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp, "", avg_p_cub, std['p_cubft'] - avg_p_cub, s_stm, sum_std_stm, avg_stm_hr, std_stm_hr - avg_stm_hr, "", avg_p_ton, std['p_ton'] - avg_p_ton, "", avg_press, avg_press - std['avg_p'], "", avg_kg_ton, std['kg_ton'] - avg_kg_ton, "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub]
+    # 🌟 บรรทัดเจ้าปัญหา: เปลี่ยน std_stm_hr เป็น sum_std_stm ทั้งหมด เพื่อไม่ให้แครชเวลาข้อมูลโหว่
+    f1_vals = ["รวมทั้งหมด", s_ov, s_wo, s_sw, s_ww, s_www, s_tw, s_sp, s_wp, s_wwp, s_tp, "", avg_p_cub, std['p_cubft'] - avg_p_cub, s_stm, sum_std_stm, avg_stm_hr, sum_std_stm - avg_stm_hr, "", avg_p_ton, std['p_ton'] - avg_p_ton, "", avg_press, avg_press - std['avg_p'], "", avg_kg_ton, std['kg_ton_b1_2'] - avg_kg_ton, "", avg_kg_cub, std['kg_cubft'] - avg_kg_cub]
     f_html_m = "<tr style='font-weight:bold; background-color:#FCE4D6;'>"
     for idx, val in enumerate(f1_vals, 1):
         c = ws_m.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment, c.fill = tb, f_b, al_r if idx > 1 else al_c, fill_peach
@@ -1612,6 +1620,17 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
 
     for boiler_name in sorted(grouped_data.keys()):
         data_list = sorted(grouped_data[boiler_name], key=lambda x: (str(x.get('record_date') or ''), str(x.get('branch_name') or '')))
+        
+        # ==========================================
+        # 🌟 1. ดึงค่า STD ตามบอยเลอร์ที่กำลังวนลูปสร้างตาราง
+        # ==========================================
+        if "1" in boiler_name:
+            current_kg_ton_std = std['kg_ton_b1']
+        elif "2" in boiler_name:
+            current_kg_ton_std = std['kg_ton_b2']
+        else:
+            current_kg_ton_std = std['kg_ton_b1']
+            
         ws = wb.create_sheet(title=boiler_name)
         ws.merge_cells("A1:O1"); ws["A1"] = f"รายงานการใช้เชื้อเพลิง {selected_branch_display} {boiler_name} เดือน {month_str} {year_buddhist}"; ws["A1"].font, ws["A1"].fill, ws["A1"].alignment = f_w, fill_blue, al_c
         headers_merge = [("A2:A3","วันที่"), ("B2:D2","เชื้อเพลิงใช้(ตัน/วัน)"), ("E2:E3","รวม น.น.\nเชื้อเพลิง"), ("F2:I2","ค่าเชื้อเพลิง(บาท)"), ("J2:K2","ผลิตไอน้ำ"), ("L2:L3","ค่าเชื้อเพลิง\n(บาท/ตันไอน้ำ)"), ("M2:O2","เชื้อเพลิงใช้(กก./ตันไอน้ำ)")]
@@ -1634,7 +1653,6 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             date_str = f"{dt.day:02d}/{dt.month:02d}/{(dt.year+543)%100}({b_short})"
             
             s_w, w_w, ww_w = float(r.get('sawdust_weight') or 0), float(r.get('wood_weight') or 0), float(r.get('waste_wood_weight') or 0)
-            # 🌟 แก้ไข: สูตรคำนวณเงิน = น้ำหนัก(ตัน) * ราคาที่กรอก
             s_p = s_w * float(r.get('sawdust_price') or 0)
             w_p = w_w * float(r.get('wood_price') or 0)
             ww_p = ww_w * float(r.get('waste_wood_price') or 0)
@@ -1643,10 +1661,16 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             stm_hr = stm / hrs if hrs > 0 else 0
             cost_ton = t_p / stm if stm > 0 else 0
             fuel_ton = (t_w * 1000) / stm if stm > 0 else 0
-            diff = std['kg_ton'] - fuel_ton
+            
+            # ==========================================
+            # 🌟 2. นำค่า STD ที่แยกแล้วมาใช้คำนวณผลต่าง (แถวรายวัน)
+            # ==========================================
+            diff = current_kg_ton_std - fuel_ton
             
             sum_sw+=s_w; sum_ww+=w_w; sum_www+=ww_w; sum_tot_w+=t_w; sum_sp+=s_p; sum_wp+=w_p; sum_wwp+=ww_p; sum_tot_p+=t_p; sum_steam+=stm; sum_hrs+=hrs
-            row_vals = [date_str, s_w, w_w, ww_w, t_w, s_p, w_p, ww_p, t_p, stm, stm_hr, cost_ton, std['kg_ton'], fuel_ton, diff]
+            
+            # 🌟 3. ใส่ค่า STD ลงในตัวแปรที่จะเอาไปพ่นลงตาราง
+            row_vals = [date_str, s_w, w_w, ww_w, t_w, s_p, w_p, ww_p, t_p, stm, stm_hr, cost_ton, current_kg_ton_std, fuel_ton, diff]
             
             body_html += "<tr>"
             for idx, val in enumerate(row_vals, 1):
@@ -1677,17 +1701,23 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         avg_stm_hr = sum_steam / sum_hrs if sum_hrs > 0 else 0
         avg_cost_ton = sum_tot_p / sum_steam if sum_steam > 0 else 0
         avg_fuel_ton = (sum_tot_w * 1000) / sum_steam if sum_steam > 0 else 0
-        avg_diff = std['kg_ton'] - avg_fuel_ton
+        
+        # ==========================================
+        # 🌟 4. นำค่า STD ที่แยกแล้วมาใช้คำนวณผลต่าง (แถวรวมด้านล่าง)
+        # ==========================================
+        avg_diff = current_kg_ton_std - avg_fuel_ton
         
         ws.merge_cells(start_row=cur_row, start_column=1, end_row=cur_row, end_column=1)
         c_title = ws.cell(row=cur_row, column=1, value="รวมทั้งหมด"); c_title.alignment, c_title.fill, c_title.border, c_title.font = al_c, fill_peach, tb, f_bold_ul
-        f1_vals = ["", sum_sw, sum_ww, sum_www, sum_tot_w, sum_sp, sum_wp, sum_wwp, sum_tot_p, sum_steam, avg_stm_hr, avg_cost_ton, std['kg_ton'], avg_fuel_ton, avg_diff]
+        
+        # 🌟 5. ใส่ค่า STD ในแถวผลรวม
+        f1_vals = ["", sum_sw, sum_ww, sum_www, sum_tot_w, sum_sp, sum_wp, sum_wwp, sum_tot_p, sum_steam, avg_stm_hr, avg_cost_ton, current_kg_ton_std, avg_fuel_ton, avg_diff]
         footer_html = f"<tr style='font-weight:bold; background-color:#FCE4D6;'><td style='text-align:center; text-decoration:underline;'>รวมทั้งหมด</td>"
         
         for idx in range(2, 16):
             val = f1_vals[idx-1]; c = ws.cell(row=cur_row, column=idx, value=val); c.border, c.font, c.alignment = tb, f_b, al_r
             
-            # 🌟 ผลรวมบรรทัดล่างสุด Excel
+            # 🌟 ผลรวมบรรทัดล่างสุด Excel 3 ตำแหน่ง
             if isinstance(val, (int, float)): 
                 c.number_format = '#,##0.000' if idx in [2, 3, 4, 5] else '#,##0.00'
                 
@@ -1699,7 +1729,7 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
             tc = "color:red;" if idx==9 or (idx==15 and val<0) else ""
             ul = "text-decoration:underline;" if idx==14 else ""
             
-            # 🌟 ผลรวมบรรทัดล่างสุด HTML
+            # 🌟 ผลรวมบรรทัดล่างสุด HTML 3 ตำแหน่ง
             if not isinstance(val, (int, float)):
                 val_str = ""
             elif idx in [2, 3, 4, 5]:
