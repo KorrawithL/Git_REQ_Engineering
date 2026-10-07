@@ -52,6 +52,55 @@ def get_dashboard_data(user_branch_id):
             if res and res['drops']: data["boiler_drop"] = int(res['drops'])
 
             # ==========================================
+            # 🌟 ดึงข้อมูลเปรียบเทียบ เดือนนี้ vs เดือนที่แล้ว (รถยนต์)
+            # ==========================================
+            # 1. ข้อมูลรวมเดือนนี้
+            cur.execute("""
+                SELECT SUM(fuel_liters) as tot_fuel, SUM(working_hours) as tot_hrs 
+                FROM fuel_records 
+                WHERE MONTH(record_date) = MONTH(CURDATE()) 
+                  AND YEAR(record_date) = YEAR(CURDATE())
+                  AND branch_id = %s
+            """, (user_branch_id,))
+            cur_res = cur.fetchone()
+            data['cur_fuel'] = float(cur_res['tot_fuel'] or 0.0)
+            data['cur_hrs'] = float(cur_res['tot_hrs'] or 0.0)
+            data['cur_rate'] = data['cur_fuel'] / data['cur_hrs'] if data['cur_hrs'] > 0 else 0.0
+
+            # 2. ข้อมูลรวมเดือนที่แล้ว
+            cur.execute("""
+                SELECT SUM(fuel_liters) as tot_fuel, SUM(working_hours) as tot_hrs 
+                FROM fuel_records 
+                WHERE MONTH(record_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) 
+                  AND YEAR(record_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
+                  AND branch_id = %s
+            """, (user_branch_id,))
+            prev_res = cur.fetchone()
+            data['prev_fuel'] = float(prev_res['tot_fuel'] or 0.0)
+            data['prev_hrs'] = float(prev_res['tot_hrs'] or 0.0)
+            data['prev_rate'] = data['prev_fuel'] / data['prev_hrs'] if data['prev_hrs'] > 0 else 0.0
+
+            # 3. หารถที่กินน้ำมันเฉลี่ยสูงสุด (เดือนนี้)
+            cur.execute("""
+                SELECT engine_code, type_name, SUM(fuel_liters) as t_fuel, SUM(working_hours) as t_hrs
+                FROM fuel_records 
+                WHERE MONTH(record_date) = MONTH(CURDATE()) 
+                  AND YEAR(record_date) = YEAR(CURDATE())
+                  AND branch_id = %s
+                GROUP BY engine_code, type_name
+                HAVING SUM(working_hours) > 0
+                ORDER BY (SUM(fuel_liters) / SUM(working_hours)) DESC
+                LIMIT 1
+            """, (user_branch_id,))
+            max_car_res = cur.fetchone()
+            if max_car_res:
+                data['max_car_name'] = f"{max_car_res['engine_code']} {max_car_res['type_name']}"
+                data['max_car_rate'] = float(max_car_res['t_fuel']) / float(max_car_res['t_hrs'])
+            else:
+                data['max_car_name'] = "-"
+                data['max_car_rate'] = 0.0
+            
+            # ==========================================
             # 🌟 สร้างโครงสร้างปฏิทิน 7 วันย้อนหลังรอไว้ก่อน
             # ==========================================
             today = pd.Timestamp.today().normalize()
@@ -137,21 +186,108 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     </div>
     """
     st.markdown(welcome_html, unsafe_allow_html=True)
-    
-    fuel_display = f"{db_data['fuel_usage']:,.1f}" if db_data['fuel_usage'] > 0 else "0.0"
 
-    col1, col2 = st.columns(2)
-    with col1:
-        with st.container(border=True): st.metric("⚙️ เครื่องจักรทำงาน (วันนี้)", f"{db_data['active_machines']} เครื่อง")
-    with col2:
-        with st.container(border=True): st.metric("⚠️️ แจ้งซ่อม (ค้างซ่อม)", f"{db_data['breakdown_count']} รายการ")
-    col3, col4 = st.columns(2)
-    with col3:
-        with st.container(border=True): st.metric("🚚 เชื้อเพลิง 7 วัน (ลิตร)", fuel_display)
-    with col4:
-        with st.container(border=True): st.metric("💨 แรงดันตก (วันนี้)", f"{db_data['boiler_drop']} ครั้ง")
+    # =========================================================
+    # 🌟 ส่วนวาดกล่อง Dashboard Metric แบบ Custom HTML (รวมทุกหัวข้อ)
+    # =========================================================
 
-    st.markdown("<br>", unsafe_allow_html=True)
+    # 1. คำนวณส่วนต่าง (Diff) สำหรับ 3 หัวข้อรายเดือน
+    diff_fuel = db_data.get('cur_fuel', 0) - db_data.get('prev_fuel', 0)
+    diff_hrs = db_data.get('cur_hrs', 0) - db_data.get('prev_hrs', 0)
+    diff_rate = db_data.get('cur_rate', 0) - db_data.get('prev_rate', 0)
+
+    # ฟังก์ชันสร้างป้ายแคปซูล (Pill) แสดงผลต่างสีแดง/เขียว อัตโนมัติ
+    def get_diff_pill(diff, unit, invert_color=False):
+        if abs(diff) < 0.01:
+            return f'<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">- 0 {unit}</span>'
+        is_pos = diff > 0
+        arrow = "↑" if is_pos else "↓"
+        if (is_pos and not invert_color) or (not is_pos and invert_color):
+            bg, text = "#D1FAE5", "#059669" # สีเขียว
+        else:
+            bg, text = "#FEE2E2", "#DC2626" # สีแดง
+        return f'<span style="background-color: {bg}; color: {text}; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{arrow} {abs(diff):,.2f} {unit}</span>'
+
+    # -----------------------------------------------------
+    # จัดเตรียมข้อมูล 3 กล่องบน (ภาพรวมรายเดือน)
+    # -----------------------------------------------------
+    val_fuel = f"{db_data.get('cur_fuel', 0):,.2f}"
+    pill_fuel = get_diff_pill(diff_fuel, "ลิตร", invert_color=True)
+
+    val_hrs = f"{db_data.get('cur_hrs', 0):,.2f}"
+    pill_hrs = get_diff_pill(diff_hrs, "ชม.", invert_color=False)
+
+    val_rate = f"{db_data.get('cur_rate', 0):,.2f}"
+    pill_rate = get_diff_pill(diff_rate, "ล/ชม.", invert_color=True)
+
+    # -----------------------------------------------------
+    # จัดเตรียมข้อมูล 4 กล่องล่าง (สถานะอัปเดตรายวัน/สัปดาห์)
+    # -----------------------------------------------------
+    val_active = db_data.get('active_machines', 0)
+    pill_active = '<span style="background-color: #E0F2FE; color: #0284C7; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">อัปเดตวันนี้</span>'
+
+    val_bd = db_data.get('breakdown_count', 0)
+    pill_bd = '<span style="background-color: #FEE2E2; color: #DC2626; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">🔴 ค้างซ่อม</span>' if val_bd > 0 else '<span style="background-color: #D1FAE5; color: #059669; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">✅ ปกติ</span>'
+
+    val_f7 = f"{db_data.get('fuel_usage', 0.0):,.1f}"
+    pill_f7 = '<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">📅 7 วันล่าสุด</span>'
+
+    val_drop = db_data.get('boiler_drop', 0)
+    pill_drop = '<span style="background-color: #FEF3C7; color: #D97706; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">⚠️ แจ้งเตือน</span>' if val_drop > 0 else '<span style="background-color: #D1FAE5; color: #059669; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">✅ ปกติ</span>'
+
+    # ⚠️ ข้อควรระวัง: โค้ด HTML ต้องวางชิดขอบซ้ายสุด ป้องกันบัค Markdown ของ Streamlit
+    custom_metric_html = f"""
+<div style="background-color: #FCFBF8; padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
+
+<!-- แถวที่ 1: ภาพรวมรายเดือน -->
+<div style="color: #D97706; font-size: 18px; font-weight: bold; margin-bottom: 15px;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน (เทียบกับเดือนก่อน)</div>
+<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-bottom: 25px;">
+<div style="flex: 1; min-width: 180px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ปริมาณน้ำมันรวม</div>
+<div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_fuel} <span style="font-size: 20px; font-weight: normal; color: #666666;">ลิตร</span></div>
+{pill_fuel}
+</div>
+<div style="flex: 1; min-width: 180px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ชั่วโมงทำงานรวม</div>
+<div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_hrs} <span style="font-size: 20px; font-weight: normal; color: #666666;">ชม.</span></div>
+{pill_hrs}
+</div>
+<div style="flex: 1; min-width: 180px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">อัตราสิ้นเปลืองเฉลี่ย</div>
+<div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_rate} <span style="font-size: 20px; font-weight: normal; color: #666666;">ล/ชม.</span></div>
+{pill_rate}
+</div>
+</div>
+
+<hr style="border: none; border-top: 1px dashed #D6D3D1; margin: 0 0 20px 0;">
+
+<!-- แถวที่ 2: ข้อมูลอัปเดตล่าสุด -->
+<div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 15px;">⚡ สถานะปฏิบัติงาน (ข้อมูลอัปเดตล่าสุด)</div>
+<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักรทำงาน (วันนี้)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_active} <span style="font-size: 16px; font-weight: normal; color: #666666;">เครื่อง</span></div>
+{pill_active}
+</div>
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚠️ แจ้งซ่อม (ค้างซ่อม)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_bd} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
+{pill_bd}
+</div>
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 เชื้อเพลิง 7 วัน</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_f7} <span style="font-size: 16px; font-weight: normal; color: #666666;">ลิตร</span></div>
+{pill_f7}
+</div>
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">💨 แรงดันตก (วันนี้)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_drop} <span style="font-size: 16px; font-weight: normal; color: #666666;">ครั้ง</span></div>
+{pill_drop}
+</div>
+</div>
+</div>
+"""
+    st.markdown(custom_metric_html, unsafe_allow_html=True)
 
     c_chart1, c_chart2 = st.columns(2)
     
