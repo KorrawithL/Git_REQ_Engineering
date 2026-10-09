@@ -23,7 +23,7 @@ import altair as alt
 # 📦 นำเข้าฟังก์ชันจากไฟล์แยกที่ทำการ Refactoring ไว้
 from streamlit_cookies_controller import CookieController
 from home import render_dashboard
-from database import get_db_connection, hash_password
+from database import get_db_connection, hash_password, log_activity
 from tab_views import render_engineering_system_tabs
 from admin import render_admin_user_management
 from all_reports import render_all_reports_module
@@ -376,7 +376,7 @@ if 'app_init' not in st.session_state:
     st.session_state['app_init'] = True
     st.markdown("""
         <div style='text-align:center; padding-top:25vh; font-family:"Sarabun", sans-serif;'>
-            <h1 style='color:#D97706; font-weight:800; font-size:45px;'> WORK WOOD</h1>
+            <h1 style='color:#D97706; font-weight:800; font-size:45px;'> WOOD WORK</h1>
             <p style='color:#64748B; font-size:18px;'>กำลังเชื่อมต่อและตรวจสอบข้อมูลการเข้าสู่ระบบ...</p>
         </div>
     """, unsafe_allow_html=True)
@@ -450,6 +450,16 @@ def change_password_dialog():
                         else:
                             cur.execute("UPDATE system_users SET password_hash = %s WHERE user_id = %s", (hash_password(new_pwd), st.session_state.user_id))
                             conn.commit()
+                            
+                            # 🌟 เพิ่มบรรทัดนี้: บันทึกลงตาราง activity_logs ทันที
+                            log_activity(
+                                st.session_state.user_id,
+                                st.session_state.username,
+                                "UPDATE",
+                                "Auth: Password",
+                                "ผู้ใช้งานทำการเปลี่ยนรหัสผ่านใหม่สำเร็จ"
+                            )
+                            
                             st.success("✅ เปลี่ยนรหัสผ่านสำเร็จ! ระบบกำลังนำคุณออกเพื่อเข้าสู่ระบบใหม่...")
                             time.sleep(1.5)
                             perform_logout()
@@ -648,7 +658,7 @@ else:
     if 'sidebar_sub_report' not in st.session_state:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
     with st.sidebar:
-        st.markdown(f"<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WORK WOOD</h3>", unsafe_allow_html=True)
+        st.markdown(f"<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WOOD WORK</h3>", unsafe_allow_html=True)
 
         for choice in main_choices:
             is_main_active = (st.session_state['sidebar_main'] == choice)

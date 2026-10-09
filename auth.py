@@ -1,6 +1,6 @@
 import streamlit as st
 import time
-from database import get_db_connection, hash_password
+from database import get_db_connection, hash_password, log_activity
 from config import branch_dict
 
 def render_login_page():
