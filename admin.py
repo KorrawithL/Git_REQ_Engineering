@@ -1,26 +1,46 @@
 import streamlit as st
 import pandas as pd
 import time
-from database import get_db_connection, hash_password
-from config import branch_dict
+from database import get_db_connection, hash_password, log_activity
+
+# =============================================================================
+# 🏢 ฟังก์ชันดึงข้อมูลสาขาจาก Database แบบ Real-time
+# =============================================================================
+def get_db_branches():
+    b_dict = {}
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT id, CONVERT(branch_name USING utf8mb4) AS b_name 
+                FROM branches 
+                WHERE is_active = 1 
+                ORDER BY id ASC
+            """)
+            for r in cur.fetchall():
+                if r['b_name']:
+                    b_dict[r['b_name'].strip()] = r['id']
+        conn.close()
+    except Exception as e:
+        print(f"Error fetching branches: {e}")
+    return b_dict
 
 def render_admin_user_management():
-    # 🎯 เพิ่ม CSS ชุดนี้เพื่อบังคับซ่อนแถบ Header ด้านบน (พื้นที่สีแดง)
+    # 🎯 เพิ่ม CSS ซ่อนแถบ Header ด้านบน
     st.markdown("""
         <style>
-        /* ซ่อนแถบ Header หลักของ Streamlit */
         header[data-testid="stHeader"] { display: none !important; }
         #header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
-        
-        /* ขยับคอนเทนต์ (พื้นที่สีน้ำเงิน) ขึ้นไปชิดขอบบนสุดแทน */
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
         </style>
     """, unsafe_allow_html=True)
     st.header("👥 ระบบบริหารสิทธิ์และจัดการผู้ใช้งานระบบ")
 
-    
-    # 🎯 1. ดึงข้อมูลตำแหน่งจากตาราง departments เพื่อนำมาสร้างตัวเลือก Dropdown
+    # 🌟 ดึงข้อมูลสาขาจริงจากฐานข้อมูล
+    current_branch_dict = get_db_branches()
+
+    # 🎯 1. ดึงข้อมูลตำแหน่งจากตาราง departments
     position_list = ["-- กรุณาเลือกตำแหน่ง --"]
     try:
         conn = get_db_connection()
@@ -67,7 +87,7 @@ def render_admin_user_management():
             with col_c2: new_phone = st.text_input("เบอร์โทรศัพท์")
             
             st.markdown("#### 🏢 ข้อมูลสิทธิ์และสังกัด")
-            new_branch_label = st.selectbox("เลือกสาขาประจำตัว (หลัก) *", options=list(branch_dict.keys()), key="adm_add_br")
+            new_branch_label = st.selectbox("เลือกสาขาประจำตัว (หลัก) *", options=list(current_branch_dict.keys()), key="adm_add_br")
             new_role = st.selectbox("กำหนดระดับสิทธิ์ (Role_tab) *", options=["user", "reporter", "manager", "admin"])
             
             st.write("")
@@ -83,7 +103,7 @@ def render_admin_user_management():
                             else:
                                 sql = """INSERT INTO system_users (username, password_hash, full_name, position, email, phone_number, branch_id, Role_tab, allowed_tabs, status) 
                                          VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, '', 'active')"""
-                                cursor.execute(sql, (new_user, hash_password(new_pass), new_fullname, new_pos, new_email, new_phone, branch_dict[new_branch_label], new_role))
+                                cursor.execute(sql, (new_user, hash_password(new_pass), new_fullname, new_pos, new_email, new_phone, current_branch_dict[new_branch_label], new_role))
                                 conn.commit()
                                 st.success(f"เพิ่มผู้ใช้งาน {new_user} สำเร็จ!")
                                 time.sleep(1)
@@ -93,7 +113,7 @@ def render_admin_user_management():
 
     st.write("### 🗂️ รายชื่อผู้ใช้งานทั้งหมดในระบบ")
     if all_users:
-        reverse_branch_dict = {str(v): k for k, v in branch_dict.items()}
+        reverse_branch_dict = {str(v): k for k, v in current_branch_dict.items()}
         def get_extra_branches_display(ids_str):
             if not ids_str: return ""
             return ", ".join([reverse_branch_dict.get(str(i).strip(), str(i).strip()) for i in str(ids_str).split(',') if i.strip()])
@@ -123,7 +143,6 @@ def render_admin_user_management():
         target_id = user_options[selected_target_user]
         
         current_user_row = [r for r in all_users if r['user_id'] == target_id][0]
-        
         current_user_tabs = [x.strip() for x in str(current_user_row.get('allowed_tabs', '') or '').split(',') if x.strip()]
 
         sa_key = "sa_edit"
@@ -161,10 +180,11 @@ def render_admin_user_management():
         status_list = ["active", "disabled"]
         curr_status_idx = status_list.index(current_user_row['status']) if current_user_row['status'] in status_list else 0
 
+        # 🌟 ดึงสาขาที่มีสิทธิ์โดยเทียบกับ Database จริง
         raw_allowed_branches = str(current_user_row.get('additional_branches', '')) or ''
         extra_b_ids = [int(x.strip()) for x in raw_allowed_branches.split(',') if x.strip().isdigit()]
         all_allowed_ids = set([current_user_row['branch_id']] + extra_b_ids)
-        current_allowed_branch_names = [k for k, v in branch_dict.items() if v in all_allowed_ids]
+        current_allowed_branch_names = [k for k, v in current_branch_dict.items() if v in all_allowed_ids]
 
         with st.container(border=True): 
             st.markdown("**📋 แก้ไขข้อมูลส่วนตัว**")
@@ -207,7 +227,6 @@ def render_admin_user_management():
             with cb_col1:
                 st.checkbox("⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์", key=t1_key, on_change=on_tab_change)
                 st.checkbox("🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ", key=t2_key, on_change=on_tab_change)
-                # 🌟 เพิ่มเงื่อนไขโชว์หน้า 5 เฉพาะตอนที่เลือก Role เป็น manager
                 if edit_role == "manager":
                     st.checkbox("🛠️ หน้า 5: จัดการข้อมูลอุปกรณ์", key=t5_key)
             with cb_col2:
@@ -216,15 +235,15 @@ def render_admin_user_management():
             
             st.write("")
             
-            # 🎯 ตรวจสอบสิทธิ์แบบ Real-time ถ้าเป็น Admin ให้ซ่อนและโชว์ Full Access
             if edit_role == "admin":
                 st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 5px;'>📍 กำหนดสาขาที่มีสิทธิ์:</p>", unsafe_allow_html=True)
                 st.success("🌟 **Full Access** (สิทธิ์ระดับ Admin สามารถเข้าถึงและจัดการข้อมูลได้ทุกสาขาอัตโนมัติ)")
-                edit_allowed_branches = [] # เคลียร์ค่าออกไปเลย เพราะ Admin ดูได้หมดอยู่แล้ว
+                edit_allowed_branches = []
             else:
+                # 🌟 ดึง options จาก Database จริง (ไม่มีสาขา WK และมีสาขา OC ทันที)
                 edit_allowed_branches = st.multiselect(
                     "📍 กำหนดสาขาที่มีสิทธิ์ (รวมสาขาหลักของ User คนนี้แล้ว):", 
-                    options=list(branch_dict.keys()), 
+                    options=list(current_branch_dict.keys()), 
                     default=current_allowed_branch_names,
                     key=f"br_{target_id}",
                     help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
@@ -236,12 +255,10 @@ def render_admin_user_management():
                 if st.session_state[t2_key]: allowed_tabs_list.append("2")
                 if st.session_state[t3_key]: allowed_tabs_list.append("3")
                 if st.session_state[t4_key]: allowed_tabs_list.append("4")
-                # 🌟 เพิ่มดักจับการบันทึกหน้า 5
                 if edit_role == "manager" and st.session_state.get(t5_key): 
                     allowed_tabs_list.append("5")
                 
                 allowed_tabs_str = ",".join(allowed_tabs_list)
-                
                 final_edit_pos = edit_pos if edit_pos != "-- กรุณาเลือกตำแหน่ง --" else ""
 
                 try:
@@ -252,8 +269,8 @@ def render_admin_user_management():
                         
                         cur.execute("DELETE FROM user_branches WHERE user_id=%s", (int(target_id),))
                         for b_name in edit_allowed_branches:
-                            b_id = branch_dict[b_name]
-                            if b_id != current_user_row['branch_id']:
+                            b_id = current_branch_dict.get(b_name)
+                            if b_id and b_id != current_user_row['branch_id']:
                                 cur.execute("INSERT INTO user_branches (user_id, branch_id) VALUES (%s, %s)", (int(target_id), b_id))
                         
                         conn.commit()
