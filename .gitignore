@@ -4,3 +4,6 @@ __pycache__/
 .streamlit/secrets.toml
 venv/
 .vscode/
+backup_db.bat
+backups/
+*.sql
