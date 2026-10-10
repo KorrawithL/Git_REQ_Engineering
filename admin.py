@@ -25,6 +25,41 @@ def get_db_branches():
         print(f"Error fetching branches: {e}")
     return b_dict
 
+# =============================================================================
+# 🚨 ฟังก์ชัน Popup ยืนยันการลบบัญชีผู้ใช้งาน
+# =============================================================================
+@st.dialog("⚠️ ยืนยันการลบบัญชีผู้ใช้งาน")
+def confirm_delete_user_dialog(user_id, username):
+    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบบัญชีผู้ใช้งาน **'{username}'** (User ID: {user_id}) ?")
+    st.markdown("<span style='color:#EF4444; font-size:14px;'>* คำเตือน: ข้อมูลบัญชีผู้ใช้และสิทธิ์การเข้าถึงทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้</span>", unsafe_allow_html=True)
+    st.write("")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_del_u_{user_id}"):
+            st.rerun()
+    with c2:
+        if st.button("🗑️ ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_del_u_{user_id}"):
+            try:
+                conn = get_db_connection()
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM system_users WHERE user_id = %s", (int(user_id),))
+                    cur.execute("DELETE FROM user_branches WHERE user_id = %s", (int(user_id),))
+                    conn.commit()
+                    log_activity(
+                        st.session_state.user_id,
+                        st.session_state.username,
+                        "DELETE",
+                        "Admin: User Management",
+                        f"ลบบัญชีผู้ใช้งาน '{username}' (User ID: {user_id}) ออกจากระบบ"
+                    )
+                conn.close()
+                st.success(f"ทำการลบบัญชี '{username}' ออกจากฐานข้อมูลเรียบร้อยแล้ว")
+                time.sleep(1.2)
+                st.rerun()
+            except Exception as e:
+                st.error(f"ไม่สามารถลบข้อมูลได้: {e}")
+
 def render_admin_user_management():
     # 🎯 เพิ่ม CSS ซ่อนแถบ Header ด้านบน
     st.markdown("""
@@ -105,6 +140,13 @@ def render_admin_user_management():
                                          VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, '', 'active')"""
                                 cursor.execute(sql, (new_user, hash_password(new_pass), new_fullname, new_pos, new_email, new_phone, current_branch_dict[new_branch_label], new_role))
                                 conn.commit()
+                                log_activity(
+                                    st.session_state.user_id,
+                                    st.session_state.username,
+                                    "INSERT",
+                                    "Admin: User Management",
+                                    f"สร้างบัญชีใหม่: {new_user} (สิทธิ์: {new_role}, สาขา: {new_branch_label})"
+                                )
                                 st.success(f"เพิ่มผู้ใช้งาน {new_user} สำเร็จ!")
                                 time.sleep(1)
                                 st.rerun()
@@ -274,6 +316,13 @@ def render_admin_user_management():
                                 cur.execute("INSERT INTO user_branches (user_id, branch_id) VALUES (%s, %s)", (int(target_id), b_id))
                         
                         conn.commit()
+                        log_activity(
+                            st.session_state.user_id,
+                            st.session_state.username,
+                            "UPDATE",
+                            "Admin: User Management",
+                            f"แก้ไขข้อมูล/สิทธิ์ของ '{selected_target_user}' (Role: {edit_role}, สถานะ: {edit_status}, แท็บ: {allowed_tabs_str})"
+                        )
                     conn.close()
                     st.session_state['loaded_edit_user'] = None 
                     st.success(f"อัปเดตสิทธิ์การใช้งานของ '{selected_target_user}' สำเร็จเรียบร้อย!")
@@ -283,18 +332,15 @@ def render_admin_user_management():
                 
         st.write("<br>", unsafe_allow_html=True)
         with st.expander("🚨 โซนอันตราย: ลบบัญชีผู้ใช้นี้ออกจากระบบ"):
-            st.warning(f"คุณแน่ใจหรือไม่ที่จะทำการลบบัญชีผู้ใช้งานที่ชื่อว่า **{selected_target_user}**?")
-            if st.button(f"🗑️ ยืนยันการลบตัวตน {selected_target_user}", key="btn_del_usr", type="primary", use_container_width=True):
-                try:
-                    conn = get_db_connection()
-                    with conn.cursor() as cur:
-                        cur.execute("DELETE FROM system_users WHERE user_id = %s", (int(target_id),))
-                        cur.execute("DELETE FROM user_branches WHERE user_id = %s", (int(target_id),))
-                        conn.commit()
-                    conn.close()
-                    st.success(f"ทำการลบบัญชี {selected_target_user} ออกจากฐานข้อมูลเสร็จสิ้น")
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e: st.error(f"ไม่สามารถลบข้อมูลได้: {e}")
+            st.warning(f"การลบบัญชี **{selected_target_user}** จะลบข้อมูลสิทธิ์และการเข้าถึงทั้งหมดออกจากระบบถาวร")
+            
+            # ป้องกันไม่ให้แอดมินเผลอกดลบบัญชีตัวเองที่กำลังล็อกอินอยู่
+            is_self = (int(target_id) == int(st.session_state.user_id))
+            if is_self:
+                st.info("ℹ️ คุณไม่สามารถลบบัญชีของตัวเองในขณะที่กำลังเข้าสู่ระบบอยู่ได้")
+
+            # 🌟 ให้ปุ่มด้านนอกทำหน้าที่ "เปิดหน้าต่าง Pop-up" เพียงอย่างเดียวเท่านั้น
+            if st.button(f"🗑️ ขอลบบัญชี {selected_target_user}", key="btn_del_usr", type="primary", use_container_width=True, disabled=is_self):
+                confirm_delete_user_dialog(target_id, selected_target_user)               
     else:
         st.info("ยังไม่มีข้อมูลบัญชีผู้ใช้ระบบคนอื่นนอกจากตัวคุณ")

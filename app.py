@@ -29,6 +29,7 @@ from admin import render_admin_user_management
 from all_reports import render_all_reports_module
 from addMachines import render_add_new_equipment
 from auth import render_register_page
+from system_logs import render_system_logs_module  # 🌟 เพิ่มบรรทัดนี้
 
 # =============================================================================
 # 🚀 1. ฟังก์ชันดึงข้อมูลสาขาจาก Database (เพิ่ม show_spinner=False ซ่อนข้อความโหลด)
@@ -59,7 +60,7 @@ def setup_pwa():
         if (!window.parent.document.getElementById('pwa-manifest')) {
             const manifest = {
                 "name": "Woodwork Engineering Records System",
-                "short_name": "Work Wood",
+                "short_name": "WOOD WORK",
                 "theme_color": "#D97706",
                 "background_color": "#F2EFEA",
                 "display": "standalone", 
@@ -91,7 +92,7 @@ def setup_pwa():
             const metaTags = [
                 {name: "apple-mobile-web-app-capable", content: "yes"},
                 {name: "apple-mobile-web-app-status-bar-style", content: "black-translucent"},
-                {name: "apple-mobile-web-app-title", content: "Work Wood"},
+                {name: "apple-mobile-web-app-title", content: "WOOD WORK"},
                 {name: "theme-color", content: "#D97706"}
             ];
             
@@ -338,6 +339,13 @@ def safe_remove_cookie(name):
         pass
 
 def perform_logout(message=None):
+    # 🌟 บันทึก Log การออกจากระบบก่อนเคลียร์ session
+    u_id = st.session_state.get('user_id')
+    u_name = st.session_state.get('username')
+    if u_id and u_name:
+        reason = f"ออกจากระบบ ({message})" if message else "ผู้ใช้งานกดออกจากระบบ"
+        log_activity(u_id, u_name, "LOGOUT", "Auth: System", reason)
+    
     # 🌟 1. สั่งทำลายคุกกี้ก่อนเป็นอันดับแรกสุด! เพื่อให้เบราว์เซอร์รับคำสั่งทันเวลา
     safe_remove_cookie("auth_user")
     
@@ -539,8 +547,14 @@ if not st.session_state.get('logged_in'):
                             conn.close()
 
                             if user and user['password_hash'] == hash_password(password_input):
-                                if user['status'] != 'active': st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
+                                if user['status'] != 'active': 
+                                    # 🌟 กรณีบัญชีถูกระงับ
+                                    log_activity(user['user_id'], user['username'], "FAILED_LOGIN", "Auth: System", "เข้าสู่ระบบไม่สำเร็จ: บัญชีถูกระงับ")
+                                    st.error("🚫 บัญชีของคุณถูกระงับการใช้งาน หรือรอการอนุมัติสิทธิ์")
                                 else:
+                                    # 🌟 กรณีเข้าสู่ระบบสำเร็จ
+                                    log_activity(user['user_id'], user['username'], "LOGIN", "Auth: System", "เข้าสู่ระบบสำเร็จ")            
+
                                     safe_set_cookie("auth_user", user['username'], SESSION_TIMEOUT_SECONDS)
                                     
                                     now_time = time.time()
@@ -558,7 +572,11 @@ if not st.session_state.get('logged_in'):
                                     # 🔥 3. เซ็ตสถานะให้ข้ามไปโชว์หน้า Loading แทน แล้วรีรันทันที 🔥
                                     st.session_state['show_login_success'] = True
                                     st.rerun()
-                            else: st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
+                            else: 
+                                # 🌟 กรณีรหัสผ่านผิด
+                                failed_uid = user['user_id'] if user else 0
+                                log_activity(failed_uid, username_input, "FAILED_LOGIN", "Auth: System", "เข้าสู่ระบบไม่สำเร็จ: ชื่อผู้ใช้หรือรหัสผ่านผิด")
+                                st.error("❌ ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง")
                         except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}")
         with col_right:
             st.markdown('<div class="newhere-header-title">New Here?</div><div class="newhere-header-desc">Dear all, the team has completed the development of the machine usage logging system...</div>', unsafe_allow_html=True)
@@ -630,7 +648,7 @@ else:
     user_allowed_tabs = st.session_state.get('allowed_tabs', [])
 
     if current_role == 'admin':
-        main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "⚙️ จัดการผู้ใช้และสิทธิ์", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
+        main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "⚙️ จัดการผู้ใช้และสิทธิ์", "📋 ประวัติกิจกรรม(System Logs)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
     elif current_role == 'reporter':
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", report_menu_label]
     else:
@@ -756,7 +774,10 @@ else:
             
         elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
             render_admin_user_management()
-            
+
+        elif selected_main == "📋 ประวัติกิจกรรม(System Logs)":
+            render_system_logs_module()
+
         elif selected_main == report_menu_label: 
             render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
             
