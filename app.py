@@ -29,7 +29,8 @@ from admin import render_admin_user_management
 from all_reports import render_all_reports_module
 from addMachines import render_add_new_equipment
 from auth import render_register_page
-from system_logs import render_system_logs_module  # 🌟 เพิ่มบรรทัดนี้
+from system_logs import render_system_logs_module
+from std_setting import render_std_settings_module  # 🌟 เพิ่มบรรทัดนี้
 
 # =============================================================================
 # 🚀 1. ฟังก์ชันดึงข้อมูลสาขาจาก Database (เพิ่ม show_spinner=False ซ่อนข้อความโหลด)
@@ -648,15 +649,28 @@ else:
     user_allowed_tabs = st.session_state.get('allowed_tabs', [])
 
     if current_role == 'admin':
-        main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "⚙️ จัดการผู้ใช้และสิทธิ์", "📋 ประวัติกิจกรรม(System Logs)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label, "🛠️ จัดการข้อมูลอุปกรณ์"]
+        main_choices = [
+            "📊 แดชบอร์ดภาพรวม (Dashboard)", 
+            "⚙️ จัดการผู้ใช้และสิทธิ์", 
+            "📋 ประวัติกิจกรรม(System Logs)", 
+            "⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)",  # 🌟 เพิ่มเมนูนี้ให้ Admin
+            "📝 บันทึกข้อมูลประจำวัน", 
+            report_menu_label, 
+            "🛠️ จัดการข้อมูลอุปกรณ์"
+        ]
     elif current_role == 'reporter':
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", report_menu_label]
     else:
         report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label]
-        # 🌟 เช็คว่าเป็น manager "และ" ได้รับสิทธิ์เข้าถึงแท็บ 5 (จัดการอุปกรณ์) ด้วยเท่านั้น
+        
+        # สิทธิ์แท็บ 5 (จัดการอุปกรณ์)
         if current_role == 'manager' and "5" in user_allowed_tabs:
             main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
+            
+        # 🌟 สิทธิ์แท็บ 6: แสดงเมนูกำหนดเกณฑ์มาตรฐาน หากถูกติ๊กให้สิทธิ์มา
+        if "6" in user_allowed_tabs:
+            main_choices.append("⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)")
 
     # =========================================================================
     # 🌟 ฟื้นความจำ: ดึงชื่อ Tab ล่าสุดจากคุกกี้ ป้องกันการเด้งกลับหน้า Dashboard
@@ -777,6 +791,10 @@ else:
 
         elif selected_main == "📋 ประวัติกิจกรรม(System Logs)":
             render_system_logs_module()
+
+        # 🌟 เพิ่มเงื่อนไขนี้ เพื่อสั่งให้เปิดหน้าจอ STD Settings
+        elif selected_main == "⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)":
+            render_std_settings_module()
 
         elif selected_main == report_menu_label: 
             render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)

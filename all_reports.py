@@ -1415,8 +1415,18 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         conn = get_db_connection()
         with conn.cursor() as cur:
             std = {'p_cubft': 12.00, 'stm_mul': 0.1875, 'p_ton': 240.00, 'avg_p': 3.00, 'kg_ton': 300.00, 'kg_cubft': 15.00}
-            cur.execute("SELECT * FROM std_settings LIMIT 1")
+            
+            # 🌟 ดึงค่า STD ตามสาขาที่เลือกดูรายงาน (ถ้าดู "ทั้งหมด" หรือสาขานั้นยังไม่มี ให้ Fallback ไปแถวแรก)
+            if b_id_t4 not in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"]:
+                cur.execute("SELECT * FROM std_settings WHERE branch_id = %s LIMIT 1", (b_id_t4,))
+            else:
+                cur.execute("SELECT * FROM std_settings LIMIT 1")
+                
             s_res = cur.fetchone()
+            if not s_res:  # กรณีสาขานั้นยังไม่เคยตั้งค่า ให้ดึงค่าเริ่มต้นจากแถวแรก
+                cur.execute("SELECT * FROM std_settings LIMIT 1")
+                s_res = cur.fetchone()
+
             if s_res:
                 std['p_cubft'] = float(s_res.get('std_fuel_price_per_cubft', 12.00))
                 std['stm_mul'] = float(s_res.get('std_steam_multiplier', 0.1875))

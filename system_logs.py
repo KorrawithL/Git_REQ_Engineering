@@ -19,7 +19,7 @@ def render_system_logs_module():
         
     # ดึงรายชื่อ User และ Action Type ทั้งหมดที่มีในระบบมาทำตัวเลือก
     user_list = ["ทั้งหมด"]
-    action_list = ["ทั้งหมด", "INSERT", "UPDATE", "DELETE"]
+    action_list = ["ทั้งหมด", "INSERT", "UPDATE", "DELETE", "LOGIN", "LOGOUT", "FAILED_LOGIN"]
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
