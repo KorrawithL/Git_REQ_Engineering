@@ -193,6 +193,7 @@ def render_admin_user_management():
         t3_key = "t3_edit"
         t4_key = "t4_edit"
         t5_key = "t5_edit"
+        t6_key = "t6_edit"  # 🌟 เพิ่ม Key สำหรับแท็บ 6
 
         if st.session_state.get('loaded_edit_user') != target_id:
             st.session_state['loaded_edit_user'] = target_id
@@ -202,6 +203,7 @@ def render_admin_user_management():
             st.session_state[t3_key] = ("3" in current_user_tabs)
             st.session_state[t4_key] = ("4" in current_user_tabs)
             st.session_state[t5_key] = ("5" in current_user_tabs)
+            st.session_state[t6_key] = ("6" in current_user_tabs)  # 🌟 เพิ่มบรรทัดนี้
 
         def on_select_all():
             val = st.session_state.get(sa_key, False)
@@ -210,6 +212,7 @@ def render_admin_user_management():
             st.session_state[t3_key] = val
             st.session_state[t4_key] = val
             st.session_state[t5_key] = val
+            st.session_state[t6_key] = val  # 🌟 เพิ่มบรรทัดนี้
 
         def on_tab_change():
             if st.session_state[t1_key] and st.session_state[t2_key] and st.session_state[t3_key] and st.session_state[t4_key]:
@@ -274,7 +277,9 @@ def render_admin_user_management():
             with cb_col2:
                 st.checkbox("💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์", key=t3_key, on_change=on_tab_change)
                 st.checkbox("🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)", key=t4_key, on_change=on_tab_change)
-            
+                # 🌟 เพิ่ม Checkbox หน้า 6 ตรงนี้
+                if edit_role in ["manager", "admin"]:
+                    st.checkbox("⚙️ หน้า 6: กำหนดเกณฑ์มาตรฐาน (STD Settings)", key=t6_key)
             st.write("")
             
             if edit_role == "admin":
@@ -297,9 +302,9 @@ def render_admin_user_management():
                 if st.session_state[t2_key]: allowed_tabs_list.append("2")
                 if st.session_state[t3_key]: allowed_tabs_list.append("3")
                 if st.session_state[t4_key]: allowed_tabs_list.append("4")
-                if edit_role == "manager" and st.session_state.get(t5_key): 
-                    allowed_tabs_list.append("5")
-                
+                if st.session_state.get(t5_key): allowed_tabs_list.append("5")
+                if st.session_state.get(t6_key): allowed_tabs_list.append("6")  # 🌟 เพิ่มบรรทัดนี้
+
                 allowed_tabs_str = ",".join(allowed_tabs_list)
                 final_edit_pos = edit_pos if edit_pos != "-- กรุณาเลือกตำแหน่ง --" else ""
 
