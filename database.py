@@ -61,12 +61,22 @@ def hash_password(password):
     return hashlib.sha256(str.encode(password)).hexdigest()    
 
 def log_activity(user_id, username, action_type, module_name, details):
+    # 🌟 ดึง IP Address ของผู้ใช้งานผ่าน Request Headers (รองรับ Nginx Reverse Proxy)
+    client_ip = "127.0.0.1"
+    try:
+        headers = st.context.headers
+        client_ip = headers.get("X-Forwarded-For", headers.get("X-Real-IP", "127.0.0.1"))
+        if "," in client_ip:
+            client_ip = client_ip.split(",")[0].strip()
+    except Exception:
+        pass
+
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            sql = """INSERT INTO activity_logs (user_id, username, action_type, module_name, details, created_at) 
-                     VALUES (%s, %s, %s, %s, %s, NOW())"""
-            cur.execute(sql, (user_id, username, action_type, module_name, details))
+            sql = """INSERT INTO activity_logs (user_id, ip_address, username, action_type, module_name, details, created_at) 
+                     VALUES (%s, %s, %s, %s, %s, %s, NOW())"""
+            cur.execute(sql, (user_id, client_ip, username, action_type, module_name, details))
             conn.commit()
         conn.close() # โยนท่อกลับลงสระ
     except Exception as e:

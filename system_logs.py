@@ -46,7 +46,7 @@ def render_system_logs_module():
         conn = get_db_connection()
         with conn.cursor() as cur:
             sql = """
-                SELECT log_id, user_id, username, action_type, module_name, details, created_at
+                SELECT log_id, user_id, ip_address, username, action_type, module_name, details, created_at
                 FROM activity_logs
                 WHERE DATE(created_at) BETWEEN %s AND %s
             """
@@ -85,6 +85,7 @@ def render_system_logs_module():
         df_display = df_logs.rename(columns={
             'log_id': 'รหัส Log',
             'user_id': 'User ID',
+            'ip_address': 'IP Address',
             'username': 'ชื่อผู้ใช้',
             'action_type': 'กิจกรรม',
             'module_name': 'เมนู / โมดูล',
