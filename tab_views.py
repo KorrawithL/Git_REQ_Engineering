@@ -71,7 +71,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 c_top1, c_top2 = st.columns([1.5, 1])
                 with c_top1:
                     if len(available_options) > 1:
-                        t1_branch_label = st.selectbox("ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t1_branch")
+                        t1_branch_label = st.selectbox("🏢 ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t1_branch")
                         t1_branch_invalid = (t1_branch_label == "-- เลือกสาขา --")
                         if not t1_branch_invalid:
                             target_branch_id = branch_dict[t1_branch_label]
@@ -124,7 +124,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
 
                 c1, c2 = st.columns(2)
                 with c1:
-                    m_label = st.selectbox("ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0, disabled=t1_branch_invalid, key=f"t1_m_label_{rk1}")
+                    m_label = st.selectbox("🚜 ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0, disabled=t1_branch_invalid, key=f"t1_m_label_{rk1}")
                     is_m_not_selected = t1_branch_invalid or (m_label in ["-- กรุณาเลือกเครื่องจักร --", "-- บันทึกข้อมูลครบทุกเครื่องแล้ว --"])
                     m_qty = st.number_input("จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน", disabled=is_m_not_selected, key=f"t1_qty_{rk1}")
                 with c2:
@@ -188,7 +188,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 c_top1, c_top2 = st.columns([1.5, 1])
                 with c_top1:
                     if len(available_options) > 1:
-                        t2_branch_lbl = st.selectbox("🏢 1. สาขา *", ["-- เลือกสาขา --"] + available_options, key="t2_br")
+                        t2_branch_lbl = st.selectbox("🏢 ระบุสาขาที่ต้องการบันทึก *", ["-- เลือกสาขา --"] + available_options, key="t2_br")
                         t2_branch_invalid = (t2_branch_lbl == "-- เลือกสาขา --")
                         if not t2_branch_invalid:
                             target_branch_id_t2 = branch_dict[t2_branch_lbl]
@@ -241,7 +241,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     f2_type_disabled = True
                     
                 with c_sel1:
-                    f2_type = st.selectbox("🚜 2. ชนิด / ประเภทรถ *", type_options, key="f2_ty", disabled=f2_type_disabled)
+                    f2_type = st.selectbox("🚜 ระบุ ชนิด / ประเภทรถ ที่ต้องการบันทึก *", type_options, key="f2_ty", disabled=f2_type_disabled)
                 
                 f2_code_disabled = (f2_type in ["-- เลือกประเภท --", "-- บันทึกข้อมูลครบทุกคันแล้ว --"]) or f2_type_disabled
                 if not f2_code_disabled:
@@ -251,7 +251,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     code_options = ["-- เลือกรถ --"]
                     
                 with c_sel2:
-                    f2_code = st.selectbox("🏷️ 3. รหัสงาน / ทะเบียนรถ *", code_options, key=f"f2_cd_{rk2}", disabled=f2_code_disabled)
+                    f2_code = st.selectbox("🏷️ ระบุ รหัสงาน / ทะเบียนรถ ที่ต้องการบันทึก *", code_options, key=f"f2_cd_{rk2}", disabled=f2_code_disabled)
                     
                 inputs_disabled = (f2_code == "-- เลือกรถ --") or f2_code_disabled
                 
@@ -312,7 +312,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 c_top1, c_top2 = st.columns([1.5, 1])
                 with c_top1:
                     if len(available_options) > 1:
-                        t3_branch_label = st.selectbox("ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t3_branch")
+                        t3_branch_label = st.selectbox("🏢 ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t3_branch")
                         t3_branch_invalid = (t3_branch_label == "-- เลือกสาขา --")
                         if not t3_branch_invalid:
                             target_branch_id = branch_dict[t3_branch_label]
@@ -409,7 +409,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     c_top1, c_top2 = st.columns([1.5, 1])
                     with c_top1:
                         if len(available_options) > 1:
-                            t4_branch_lbl_1 = st.selectbox("ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t4_br1")
+                            t4_branch_lbl_1 = st.selectbox("🏢 ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t4_br1")
                             t4_ov_invalid = (t4_branch_lbl_1 == "-- เลือกสาขา --")
                             if not t4_ov_invalid:
                                 target_branch_id_1 = branch_dict[t4_branch_lbl_1]
@@ -488,7 +488,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     c_top1, c_top2 = st.columns([1.5, 1])
                     with c_top1:
                         if len(available_options) > 1:
-                            t4_branch_lbl_2 = st.selectbox("ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t4_br2")
+                            t4_branch_lbl_2 = st.selectbox("🏢 ระบุสาขาที่ต้องการบันทึก *", options=["-- เลือกสาขา --"] + available_options, key="t4_br2")
                             t4_bf_invalid = (t4_branch_lbl_2 == "-- เลือกสาขา --")
                             if not t4_bf_invalid:
                                 target_branch_id_2 = branch_dict[t4_branch_lbl_2]
@@ -540,7 +540,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         b_list = ["-- เลือกบอยเลอร์ --"]
                         is_boiler_invalid = True
                         
-                    boiler_name_input = st.selectbox("ระบุเครื่องบอยเลอร์ที่ใช้งาน *", b_list, disabled=is_boiler_invalid, key="t4_boiler")
+                    boiler_name_input = st.selectbox("🚜 ระบุเครื่องบอยเลอร์ที่ใช้งาน *", b_list, disabled=is_boiler_invalid, key="t4_boiler")
                     disable_t4_inputs = is_boiler_invalid or (boiler_name_input == "-- เลือกบอยเลอร์ --")
 
                     c1, c2, c3 = st.columns(3)

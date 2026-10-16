@@ -23,15 +23,15 @@ ui_flusher.empty()
 # =========================================================================
 
 # ==========================================================
-# 🛑 1. ฟังก์ชัน Popup ยืนยันการลบข้อมูล (Delete Dialogs)
+# 🛑 1. ฟังก์ชัน Popup ยืนยันการลบข้อมูล (Soft Delete ลงถังขยะ)
 # ==========================================================
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 1)")
 def delete_record_dialog_t1(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
     st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
     st.write(f"**เครื่องจักร:** {row_data.get('machine_name')}")
-    st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d1_{rec_id}"): st.rerun()
@@ -40,12 +40,12 @@ def delete_record_dialog_t1(row_data, pk_col):
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute(f"DELETE FROM machine_trans WHERE {pk_col}=%s", (rec_id,))
+                    cur.execute(f"UPDATE machine_trans SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
                 conn.close()
                 st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 1", f"ลบข้อมูล ID: {rec_id}")
-                st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
+                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 1", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
+                st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
@@ -53,10 +53,10 @@ def delete_record_dialog_t1(row_data, pk_col):
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 2)")
 def delete_record_dialog_t2(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
     st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
     st.write(f"**ทะเบียนรถ:** {row_data.get('engine_code')} ({row_data.get('type_name')})")
-    st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d2_{rec_id}"): st.rerun()
@@ -65,26 +65,24 @@ def delete_record_dialog_t2(row_data, pk_col):
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute(f"DELETE FROM fuel_records WHERE {pk_col}=%s", (rec_id,))
+                    cur.execute(f"UPDATE fuel_records SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
-
                 st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 2", f"ลบข้อมูล ID: {rec_id}")
-                st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
+                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 2", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
+                st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
             finally:
-                if conn:
-                    conn.close()
+                if conn: conn.close()
 
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 3)")
 def delete_record_dialog_t3(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
     st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
     st.write(f"**จำนวนตรวจเช็คทั้งหมด:** {row_data.get('total_count')} ครั้ง | **ตก:** {row_data.get('total_drop')} ครั้ง")
-    st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d3_{rec_id}"): st.rerun()
@@ -93,12 +91,12 @@ def delete_record_dialog_t3(row_data, pk_col):
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute(f"DELETE FROM boiler_pressure_records WHERE {pk_col}=%s", (rec_id,))
+                    cur.execute(f"UPDATE boiler_pressure_records SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
                 conn.close()
                 st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 3", f"ลบข้อมูล ID: {rec_id}")
-                st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
+                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 3", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
+                st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
@@ -106,10 +104,10 @@ def delete_record_dialog_t3(row_data, pk_col):
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 4)")
 def delete_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
     st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
     st.write(f"**ผลิตไอน้ำ:** {row_data.get('steam_production')} ตัน | **ชม.ทำงาน:** {row_data.get('working_hours')} ชม.")
-    st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d4_{rec_id}"): st.rerun()
@@ -118,26 +116,24 @@ def delete_record_dialog_t4(row_data, pk_col):
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute(f"DELETE FROM boiler_fuel_records WHERE {pk_col}=%s", (rec_id,))
+                    cur.execute(f"UPDATE boiler_fuel_records SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
-
                 st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4", f"ลบข้อมูล ID: {rec_id}")
-                st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
+                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
+                st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
             finally:
-                if conn:
-                    conn.close()
+                if conn: conn.close()
 
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (ยอดรวมสาขา)")
 def delete_record_dialog_oven(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.error(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
     st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
     st.write(f"**จำนวนเตา:** {row_data.get('oven_qty')} เตา | **ไม้เข้าอบ:** {row_data.get('wood_out_cubft')} ลบ.ฟ.")
-    st.markdown("<span style='color:#EF4444; font-size:14px;'>* การกระทำนี้ไม่สามารถกู้คืนข้อมูลได้</span>", unsafe_allow_html=True)
+    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
         if st.button("❌ ยกเลิก", use_container_width=True, key=f"c_d_ov_{rec_id}"): st.rerun()
@@ -146,12 +142,12 @@ def delete_record_dialog_oven(row_data, pk_col):
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
-                    cur.execute(f"DELETE FROM daily_wood_oven_records WHERE {pk_col}=%s", (rec_id,))
+                    cur.execute(f"UPDATE daily_wood_oven_records SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
                 conn.close()
                 st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4 Oven", f"ลบข้อมูล ID: {rec_id}")
-                st.success("🗑️ ลบข้อมูลเรียบร้อยแล้ว!")
+                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4 Oven", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
+                st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
@@ -580,14 +576,14 @@ def process_t1(b_id_t1, start_date_str, end_date_str, allowed_tuple, selected_br
         conn = get_db_connection()
         with conn.cursor() as cur:
             if b_id_t1 == "ทั้งหมด":
-                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
+                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.is_deleted = 0 AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
             elif b_id_t1 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
-                sql = f"SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.branch_id IN ({placeholders}) AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
+                sql = f"SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.is_deleted = 0 AND t.branch_id IN ({placeholders}) AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
             else:
-                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.branch_id = %s AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
+                sql = "SELECT t.*, b.branch_name, m.machine_name FROM machine_trans t LEFT JOIN branches b ON t.branch_id = b.id LEFT JOIN machines_set m ON t.machine_id = m.id WHERE t.is_deleted = 0 AND t.branch_id = %s AND t.record_date BETWEEN %s AND %s ORDER BY t.record_date ASC"
                 cur.execute(sql, (b_id_t1, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
@@ -855,7 +851,7 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.machine_type = 'engine' AND e.is_active = 1 ORDER BY b.id ASC, e.machine_name ASC"
                 cur.execute(sql_eng)
                 engines_list = cur.fetchall()
-                sql_trans = "SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql_trans = "SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql_trans, (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
             elif b_id_t2 == "รวมเฉพาะที่มีสิทธิ์":
@@ -863,14 +859,14 @@ def process_t2(b_id_t2, start_date_str, end_date_str, allowed_tuple, selected_br
                 sql_eng = f"SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id IN ({placeholders}) AND e.machine_type = 'engine' AND e.is_active = 1 ORDER BY e.machine_name ASC"
                 cur.execute(sql_eng, allowed_tuple)
                 engines_list = cur.fetchall()
-                sql_trans = f"SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql_trans = f"SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql_trans, allowed_tuple + (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
             else:
                 sql_eng = "SELECT e.id AS engine_pk_id, CONVERT(e.machine_name USING utf8mb4) AS engine_code, CONVERT(et.type_name USING utf8mb4) AS type_name, CONVERT(b.branch_name USING utf8mb4) AS branch_name, e.branch_id FROM machines_set e LEFT JOIN engine_types et ON e.engine_type_id = et.id LEFT JOIN branches b ON e.branch_id = b.id WHERE e.branch_id = %s AND e.machine_type = 'engine' AND e.is_active = 1 ORDER BY e.id ASC"
                 cur.execute(sql_eng, (b_id_t2,))
                 engines_list = cur.fetchall()
-                sql_trans = "SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql_trans = "SELECT r.*, b.branch_name FROM fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql_trans, (b_id_t2, start_date_str, end_date_str))
                 raw_data = cur.fetchall()
         conn.close()
@@ -1258,14 +1254,14 @@ def process_t3(b_id_t3, start_date_str, end_date_str, allowed_tuple, selected_br
         conn = get_db_connection()
         with conn.cursor() as cur:
             if b_id_t3 == "ทั้งหมด":
-                sql = "SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql = "SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
             elif b_id_t3 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
-                sql = f"SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql = f"SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
             else:
-                sql = "SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql = "SELECT r.*, b.branch_name FROM boiler_pressure_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (b_id_t3, start_date_str, end_date_str))
             raw_data = cur.fetchall()
         conn.close()
@@ -1414,49 +1410,55 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            std = {'p_cubft': 12.00, 'stm_mul': 0.1875, 'p_ton': 240.00, 'avg_p': 3.00, 'kg_ton': 300.00, 'kg_cubft': 15.00}
+            # 🌟 1. ดึง STD ของทุกสาขามาเก็บไว้ใน std_map โดยใช้ branch_id เป็น key
+            default_std = {'p_cubft': 12.00, 'stm_mul': 0.1875, 'p_ton': 240.00, 'avg_p': 3.00, 'kg_ton_b1': 280.00, 'kg_ton_b2': 280.00, 'kg_ton_b1_2': 300.00, 'kg_cubft': 15.00}
+            std_map = {}
             
-            # 🌟 ดึงค่า STD ตามสาขาที่เลือกดูรายงาน (ถ้าดู "ทั้งหมด" หรือสาขานั้นยังไม่มี ให้ Fallback ไปแถวแรก)
-            if b_id_t4 not in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"]:
-                cur.execute("SELECT * FROM std_settings WHERE branch_id = %s LIMIT 1", (b_id_t4,))
+            cur.execute("SELECT * FROM std_settings")
+            for s_row in cur.fetchall():
+                b_id_val = s_row.get('branch_id')
+                parsed = {
+                    'p_cubft': float(s_row.get('std_fuel_price_per_cubft', 12.00)),
+                    'stm_mul': float(s_row.get('std_steam_multiplier', 0.1875)),
+                    'p_ton': float(s_row.get('std_fuel_price_per_steam_ton', 240.00)),
+                    'avg_p': float(s_row.get('std_avg_pressure', 3.00)),
+                    'kg_ton_b1': float(s_row.get('std_fuel_kg_per_ton_b1', 280.00)),
+                    'kg_ton_b2': float(s_row.get('std_fuel_kg_per_ton_b2', 280.00)),
+                    'kg_ton_b1_2': float(s_row.get('std_fuel_kg_per_ton_b1_2', 300.00)),
+                    'kg_cubft': float(s_row.get('std_fuel_kg_per_cubft', 15.00))
+                }
+                if b_id_val is not None:
+                    std_map[int(b_id_val)] = parsed
+                if 'default' not in std_map:
+                    std_map['default'] = parsed
+
+            # ค่า STD กลางสำหรับแถวสรุปรวมท้ายตาราง
+            if b_id_t4 not in ["ทั้งหมด", "รวมเฉพาะที่มีสิทธิ์"] and int(b_id_t4) in std_map:
+                std = std_map[int(b_id_t4)]
             else:
-                cur.execute("SELECT * FROM std_settings LIMIT 1")
-                
-            s_res = cur.fetchone()
-            if not s_res:  # กรณีสาขานั้นยังไม่เคยตั้งค่า ให้ดึงค่าเริ่มต้นจากแถวแรก
-                cur.execute("SELECT * FROM std_settings LIMIT 1")
-                s_res = cur.fetchone()
+                std = std_map.get('default', default_std)
 
-            if s_res:
-                std['p_cubft'] = float(s_res.get('std_fuel_price_per_cubft', 12.00))
-                std['stm_mul'] = float(s_res.get('std_steam_multiplier', 0.1875))
-                std['p_ton'] = float(s_res.get('std_fuel_price_per_steam_ton', 240.00))
-                std['avg_p'] = float(s_res.get('std_avg_pressure', 3.00))
-                std['kg_ton_b1'] = float(s_res.get('std_fuel_kg_per_ton_b1', 280.00))
-                std['kg_ton_b2'] = float(s_res.get('std_fuel_kg_per_ton_b2', 280.00))
-                std['kg_ton_b1_2'] = float(s_res.get('std_fuel_kg_per_ton_b1_2', 300.00))
-                std['kg_cubft'] = float(s_res.get('std_fuel_kg_per_cubft', 15.00))
-
+            # 🌟 เติม r.is_deleted = 0 และ o.is_deleted = 0
             if b_id_t4 == "ทั้งหมด":
-                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
-                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
+                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.is_deleted = 0 AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, (start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
             elif b_id_t4 == "รวมเฉพาะที่มีสิทธิ์":
                 placeholders = ', '.join(['%s'] * len(allowed_tuple))
-                sql = f"SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql = f"SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.branch_id IN ({placeholders}) AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, allowed_tuple + (start_date_str, end_date_str))
                 raw_data = cur.fetchall()
-                sql_oven = f"SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id IN ({placeholders}) AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
+                sql_oven = f"SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.is_deleted = 0 AND o.branch_id IN ({placeholders}) AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, allowed_tuple + (start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
             else:
-                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
+                sql = "SELECT r.*, b.branch_name FROM boiler_fuel_records r LEFT JOIN branches b ON r.branch_id = b.id WHERE r.is_deleted = 0 AND r.branch_id = %s AND r.record_date BETWEEN %s AND %s ORDER BY r.record_date ASC"
                 cur.execute(sql, (b_id_t4, start_date_str, end_date_str))
                 raw_data = cur.fetchall()
-                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.branch_id = %s AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
+                sql_oven = "SELECT o.*, b.branch_name FROM daily_wood_oven_records o LEFT JOIN branches b ON o.branch_id = b.id WHERE o.is_deleted = 0 AND o.branch_id = %s AND o.record_date BETWEEN %s AND %s ORDER BY o.record_date ASC"
                 cur.execute(sql_oven, (b_id_t4, start_date_str, end_date_str))
                 oven_raw = cur.fetchall()
         conn.close()
@@ -1488,18 +1490,14 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         if (str(r.get('record_date')), str(r.get('branch_id'))) in complete_set:
             bn, dt = str(r.get('branch_name') or '-'), r['record_date']
             k = (bn, dt)
-            if k not in master_summary: master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
-            # ดึงค่าน้ำหนัก (ตัน)
+            if k not in master_summary: master_summary[k] = {'branch_id': r.get('branch_id'), 'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
             w_sw = float(r.get('sawdust_weight') or 0)
             w_ww = float(r.get('wood_weight') or 0)
             w_www = float(r.get('waste_wood_weight') or 0)
             
-            # บันทึกน้ำหนักรวม
             master_summary[k]['sw'] += w_sw
             master_summary[k]['ww'] += w_ww
             master_summary[k]['www'] += w_www
-            
-            # 🌟 แก้ไข: สูตรคำนวณเงิน = น้ำหนัก(ตัน) * ราคาที่กรอก
             master_summary[k]['sp'] += (w_sw * float(r.get('sawdust_price') or 0))
             master_summary[k]['wp'] += (w_ww * float(r.get('wood_price') or 0))
             master_summary[k]['wwp'] += (w_www * float(r.get('waste_wood_price') or 0))
@@ -1508,7 +1506,8 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
     for o in oven_raw_filtered:
         bn, dt = str(o.get('branch_name') or '-'), o['record_date']
         k = (bn, dt)
-        if k not in master_summary: master_summary[k] = {'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
+        # 🌟 แก้จาก r.get('branch_id') เป็น o.get('branch_id')
+        if k not in master_summary: master_summary[k] = {'branch_id': o.get('branch_id'), 'oven':0, 'wood':0, 'press':0, 'press_cnt':0, 'sw':0, 'ww':0, 'www':0, 'sp':0, 'wp':0, 'wwp':0, 'stm':0, 'hrs':0}
         master_summary[k]['oven'] = float(o.get('oven_qty') or 0); master_summary[k]['wood'] = float(o.get('wood_out_cubft') or 0); master_summary[k]['press'] += float(o.get('avg_terminal_pressure') or 0); master_summary[k]['press_cnt'] += 1
 
     wb = Workbook()
@@ -1544,17 +1543,30 @@ def process_t4(b_id_t4, start_date_str, end_date_str, allowed_tuple, selected_br
         dt = pd.to_datetime(dt_val)
         date_str = f"{dt.day:02d}/{dt.month:02d}/{(dt.year+543)%100}({b_short})"
         
+        # 🌟 ดึงค่า STD ประจำสาขาของแถวนี้ (เช่น ถ้าเป็น WT จะได้ std ของ WT ทันที)
+        row_bid = v.get('branch_id')
+        row_std = std_map.get(int(row_bid), std_map.get('default', default_std)) if row_bid else std_map.get('default', default_std)
+
         tw, tp = v['sw'] + v['ww'] + v['www'], v['sp'] + v['wp'] + v['wwp']
         avg_p = v['press'] / v['press_cnt'] if v['press_cnt'] > 0 else 0
         act_p_cub = tp / v['wood'] if v['wood'] > 0 else 0
-        std_stm_hr = v['oven'] * std['stm_mul']
-        act_stm_hr = v['stm'] / 24.0  # 🌟 แก้ให้หารด้วย 24 ตายตัว
+        std_stm_hr = v['oven'] * row_std['stm_mul']           # 🌟 ใช้ row_std
+        act_stm_hr = v['stm'] / 24.0
         act_p_ton = tp / v['stm'] if v['stm'] > 0 else 0
         act_kg_ton = (tw * 1000) / v['stm'] if v['stm'] > 0 else 0
         act_kg_cub = (tw * 1000) / v['wood'] if v['wood'] > 0 else 0
         
-        # แก้ในตัวแปร vals (แถวรายวัน)
-        vals = [date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, v['sp'], v['wp'], v['wwp'], tp, std['p_cubft'], act_p_cub, std['p_cubft'] - act_p_cub, v['stm'], std_stm_hr, act_stm_hr, std_stm_hr - act_stm_hr, std['p_ton'], act_p_ton, std['p_ton'] - act_p_ton, std['avg_p'], avg_p, avg_p - std['avg_p'], std['kg_ton_b1_2'], act_kg_ton, std['kg_ton_b1_2'] - act_kg_ton, std['kg_cubft'], act_kg_cub, std['kg_cubft'] - act_kg_cub]
+        # 🌟 ปรับ vals ให้ใช้ row_std แทน std ตัวเดิม
+        vals = [
+            date_str, v['oven'], v['wood'], v['sw'], v['ww'], v['www'], tw, 
+            v['sp'], v['wp'], v['wwp'], tp, 
+            row_std['p_cubft'], act_p_cub, row_std['p_cubft'] - act_p_cub, 
+            v['stm'], std_stm_hr, act_stm_hr, std_stm_hr - act_stm_hr, 
+            row_std['p_ton'], act_p_ton, row_std['p_ton'] - act_p_ton, 
+            row_std['avg_p'], avg_p, avg_p - row_std['avg_p'], 
+            row_std['kg_ton_b1_2'], act_kg_ton, row_std['kg_ton_b1_2'] - act_kg_ton, 
+            row_std['kg_cubft'], act_kg_cub, row_std['kg_cubft'] - act_kg_cub
+        ]
         s_ov+=v['oven']; s_wo+=v['wood']; s_sw+=v['sw']; s_ww+=v['ww']; s_www+=v['www']; s_tw+=tw; s_sp+=v['sp']; s_wp+=v['wp']; s_wwp+=v['wwp']; s_tp+=tp; s_stm+=v['stm']; s_hrs+=v['hrs']; s_prs+=v['press']; s_pcnt+=v['press_cnt']
 
         body_html_m += "<tr>"
