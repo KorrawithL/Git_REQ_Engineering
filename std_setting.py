@@ -90,8 +90,6 @@ def render_std_settings_module():
     # ดึงค่าปัจจุบันของสาขานั้น
     current_std = get_std_by_branch(selected_branch_id)
 
-    st.write("---")
-
     with st.form("std_settings_form"):
         st.markdown(f"### 📋 เกณฑ์มาตรฐานประจำ: **{selected_branch_name}**")
         
@@ -107,14 +105,14 @@ def render_std_settings_module():
         with c3:
             inp_steam_hr = st.number_input("💨 ผลิตไอน้ำมาตรฐาน (ตัน/ชม.):", value=float(current_std['std_steam_per_hr']), step=0.5, format="%.2f", key=f"std_stm_hr_{selected_branch_id}")
         with c4:
-            inp_steam_mul = st.number_input("✖️ ตัวคูณผลิตไอน้ำ (STD Ton/Hr per Oven):", value=float(current_std['std_steam_multiplier']), step=0.0001, format="%.4f", key=f"std_stm_mul_{selected_branch_id}")
+            inp_steam_mul = st.number_input("✖️ ตัวคูณผลิตไอน้ำ (Ton/Hr per Oven):", value=float(current_std['std_steam_multiplier']), step=0.0001, format="%.4f", key=f"std_stm_mul_{selected_branch_id}")
         with c5:
             inp_avg_press = st.number_input("⏲️ แรงดันปลายทางเฉลี่ยมาตรฐาน (Bar):", value=float(current_std['std_avg_pressure']), step=0.5, format="%.2f", key=f"std_avg_p_{selected_branch_id}")
 
         st.markdown("#### 3. เกณฑ์ประสิทธิภาพการใช้เชื้อเพลิง (กก./หน่วย)")
         c6, c7 = st.columns(2)
         with c6:
-            inp_kg_cubft = st.number_input("🪵 เชื้อเพลิงใช้มาตรฐาน (กก./ลบ.ฟ.):", value=float(current_std['std_fuel_kg_per_cubft']), step=1.0, format="%.2f", key=f"std_kg_cubft_{selected_branch_id}")
+            inp_kg_cubft = st.number_input("🔥 เชื้อเพลิงใช้มาตรฐาน (กก./ลบ.ฟ.):", value=float(current_std['std_fuel_kg_per_cubft']), step=1.0, format="%.2f", key=f"std_kg_cubft_{selected_branch_id}")
         with c7:
             inp_kg_ton_b1_2 = st.number_input("🔥 เชื้อเพลิงมาตรฐาน บอยเลอร์ 1+2 (กก./ตันไอน้ำ):", value=float(current_std['std_fuel_kg_per_ton_b1_2']), step=5.0, format="%.2f", key=f"std_kg_b1_2_{selected_branch_id}")
 

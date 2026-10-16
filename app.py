@@ -31,6 +31,7 @@ from addMachines import render_add_new_equipment
 from auth import render_register_page
 from system_logs import render_system_logs_module
 from std_setting import render_std_settings_module  # 🌟 เพิ่มบรรทัดนี้
+from recycle_bin import render_recycle_bin_module  # 🌟 เพิ่มบรรทัดนี้
 
 # =============================================================================
 # 🚀 1. ฟังก์ชันดึงข้อมูลสาขาจาก Database (เพิ่ม show_spinner=False ซ่อนข้อความโหลด)
@@ -628,6 +629,14 @@ else:
         "3": "💨 3. รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
         "4": "🔥 4. รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์"
     }
+    # 🌟 รายการเมนูย่อยภายใต้ "🎛️ แผงควบคุมและจัดการระบบ"
+    setting_names_map = {
+        "users": "👥 1. จัดการผู้ใช้และสิทธิ์",
+        "equip": "🛠️ 2. จัดการข้อมูลอุปกรณ์",
+        "std":   "⚙️ 3. กำหนดเกณฑ์มาตรฐาน (STD Settings)",
+        "logs":  "📋 4. ประวัติกิจกรรม (System Logs)",
+        "bin":   "🗑️ 5. ถังขยะกู้คืนข้อมูล (Recycle Bin)"
+    }
     
     def get_sub_menu_options(role, allowed_tabs):
         if role == "admin": return [all_tabs_config[k] for k in ["1", "2", "3", "4"]]
@@ -637,26 +646,33 @@ else:
         if role in ["admin", "reporter"]: return [report_names_map[k] for k in ["1", "2", "3", "4"]]
         else: return [report_names_map[k] for k in allowed_tabs if k in report_names_map]
 
-    sub_opts = get_sub_menu_options(current_role, st.session_state.get('allowed_tabs', []))
-    rep_opts = get_report_sub_options(current_role, st.session_state.get('allowed_tabs', []))
+    def get_setting_sub_options(role, allowed_tabs):
+        if role == "admin":
+            return [setting_names_map[k] for k in ["users", "equip", "std", "logs", "bin"]]
+        opts = []
+        if role == "manager" and "5" in allowed_tabs:
+            opts.append(setting_names_map["equip"])
+        if "6" in allowed_tabs:
+            opts.append(setting_names_map["std"])
+        return opts
+
+    user_allowed_tabs = st.session_state.get('allowed_tabs', [])
+    sub_opts = get_sub_menu_options(current_role, user_allowed_tabs)
+    rep_opts = get_report_sub_options(current_role, user_allowed_tabs)
+    set_opts = get_setting_sub_options(current_role, user_allowed_tabs)
 
     # =========================================================================
     # 🌟 เตรียมรายการเมนูหลัก 
     # =========================================================================
     report_menu_label = "📑 รายงานรวม (All Report)"
-
-    # 🌟 บรรทัดนี้สำคัญมาก! ต้องประกาศตัวแปรก่อนนำไปใช้เช็คเงื่อนไข
-    user_allowed_tabs = st.session_state.get('allowed_tabs', [])
+    setting_menu_label = "🎛️ แผงควบคุมและจัดการระบบ"
 
     if current_role == 'admin':
         main_choices = [
             "📊 แดชบอร์ดภาพรวม (Dashboard)", 
-            "⚙️ จัดการผู้ใช้และสิทธิ์", 
-            "📋 ประวัติกิจกรรม(System Logs)", 
-            "⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)",  # 🌟 เพิ่มเมนูนี้ให้ Admin
             "📝 บันทึกข้อมูลประจำวัน", 
             report_menu_label, 
-            "🛠️ จัดการข้อมูลอุปกรณ์"
+            setting_menu_label
         ]
     elif current_role == 'reporter':
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", report_menu_label]
@@ -664,31 +680,29 @@ else:
         report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label]
         
-        # สิทธิ์แท็บ 5 (จัดการอุปกรณ์)
-        if current_role == 'manager' and "5" in user_allowed_tabs:
-            main_choices.append("🛠️ จัดการข้อมูลอุปกรณ์")
-            
-        # 🌟 สิทธิ์แท็บ 6: แสดงเมนูกำหนดเกณฑ์มาตรฐาน หากถูกติ๊กให้สิทธิ์มา
-        if "6" in user_allowed_tabs:
-            main_choices.append("⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)")
+        # 🌟 หากผู้ใช้งานได้รับสิทธิ์แท็บ 5 (จัดการอุปกรณ์) หรือ แท็บ 6 (STD Settings) จะเห็นปุ่มแผงควบคุม
+        if set_opts:
+            main_choices.append(setting_menu_label)
 
     # =========================================================================
     # 🌟 ฟื้นความจำ: ดึงชื่อ Tab ล่าสุดจากคุกกี้ ป้องกันการเด้งกลับหน้า Dashboard
     # =========================================================================
     saved_main_tab = safe_get_cookie("last_main_tab")
     
-    if 'sidebar_main' not in st.session_state:
+    if 'sidebar_main' not in st.session_state or st.session_state['sidebar_main'] not in main_choices:
         if saved_main_tab and saved_main_tab in main_choices:
             st.session_state['sidebar_main'] = saved_main_tab
         else:
             st.session_state['sidebar_main'] = main_choices[0] # ค่าเริ่มต้น
-            # 🌟 ย้ำการฝังคุกกี้หน้าแรกด้วย เผื่อกรณีเพิ่งเข้าสู่ระบบครั้งแรก
             safe_set_cookie("last_main_tab", main_choices[0], SESSION_TIMEOUT_SECONDS) 
             
     if 'sidebar_sub_entry' not in st.session_state:
         st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์"
     if 'sidebar_sub_report' not in st.session_state:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
+    if 'sidebar_sub_setting' not in st.session_state:
+        st.session_state['sidebar_sub_setting'] = set_opts[0] if set_opts else setting_names_map["users"]
+
     with st.sidebar:
         st.markdown(f"<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WOOD WORK</h3>", unsafe_allow_html=True)
 
@@ -710,6 +724,11 @@ else:
                 default_idx_rep = rep_opts.index(st.session_state['sidebar_sub_report']) if st.session_state['sidebar_sub_report'] in rep_opts else 0
                 st.radio("เมนูย่อยรายงาน", rep_opts, index=default_idx_rep, key="sidebar_sub_report", label_visibility="collapsed")
 
+            # 🌟 กางเมนูย่อยของ "🎛️ แผงควบคุมและจัดการระบบ"
+            if choice == setting_menu_label and is_main_active and set_opts:
+                default_idx_set = set_opts.index(st.session_state['sidebar_sub_setting']) if st.session_state['sidebar_sub_setting'] in set_opts else 0
+                st.radio("เมนูย่อยแผงควบคุม", set_opts, index=default_idx_set, key="sidebar_sub_setting", label_visibility="collapsed")
+
         st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
         st.markdown(f"<hr style='border-color: #D6D3D1; margin: 10px 0;'>", unsafe_allow_html=True)
         
@@ -725,6 +744,7 @@ else:
     selected_main = st.session_state['sidebar_main']
     sub_menu_entry = st.session_state.get('sidebar_sub_entry')
     sub_menu_report = st.session_state.get('sidebar_sub_report')
+    sub_menu_setting = st.session_state.get('sidebar_sub_setting')
 
     # =========================================================================
     # 🌟 ท่าไม้ตายล้างกราฟค้าง (Force UI Flush) 🌟
@@ -737,13 +757,11 @@ else:
     # =========================================================================
 
     # 🌟 สร้าง Key เพื่อเช็คว่า "เพิ่งมีการเปลี่ยนหน้า Tab" หรือไม่
-    current_view_state = f"{selected_main}"
+    current_view_state = f"{selected_main}_{sub_menu_setting if selected_main == setting_menu_label else ''}"
 
     # =========================================================================
     # 🌟 พื้นที่แสดงผลหลัก (ระบบโหลดข้อมูลจริง Real-time)
     # =========================================================================
-    
-    # 🌟 สร้างพื้นที่ 2 กล่องเรียงกัน: กล่องโหลด (อยู่บน) และ กล่องเนื้อหา (อยู่ล่าง)
     loading_box = st.empty()
     main_view = st.empty()
 
@@ -751,7 +769,6 @@ else:
     is_changing_page = (st.session_state.get('last_view_state') != current_view_state)
 
     if is_changing_page:
-        # ดรอปม่านหน้าจอ Loading แบบ Overlay (ลอยทับหน้าจอ ไม่ดันเนื้อหา ทำให้หน้าไม่เด้งขึ้น)
         loading_box.markdown("""
             <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
                 <h1 style='color:#D97706; font-weight:800; font-size:35px; margin-bottom: 5px;'>กำลังเตรียมข้อมูล...</h1>
@@ -761,19 +778,16 @@ else:
             </div>
         """, unsafe_allow_html=True)
         
-        # 🪄 ท่าไม้ตายล้างกราฟค้างเดิม
         ui_flusher = st.empty()
         with ui_flusher:
             st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
             
-        # บังคับให้ Streamlit โชว์ม่าน Loading ให้ผู้ใช้เห็นทันทีก่อนเริ่มประมวลผลของหนัก
         time.sleep(0.1) 
         ui_flusher.empty()
         
-        # อัปเดตสถานะว่าเปลี่ยนหน้าแล้ว
         st.session_state['last_view_state'] = current_view_state
 
-    # 🎯 2. สั่งรันเนื้อหาจริง (โค้ดจะดึงข้อมูล Database และสร้างตารางอยู่เบื้องหลังม่าน Loading)
+    # 🎯 2. สั่งรันเนื้อหาจริง
     with main_view.container():
         if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
             user_position = st.session_state.get('position', '-')
@@ -785,22 +799,22 @@ else:
         elif selected_main == "📝 บันทึกข้อมูลประจำวัน": 
             st.markdown('<div class="data-entry-marker" style="display:none;"></div>', unsafe_allow_html=True)
             render_engineering_system_tabs(st.session_state.get('branch_name'), sub_menu_entry)
-            
-        elif selected_main == "⚙️ จัดการผู้ใช้และสิทธิ์": 
-            render_admin_user_management()
-
-        elif selected_main == "📋 ประวัติกิจกรรม(System Logs)":
-            render_system_logs_module()
-
-        # 🌟 เพิ่มเงื่อนไขนี้ เพื่อสั่งให้เปิดหน้าจอ STD Settings
-        elif selected_main == "⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)":
-            render_std_settings_module()
 
         elif selected_main == report_menu_label: 
             render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
-            
-        elif selected_main == "🛠️ จัดการข้อมูลอุปกรณ์": 
-            render_add_new_equipment()
+
+        # 🌟 เปิดหน้าจอตามเมนูย่อยใน "🎛️ แผงควบคุมและจัดการระบบ"
+        elif selected_main == setting_menu_label:
+            if sub_menu_setting == setting_names_map["users"]:
+                render_admin_user_management()
+            elif sub_menu_setting == setting_names_map["equip"]:
+                render_add_new_equipment()
+            elif sub_menu_setting == setting_names_map["std"]:
+                render_std_settings_module()
+            elif sub_menu_setting == setting_names_map["logs"]:
+                render_system_logs_module()
+            elif sub_menu_setting == setting_names_map["bin"]:
+                render_recycle_bin_module()
 
     # 🎯 3. เมื่อดึงข้อมูลและสร้างตารางเสร็จสมบูรณ์ 100% แล้ว ให้ทำลายม่าน Loading ทิ้ง!
     if is_changing_page:
