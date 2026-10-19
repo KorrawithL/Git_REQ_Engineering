@@ -4,7 +4,7 @@ import altair as alt
 from database import get_db_connection
 
 # =============================================================================
-# 🚀 1. ฟังก์ชันดึงข้อมูลจริงทำหน้า Dashboard (ย้ายมาจาก app.py)
+# 🚀 1. ฟังก์ชันดึงข้อมูลจริงทำหน้า Dashboard (เพิ่มการกรอง is_deleted = 0)
 # =============================================================================
 def get_dashboard_data(user_branch_id):
     data = {
@@ -12,6 +12,12 @@ def get_dashboard_data(user_branch_id):
         "breakdown_count": 0,
         "fuel_usage": 0.0,
         "boiler_drop": 0,
+        "cur_fuel": 0.0,
+        "cur_hrs": 0.0,
+        "cur_rate": 0.0,
+        "prev_fuel": 0.0,
+        "prev_hrs": 0.0,
+        "prev_rate": 0.0,
         "fuel_chart_df": pd.DataFrame(),
         "pressure_chart_df": pd.DataFrame()
     }
@@ -19,101 +25,91 @@ def get_dashboard_data(user_branch_id):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # เครื่องจักรทำงาน
+            # 1. เครื่องจักรทำงานวันนี้ (ตัด status='active' ออก และใส่ is_deleted = 0)
             cur.execute("""
                 SELECT COUNT(id) AS count FROM machine_trans 
-                WHERE record_date = CURDATE() AND branch_id = %s AND status = 'active'
+                WHERE record_date = CURDATE() AND branch_id = %s AND is_deleted = 0
             """, (user_branch_id,))
             res = cur.fetchone()
             if res and res['count']: data["active_machines"] = res['count']
 
-            # แจ้งซ่อม
+            # 2. แจ้งซ่อม/เบรกดาวน์วันนี้
             cur.execute("""
                 SELECT COUNT(id) AS count FROM machine_trans 
-                WHERE record_date = CURDATE() AND breakdown_hours > 0 AND branch_id = %s AND status = 'active'
+                WHERE record_date = CURDATE() AND breakdown_hours > 0 AND branch_id = %s AND is_deleted = 0
             """, (user_branch_id,))
             res = cur.fetchone()
             if res and res['count']: data["breakdown_count"] = res['count']
 
-            # เชื้อเพลิง 7 วัน
+            # 3. เชื้อเพลิง 7 วันล่าสุด
             cur.execute("""
                 SELECT SUM(fuel_liters) AS total FROM fuel_records  
-                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND record_date <= CURDATE() AND branch_id = %s 
+                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) 
+                  AND record_date <= CURDATE() 
+                  AND branch_id = %s 
+                  AND is_deleted = 0
             """, (user_branch_id,))
             res = cur.fetchone()
             if res and res['total']: data["fuel_usage"] = round(float(res['total']), 2)
 
-            # แรงดันตก
+            # 4. แรงดันตกวันนี้
             cur.execute("""
                 SELECT SUM(total_drop) AS drops FROM boiler_pressure_records  
-                WHERE record_date = CURDATE() AND branch_id = %s 
+                WHERE record_date = CURDATE() AND branch_id = %s AND is_deleted = 0
             """, (user_branch_id,))
             res = cur.fetchone()
             if res and res['drops']: data["boiler_drop"] = int(res['drops'])
 
             # ==========================================
-            # 🌟 ดึงข้อมูลเปรียบเทียบ เดือนนี้ vs เดือนที่แล้ว (รถยนต์)
+            # 🌟 ข้อมูลเปรียบเทียบ เดือนนี้ vs เดือนที่แล้ว
             # ==========================================
-            # 1. ข้อมูลรวมเดือนนี้
+            # 5. ข้อมูลรวมเดือนนี้
             cur.execute("""
                 SELECT SUM(fuel_liters) as tot_fuel, SUM(working_hours) as tot_hrs 
                 FROM fuel_records 
                 WHERE MONTH(record_date) = MONTH(CURDATE()) 
                   AND YEAR(record_date) = YEAR(CURDATE())
                   AND branch_id = %s
+                  AND is_deleted = 0
             """, (user_branch_id,))
             cur_res = cur.fetchone()
-            data['cur_fuel'] = float(cur_res['tot_fuel'] or 0.0)
-            data['cur_hrs'] = float(cur_res['tot_hrs'] or 0.0)
-            data['cur_rate'] = data['cur_fuel'] / data['cur_hrs'] if data['cur_hrs'] > 0 else 0.0
+            if cur_res:
+                data['cur_fuel'] = float(cur_res['tot_fuel'] or 0.0)
+                data['cur_hrs'] = float(cur_res['tot_hrs'] or 0.0)
+                data['cur_rate'] = data['cur_fuel'] / data['cur_hrs'] if data['cur_hrs'] > 0 else 0.0
 
-            # 2. ข้อมูลรวมเดือนที่แล้ว
+            # 6. ข้อมูลรวมเดือนที่แล้ว
             cur.execute("""
                 SELECT SUM(fuel_liters) as tot_fuel, SUM(working_hours) as tot_hrs 
                 FROM fuel_records 
                 WHERE MONTH(record_date) = MONTH(DATE_SUB(CURDATE(), INTERVAL 1 MONTH)) 
                   AND YEAR(record_date) = YEAR(DATE_SUB(CURDATE(), INTERVAL 1 MONTH))
                   AND branch_id = %s
+                  AND is_deleted = 0
             """, (user_branch_id,))
             prev_res = cur.fetchone()
-            data['prev_fuel'] = float(prev_res['tot_fuel'] or 0.0)
-            data['prev_hrs'] = float(prev_res['tot_hrs'] or 0.0)
-            data['prev_rate'] = data['prev_fuel'] / data['prev_hrs'] if data['prev_hrs'] > 0 else 0.0
+            if prev_res:
+                data['prev_fuel'] = float(prev_res['tot_fuel'] or 0.0)
+                data['prev_hrs'] = float(prev_res['tot_hrs'] or 0.0)
+                data['prev_rate'] = data['prev_fuel'] / data['prev_hrs'] if data['prev_hrs'] > 0 else 0.0
 
-            # 3. หารถที่กินน้ำมันเฉลี่ยสูงสุด (เดือนนี้)
-            cur.execute("""
-                SELECT engine_code, type_name, SUM(fuel_liters) as t_fuel, SUM(working_hours) as t_hrs
-                FROM fuel_records 
-                WHERE MONTH(record_date) = MONTH(CURDATE()) 
-                  AND YEAR(record_date) = YEAR(CURDATE())
-                  AND branch_id = %s
-                GROUP BY engine_code, type_name
-                HAVING SUM(working_hours) > 0
-                ORDER BY (SUM(fuel_liters) / SUM(working_hours)) DESC
-                LIMIT 1
-            """, (user_branch_id,))
-            max_car_res = cur.fetchone()
-            if max_car_res:
-                data['max_car_name'] = f"{max_car_res['engine_code']} {max_car_res['type_name']}"
-                data['max_car_rate'] = float(max_car_res['t_fuel']) / float(max_car_res['t_hrs'])
-            else:
-                data['max_car_name'] = "-"
-                data['max_car_rate'] = 0.0
-            
             # ==========================================
-            # 🌟 สร้างโครงสร้างปฏิทิน 7 วันย้อนหลังรอไว้ก่อน
+            # 🌟 สร้างโครงสร้างปฏิทิน 7 วันย้อนหลัง
             # ==========================================
             today = pd.Timestamp.today().normalize()
             date_range = pd.date_range(end=today, periods=7)
             df_template = pd.DataFrame({'วันที่': date_range})
 
             # ------------------------------------------
-            # 📉 กราฟเชื้อเพลิง
+            # 📉 กราฟเชื้อเพลิง (7 วัน)
             # ------------------------------------------
             cur.execute("""
                 SELECT DATE(record_date) AS log_date, SUM(fuel_liters) AS total_liters
                 FROM fuel_records  
-                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND record_date <= CURDATE() AND branch_id = %s 
+                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) 
+                  AND record_date <= CURDATE() 
+                  AND branch_id = %s 
+                  AND is_deleted = 0
                 GROUP BY DATE(record_date) ORDER BY DATE(record_date) ASC
             """, (user_branch_id,))
             fuel_rows = cur.fetchall()
@@ -123,23 +119,23 @@ def get_dashboard_data(user_branch_id):
                 df_f = pd.DataFrame(fuel_rows)
                 df_f['วันที่'] = pd.to_datetime(df_f['log_date'])
                 df_f['ปริมาณเชื้อเพลิง (ลิตร)'] = df_f['total_liters'].astype(float)
-                
-                # เอาข้อมูลจาก DB มาเสียบเข้าปฏิทิน 7 วัน (LEFT JOIN)
                 df_fuel_full = pd.merge(df_fuel_full, df_f[['วันที่', 'ปริมาณเชื้อเพลิง (ลิตร)']], on='วันที่', how='left')
             else:
                 df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'] = 0.0
                 
-            # วันไหนไม่มีข้อมูล (NaN) ให้แทนค่าด้วย 0.0
             df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'] = df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'].fillna(0.0)
             data["fuel_chart_df"] = df_fuel_full
 
             # ------------------------------------------
-            # 🚀 กราฟแรงดัน
+            # 🚀 กราฟแรงดันตก (7 วัน)
             # ------------------------------------------
             cur.execute("""
                 SELECT DATE(record_date) AS log_date, SUM(total_drop) AS total_drops
                 FROM boiler_pressure_records 
-                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) AND record_date <= CURDATE() AND branch_id = %s 
+                WHERE record_date >= DATE_SUB(CURDATE(), INTERVAL 6 DAY) 
+                  AND record_date <= CURDATE() 
+                  AND branch_id = %s 
+                  AND is_deleted = 0
                 GROUP BY DATE(record_date) ORDER BY DATE(record_date) ASC
             """, (user_branch_id,))
             pres_rows = cur.fetchall()
@@ -149,13 +145,10 @@ def get_dashboard_data(user_branch_id):
                 df_p = pd.DataFrame(pres_rows)
                 df_p['วันที่'] = pd.to_datetime(df_p['log_date'])
                 df_p['จำนวนครั้งที่ตก'] = df_p['total_drops'].astype(float)
-                
-                # เอาข้อมูลจาก DB มาเสียบเข้าปฏิทิน 7 วัน (LEFT JOIN)
                 df_pres_full = pd.merge(df_pres_full, df_p[['วันที่', 'จำนวนครั้งที่ตก']], on='วันที่', how='left')
             else:
                 df_pres_full['จำนวนครั้งที่ตก'] = 0.0
                 
-            # วันไหนไม่มีข้อมูล (NaN) ให้แทนค่าด้วย 0.0
             df_pres_full['จำนวนครั้งที่ตก'] = df_pres_full['จำนวนครั้งที่ตก'].fillna(0.0)
             data["pressure_chart_df"] = df_pres_full
 
@@ -171,7 +164,7 @@ def get_dashboard_data(user_branch_id):
 def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user_position, current_access, access_color, access_desc):
     db_data = get_dashboard_data(current_branch_id)
     
-    st.markdown(f"<h1 class='dash-title' style='color: #333333; font-weight: 800;'>หน้าหลัก (Dashboard)</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 class='dash-title' style='color: #333333; font-weight: 800;'>หน้าหลัก (Dashboard)</h1>", unsafe_allow_html=True)
     
     welcome_html = f"""
     <div style="background-color: #FCFBF8; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #D6D3D1; border-left: 6px solid #D97706; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);">
@@ -187,16 +180,11 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     """
     st.markdown(welcome_html, unsafe_allow_html=True)
 
-    # =========================================================
-    # 🌟 ส่วนวาดกล่อง Dashboard Metric แบบ Custom HTML (รวมทุกหัวข้อ)
-    # =========================================================
-
     # 1. คำนวณส่วนต่าง (Diff) สำหรับ 3 หัวข้อรายเดือน
     diff_fuel = db_data.get('cur_fuel', 0) - db_data.get('prev_fuel', 0)
     diff_hrs = db_data.get('cur_hrs', 0) - db_data.get('prev_hrs', 0)
     diff_rate = db_data.get('cur_rate', 0) - db_data.get('prev_rate', 0)
 
-    # ฟังก์ชันสร้างป้ายแคปซูล (Pill) แสดงผลต่างสีแดง/เขียว อัตโนมัติ
     def get_diff_pill(diff, unit, invert_color=False):
         if abs(diff) < 0.01:
             return f'<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">- 0 {unit}</span>'
@@ -208,9 +196,7 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
             bg, text = "#FEE2E2", "#DC2626" # สีแดง
         return f'<span style="background-color: {bg}; color: {text}; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{arrow} {abs(diff):,.2f} {unit}</span>'
 
-    # -----------------------------------------------------
-    # จัดเตรียมข้อมูล 3 กล่องบน (ภาพรวมรายเดือน)
-    # -----------------------------------------------------
+    # จัดเตรียมข้อมูล 3 กล่องบน
     val_fuel = f"{db_data.get('cur_fuel', 0):,.2f}"
     pill_fuel = get_diff_pill(diff_fuel, "ลิตร", invert_color=True)
 

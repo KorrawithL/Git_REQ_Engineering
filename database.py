@@ -1,7 +1,6 @@
 import pymysql
 import hashlib
 import streamlit as st
-import os
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
 
