@@ -100,7 +100,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                     AND id NOT IN (
                                         SELECT machine_id 
                                         FROM machine_trans 
-                                        WHERE branch_id = %s AND record_date = %s
+                                        WHERE branch_id = %s AND record_date = %s AND is_deleted = 0
                                     )
                             """
                             cur.execute(sql, (target_branch_id, target_branch_id, m_date))
@@ -221,6 +221,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                         AND fr.record_date = %s
                                         AND fr.engine_code = CONVERT(m.machine_name USING utf8mb4)
                                         AND fr.type_name = CONVERT(et.type_name USING utf8mb4)
+                                        AND fr.is_deleted = 0
                                     )
                             """
                             cur.execute(sql_eng, (target_branch_id_t2, target_branch_id_t2, f_date))
@@ -331,7 +332,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cur:
-                            cur.execute("SELECT 1 FROM boiler_pressure_records WHERE branch_id=%s AND record_date=%s", (target_branch_id, p_date))
+                            cur.execute("SELECT 1 FROM boiler_pressure_records WHERE branch_id=%s AND record_date=%s AND is_deleted = 0", (target_branch_id, p_date))
                             if cur.fetchone(): has_t3_record = True
                     except Exception as e: 
                         pass
@@ -428,7 +429,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         try:
                             conn = get_db_connection()
                             with conn.cursor() as cur:
-                                cur.execute("SELECT id FROM daily_wood_oven_records WHERE branch_id=%s AND record_date=%s", (target_branch_id_1, bf_date_1))
+                                cur.execute("SELECT id FROM daily_wood_oven_records WHERE branch_id=%s AND record_date=%s AND is_deleted = 0", (target_branch_id_1, bf_date_1))
                                 if cur.fetchone(): has_t4_ov_record = True
                         except Exception: pass
                         finally:
@@ -518,6 +519,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                             WHERE bfr.branch_id = %s 
                                             AND bfr.record_date = %s
                                             AND CONVERT(bfr.boiler_name USING utf8mb4) = CONVERT(b.boiler_name USING utf8mb4)
+                                            AND bfr.is_deleted = 0
                                         ) 
                                     ORDER BY b.id ASC
                                 """
