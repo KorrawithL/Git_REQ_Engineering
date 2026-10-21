@@ -14,9 +14,11 @@ def get_branch_list():
             for r in cur.fetchall():
                 if r['b_name']:
                     branches[r['b_name'].strip()] = r['id']
-        conn.close()
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการดึงข้อมูลสาขา: {e}")
+    finally:
+        if conn:
+            conn.close()
     return branches
 
 # =============================================================================
@@ -43,9 +45,11 @@ def get_std_by_branch(branch_id):
                 for k in default_vals.keys():
                     if k in res and res[k] is not None:
                         default_vals[k] = float(res[k])
-        conn.close()
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการดึงค่ามาตรฐาน: {e}")
+    finally:
+        if conn:
+            conn.close()
     return default_vals
 
 # =============================================================================

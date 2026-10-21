@@ -8,6 +8,7 @@ from database import get_db_connection, hash_password, log_activity
 # =============================================================================
 def get_db_branches():
     b_dict = {}
+    conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
@@ -20,9 +21,11 @@ def get_db_branches():
             for r in cur.fetchall():
                 if r['b_name']:
                     b_dict[r['b_name'].strip()] = r['id']
-        conn.close()
     except Exception as e:
         print(f"Error fetching branches: {e}")
+    finally:
+        if conn:
+            conn.close()
     return b_dict
 
 # =============================================================================
