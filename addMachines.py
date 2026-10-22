@@ -142,7 +142,7 @@ def render_add_new_equipment():
                             conn.close()
 
     # =========================================================================
-    # 📋 2. ตารางแสดงรายการอุปกรณ์ทั้งหมด
+    # 📋 2. ดึงข้อมูลรายการอุปกรณ์ทั้งหมด
     # =========================================================================
     st.subheader("📋 รายการอุปกรณ์ทั้งหมดในระบบ")
     
@@ -189,7 +189,7 @@ def render_add_new_equipment():
                     "วันหมดอายุ": r['expiration_date'],
                     "หมายเหตุ": r['remark'],
                     "มูลค่าของอุปกรณ์ (บาท)": r.get('machine_value'),
-                    "ผู้ขาย/vendor": r.get('vendor') or '-',
+                    "ผู้ขาย/vendor": r.get('vendor'),
                     "สถานะ": status_label, 
                     "is_active": r.get('is_active', 1), 
                     "type_id": r.get('engine_type_id')
@@ -204,7 +204,60 @@ def render_add_new_equipment():
         df = pd.DataFrame(combined_data)
         df['วันหมดอายุ_date'] = pd.to_datetime(df['วันหมดอายุ']).dt.date
         
-        with st.expander("🔍 แผงกรองข้อมูล (Filter Panel)", expanded=True):
+        # =========================================================================
+        # 🌟 [หัวข้อ 2] การ์ดสรุปตัวเลขภาพรวม (เฉพาะ 5 รายการที่เลือก)
+        # =========================================================================
+        total_items = len(df)
+        total_machines = len(df[df['หมวดหมู่'] == "⚙️ เครื่องจักร"])
+        total_vehicles = len(df[df['หมวดหมู่'] == "🚚 รถยนต์/รถยก"])
+        total_disabled = len(df[df['is_active'] == 0])
+        total_active = len(df[df['is_active'] == 1])
+
+        pct_mach = (total_machines / total_items * 100) if total_items > 0 else 0.0
+        pct_veh = (total_vehicles / total_items * 100) if total_items > 0 else 0.0
+
+        custom_equip_kpi_html = f"""
+<div style="background-color: #FCFBF8; padding: 22px 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
+
+<div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 18px;">⚡ สถานะความพร้อมและหมวดหมู่อุปกรณ์ (ข้อมูลปัจจุบัน)</div>
+<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
+
+<div style="flex: 1; min-width: 140px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">📦 อุปกรณ์ทั้งหมด</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_items:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
+</div>
+
+<div style="flex: 1; min-width: 140px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักร</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_machines:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">เครื่อง</span></div>
+<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{pct_mach:.1f}% ของระบบ</span>
+</div>
+
+<div style="flex: 1; min-width: 140px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 รถยนต์ / รถยก</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_vehicles:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">คัน</span></div>
+<span style="background-color: #FFFBEB; color: #D97706; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{pct_veh:.1f}% ของระบบ</span>
+</div>
+
+<div style="flex: 1; min-width: 140px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">▶️ ใช้งานปกติ (Active)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_active:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
+</div>
+
+<div style="flex: 1; min-width: 140px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🔴 ระงับการใช้งาน</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_disabled:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
+</div>
+
+</div>
+</div>
+"""
+        st.markdown(custom_equip_kpi_html, unsafe_allow_html=True)
+
+        # =========================================================================
+        # 🔍 แผงกรองข้อมูล (Filter Panel)
+        # =========================================================================
+        with st.expander("🔍 แผงกรองข้อมูล (Filter Panel)", expanded=False):
             f_c1, f_c2, f_c3 = st.columns(3)
             with f_c1:
                 search_q = st.text_input("🔍 ค้นหาชื่อ/รหัส:", placeholder="พิมพ์เพื่อค้นหา...")
@@ -232,9 +285,39 @@ def render_add_new_equipment():
         if len(f_exp) == 2:
             filtered_df = filtered_df[filtered_df['วันหมดอายุ_date'].notna() & filtered_df['วันหมดอายุ_date'].between(f_exp[0], f_exp[1])]
 
-        st.write(f"แสดงผล **{len(filtered_df)}** รายการ จากทั้งหมด {len(df)} รายการ")
+        st.caption(f"แสดงผล **{len(filtered_df)}** รายการ จากทั้งหมด {len(df)} รายการ")
+
+        # =========================================================================
+        # 🌟 [หัวข้อ 3] จัดฟอร์แมตข้อมูลตารางให้สะอาดตา (Clean DataFrame Display)
+        # =========================================================================
+        df_display = filtered_df.copy()
+
+        def clean_date_str(val):
+            if pd.isna(val) or val is None or str(val).strip().lower() in ['none', 'nat', '']:
+                return '-'
+            try:
+                return pd.to_datetime(val).strftime('%d/%m/%Y')
+            except Exception:
+                return str(val)
+
+        def clean_currency_str(val):
+            if pd.isna(val) or val is None:
+                return '-'
+            try:
+                f_val = float(val)
+                return f"{f_val:,.2f}" if f_val > 0 else "-"
+            except Exception:
+                return str(val)
+
+        df_display['วันที่ซื้อ'] = df_display['วันที่ซื้อ'].apply(clean_date_str)
+        df_display['วันที่เริ่มใช้งาน'] = df_display['วันที่เริ่มใช้งาน'].apply(clean_date_str)
+        df_display['วันหมดอายุ'] = df_display['วันหมดอายุ'].apply(clean_date_str)
+        df_display['มูลค่าของอุปกรณ์ (บาท)'] = df_display['มูลค่าของอุปกรณ์ (บาท)'].apply(clean_currency_str)
+        df_display['ผู้ขาย/vendor'] = df_display['ผู้ขาย/vendor'].apply(lambda x: '-' if pd.isna(x) or not str(x).strip() or str(x).strip().lower() == 'none' else str(x).strip())
+        df_display['หมายเหตุ'] = df_display['หมายเหตุ'].apply(lambda x: '-' if pd.isna(x) or not str(x).strip() or str(x).strip().lower() == 'none' else str(x).strip())
+
         display_cols = ['สถานะ', 'หมวดหมู่', 'ID', 'ชื่อ/รหัส', 'ชนิดรถ', 'สาขา', 'วันที่ซื้อ', 'วันที่เริ่มใช้งาน', 'มูลค่าของอุปกรณ์ (บาท)', 'ผู้ขาย/vendor', 'วันหมดอายุ', 'หมายเหตุ']
-        st.dataframe(filtered_df[display_cols], use_container_width=True, height=350)
+        st.dataframe(df_display[display_cols], use_container_width=True, height=350, hide_index=True)
 
         # =========================================================================
         # ✏️ 3. ส่วนแก้ไข หรือระงับการใช้งาน
@@ -279,7 +362,7 @@ def render_add_new_equipment():
 
                 with e_c5:
                     old_vendor = sel_data.get('ผู้ขาย/vendor')
-                    edit_vendor = st.text_input("แก้ไข ผู้ขาย/vendor", value=old_vendor if old_vendor != '-' else "")
+                    edit_vendor = st.text_input("แก้ไข ผู้ขาย/vendor", value=old_vendor if old_vendor and old_vendor != '-' else "")
 
                 e_c6, e_c7 = st.columns(2)    
                 with e_c6:
