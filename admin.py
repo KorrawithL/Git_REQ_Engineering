@@ -226,7 +226,13 @@ def render_admin_user_management():
     # =========================================================================
     # 🗂️ รายชื่อผู้ใช้งานและแผงค้นหา (Search & Filter)
     # =========================================================================
-    st.write("### 🗂️ รายชื่อผู้ใช้งานทั้งหมดในระบบ")
+    # 🌟 จุดที่ 1 (วงสีแดงบน): แบ่ง 2 ฝั่งเพื่อใส่ข้อความแจ้งเตือนชิดขวา
+    col_hdr1, col_hdr2 = st.columns([2.5, 1.5])
+    with col_hdr1:
+        st.write("### 🗂️ รายชื่อผู้ใช้งานทั้งหมดในระบบ")
+    with col_hdr2:
+        st.markdown("<div style='text-align: right; padding-top: 15px;'><span style='color: #64748B; font-size: 13px;'>🔄 แผงค้นหาซิงค์ข้อมูล: <b>ตาราง & Dropdown</b></span></div>", unsafe_allow_html=True)
+
     if all_users:
         reverse_branch_dict = {str(v): k for k, v in current_branch_dict.items()}
         def get_extra_branches_display(ids_str):
@@ -281,15 +287,18 @@ def render_admin_user_management():
         display_user_cols = ['ID', 'Username', 'ชื่อ-นามสกุล', 'ตำแหน่ง', 'E-mail', 'เบอร์โทร', 'สาขาประจำตัว', 'ระดับสิทธิ์', 'หน้ารายการที่เข้าถึงได้', 'สาขาเสริมที่มีสิทธิ์', 'สถานะบัญชี']
         st.dataframe(filtered_df[display_user_cols], use_container_width=True, height=280)
         
-        st.write("---")
-        st.write("#### 🛠️ เครื่องมืออนุมัติและปรับเปลี่ยนข้อมูลรายบัญชี")
-
+        # 🌟 จุดที่ 2 (วงสีแดงล่าง): เพิ่มป้าย Badge สีฟ้าชิดขวาเหนือ Dropdown
+        col_tool1, col_tool2 = st.columns([2.5, 1.5])
+        with col_tool1:
+            st.write("#### 🛠️ เครื่องมืออนุมัติและปรับเปลี่ยนข้อมูลรายบัญชี")
+        with col_tool2:
+            st.markdown("<div style='text-align: right; padding-top: 15px;'><span style='color: #64748B; font-size: 13px;'>🔗 รายชื่อเปลี่ยนตามตัวกรองด้านบน<b>ตาราง & Dropdown</b></span></div>", unsafe_allow_html=True)
         if not filtered_df.empty:
             user_options = {
                 f"[{r['สถานะบัญชี']}] {r['Username']} — {r['ชื่อ-นามสกุล']} ({r['สาขาประจำตัว']})": r['ID']
                 for _, r in filtered_df.iterrows()
             }
-            selected_label = st.selectbox("เลือกบัญชีผู้ใช้งานที่ต้องการปรับปรุง:", options=list(user_options.keys()))
+            selected_label = st.selectbox("เลือกบัญชีผู้ใช้งานที่ต้องการปรับปรุง:", options=list(user_options.keys()),help="รายชื่อในกล่องนี้จะปรับเพิ่ม/ลด ตามคำค้นหาและตัวกรองที่เลือกไว้ในแผงด้านบนอัตโนมัติ")
             target_id = user_options[selected_label]
             selected_target_user = [r['Username'] for _, r in filtered_df.iterrows() if r['ID'] == target_id][0]
         else:
@@ -423,7 +432,13 @@ def render_admin_user_management():
             with c_edit0: 
                 edit_primary_branch = st.selectbox("🏢 สาขาประจำตัว (หลัก) *", options=branch_names_list, index=curr_b_idx, key=f"pbr_{target_id}")
             with c_edit1: 
-                edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx, key=f"ro_{target_id}")
+                edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx, key=f"ro_{target_id}", help=(
+                    "👑 admin: เข้าถึงได้ทุกหน้าและทุกสาขาอัตโนมัติ\n\n"
+                    "👔 manager: ดูรายงานหลายสาขา, จัดการอุปกรณ์ (หน้า 5) และตั้งค่า STD (หน้า 6)\n\n"
+                    "📊 reporter: ดูและ Export รายงานได้ตามสาขาที่ได้รับสิทธิ์\n\n"
+                    "✍️ user: พนักงานทั่วไป ลงบันทึกงานประจำวันเฉพาะสาขาของตนเอง"
+                    )
+                )
             with c_edit2: 
                 edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx, key=f"st_{target_id}")
             
@@ -436,15 +451,43 @@ def render_admin_user_management():
             
             cb_col1, cb_col2 = st.columns(2)
             with cb_col1:
-                st.checkbox("⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์", key=t1_key, on_change=on_tab_change)
-                st.checkbox("🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ", key=t2_key, on_change=on_tab_change)
+                st.checkbox(
+                    "⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์", 
+                    key=t1_key, 
+                    on_change=on_tab_change,
+                    help="บันทึกชั่วโมงการทำงาน, การหยุดเครื่อง และการแจ้งซ่อมเครื่องจักรหลัก"
+                )
+                st.checkbox(
+                    "🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ", 
+                    key=t2_key, 
+                    on_change=on_tab_change,
+                    help="บันทึกชั่วโมงมิเตอร์, ปริมาณการเติมน้ำมันดีเซล และคำนวณอัตราสิ้นเปลือง (ลิตร/ชม.)"
+                )
                 if edit_role == "manager":
-                    st.checkbox("🛠️ หน้า 5: จัดการข้อมูลอุปกรณ์", key=t5_key)
+                    st.checkbox(
+                        "🛠️ หน้า 5: จัดการข้อมูลอุปกรณ์", 
+                        key=t5_key,
+                        help="สิทธิ์เพิ่ม/แก้ไข/ระงับ รายชื่อเครื่องจักรและยานพาหนะของสาขาที่รับผิดชอบ"
+                    )
             with cb_col2:
-                st.checkbox("💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์", key=t3_key, on_change=on_tab_change)
-                st.checkbox("🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)", key=t4_key, on_change=on_tab_change)
+                st.checkbox(
+                    "💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
+                    key=t3_key, 
+                    on_change=on_tab_change,
+                    help="บันทึกสถิติแรงดันตก (Pressure Drop) และเกณฑ์มาตรฐานแรงดัน"
+                )
+                st.checkbox(
+                    "🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)", 
+                    key=t4_key, 
+                    on_change=on_tab_change,
+                    help="บันทึกเชื้อเพลิงหม้อต้มชีวมวล และยอดรวมการอบไม้ประจำวัน"
+                )
                 if edit_role in ["manager", "admin"]:
-                    st.checkbox("⚙️ หน้า 6: กำหนดเกณฑ์มาตรฐาน (STD Settings)", key=t6_key)
+                    st.checkbox(
+                        "⚙️ หน้า 6: กำหนดเกณฑ์มาตรฐาน (STD Settings)", 
+                        key=t6_key,
+                        help="สิทธิ์ปรับปรุงค่า Target KPI, ค่าแรงดันมาตรฐาน และเกณฑ์การใช้น้ำมัน"
+                    )
             st.write("")
             
             if edit_role == "admin":
@@ -459,6 +502,7 @@ def render_admin_user_management():
                     key=f"br_{target_id}",
                     help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
                 )
+                st.caption("ℹ️ *หากเลือกหลายสาขา ผู้ใช้จะเห็น Dropdown สลับดูข้อมูลของสาขาเหล่านั้นในหน้ารายงานและหน้าบันทึกได้ทันที*")
 
             if st.button("💾 บันทึกและอนุมัติสิทธิ์การเข้าถึง", type="primary", use_container_width=True):
                 allowed_tabs_list = []

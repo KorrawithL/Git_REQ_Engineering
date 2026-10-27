@@ -33,7 +33,6 @@ def render_add_new_equipment():
         </style>
     """, unsafe_allow_html=True)
     
-    # 🎯 1. ดึงข้อมูลสาขา และชนิดรถเตรียมไว้ด้านบนสุด
     branch_dict = get_branch_dict_from_db()
     current_role = st.session_state.get('role_tab', 'user')
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.get('branch_id'))])
@@ -69,7 +68,12 @@ def render_add_new_equipment():
     # =========================================================================
     with st.expander("➕ เพิ่มอุปกรณ์ใหม่เข้าสู่ระบบ", expanded=False):
         equip_options = ["-- กรุณาเลือกประเภทอุปกรณ์ --", "⚙️ เครื่องจักร (Machine)", "🚚 รถยนต์ / รถยก (Vehicle)"]
-        equip_type_add = st.selectbox("เลือกประเภทอุปกรณ์ที่ต้องการเพิ่ม:", options=equip_options)
+        # 🌟 จุดที่ 1: เพิ่ม help อธิบายประเภทอุปกรณ์
+        equip_type_add = st.selectbox(
+            "เลือกประเภทอุปกรณ์ที่ต้องการเพิ่ม:", 
+            options=equip_options,
+            help="• เครื่องจักร: อุปกรณ์ที่ไม่ต้องระบุชนิดรถ (เช่น โต๊ะเลื่อย (≤ 0.15%), ตาชั่งใหญ่(≤ 0.20%))\n• รถยนต์/รถยก: ต้องระบุยี่ห้อ/ชนิดรถยนต์ร่วมด้วยเสมอ (เช่น TOYOTA, TCK)"
+        )
         
         is_not_selected = (equip_type_add == "-- กรุณาเลือกประเภทอุปกรณ์ --")
         is_machine_add = (equip_type_add == "⚙️ เครื่องจักร (Machine)")
@@ -205,7 +209,7 @@ def render_add_new_equipment():
         df['วันหมดอายุ_date'] = pd.to_datetime(df['วันหมดอายุ']).dt.date
         
         # =========================================================================
-        # 🌟 [หัวข้อ 2] การ์ดสรุปตัวเลขภาพรวม (เฉพาะ 5 รายการที่เลือก)
+        # 🌟 การ์ดสรุปตัวเลขภาพรวม (5 รายการแถวเดียว)
         # =========================================================================
         total_items = len(df)
         total_machines = len(df[df['หมวดหมู่'] == "⚙️ เครื่องจักร"])
@@ -288,7 +292,7 @@ def render_add_new_equipment():
         st.caption(f"แสดงผล **{len(filtered_df)}** รายการ จากทั้งหมด {len(df)} รายการ")
 
         # =========================================================================
-        # 🌟 [หัวข้อ 3] จัดฟอร์แมตข้อมูลตารางให้สะอาดตา (Clean DataFrame Display)
+        # 🌟 จัดฟอร์แมตข้อมูลตารางให้สะอาดตา (Clean DataFrame Display)
         # =========================================================================
         df_display = filtered_df.copy()
 
@@ -323,10 +327,27 @@ def render_add_new_equipment():
         # ✏️ 3. ส่วนแก้ไข หรือระงับการใช้งาน
         # =========================================================================
         with st.expander("✏️ / 🚫 แก้ไขข้อมูล หรือ ระงับการใช้งานอุปกรณ์", expanded=False):
-            item_options = {f"[{r['สถานะ']}] {r['หมวดหมู่'].split(' ')[1]} ID:{r['ID']} - {r['ชื่อ/รหัส']} ({r['สาขา']})": r for r in combined_data}
-            selected_label = st.selectbox("เลือกอุปกรณ์ที่ต้องการจัดการ:", options=list(item_options.keys()))
-            sel_data = item_options[selected_label]
-            is_machine_edit = (sel_data['หมวดหมู่'] == "⚙️ เครื่องจักร")
+            # 🌟 ปรับ Dropdown ให้กรองตามรายการที่ค้นหา (Smart Selectbox) พร้อมเช็คค่าว่าง
+            if not filtered_df.empty:
+                filtered_ids = set(filtered_df['ID'].tolist())
+                target_items = [r for r in combined_data if r['ID'] in filtered_ids]
+                item_options = {f"[{r['สถานะ']}] {r['หมวดหมู่'].split(' ')[1]} ID:{r['ID']} - {r['ชื่อ/รหัส']} ({r['สาขา']})": r for r in target_items}
+                
+                col_sel1, col_sel2 = st.columns([2.5, 1.5])
+                with col_sel1:
+                    selected_label = st.selectbox(
+                        "เลือกอุปกรณ์ที่ต้องการจัดการ:", 
+                        options=list(item_options.keys()),
+                        help="รายชื่อจะปรับเปลี่ยนตามตัวกรองและการค้นหาด้านบนอัตโนมัติ"
+                    )
+                with col_sel2:
+                    st.markdown("<div style='text-align: right; padding-top: 28px;'><span style='background-color: #E0F2FE; color: #0284C7; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold;'>🔗 ซิงค์ตามตัวกรองด้านบน</span></div>", unsafe_allow_html=True)
+                
+                sel_data = item_options[selected_label]
+                is_machine_edit = (sel_data['หมวดหมู่'] == "⚙️ เครื่องจักร")
+            else:
+                st.warning("⚠️ ไม่พบข้อมูลอุปกรณ์ที่ตรงกับเงื่อนไขการค้นหา")
+                return
 
             with st.form("edit_equipment_form"):
                 e_c1, e_c2, e_c3 = st.columns(3)
@@ -334,7 +355,13 @@ def render_add_new_equipment():
                     edit_name = st.text_input("แก้ไข ชื่อ/รหัส", value=sel_data['ชื่อ/รหัส'])
                     status_opts = ["▶️ ใช้งานปกติ (Active)", "🔴 ระงับการใช้งาน (Disabled)"]
                     default_status = 0 if sel_data['is_active'] == 1 else 1
-                    edit_status = st.selectbox("สถานะการใช้งาน", options=status_opts, index=default_status)
+                    # 🌟 จุดที่ 2: กำหนด default_status และเพิ่ม help อย่างปลอดภัย
+                    edit_status = st.selectbox(
+                        "สถานะการใช้งาน", 
+                        options=status_opts, 
+                        index=default_status,
+                        help="การเปลี่ยนเป็น 'ระงับการใช้งาน' จะซ่อนอุปกรณ์ออกจากหน้าบันทึกงานใหม่ แต่ยังคงรักษาประวัติงานและชั่วโมงการทำงานเดิมไว้ในระบบ"
+                    )
 
                 with e_c2:
                     t_idx = 0
