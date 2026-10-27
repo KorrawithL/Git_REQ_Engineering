@@ -78,6 +78,7 @@ TABLE_CONFIG = {
 # =============================================================================
 def get_trash_counts():
     counts = {}
+    conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
@@ -86,10 +87,12 @@ def get_trash_counts():
                 cur.execute(f"SELECT COUNT(*) AS cnt FROM {tbl} WHERE is_deleted = 1")
                 res = cur.fetchone()
                 counts[k] = int(res['cnt']) if res else 0
-        conn.close()
     except Exception:
         for k in TABLE_CONFIG.keys():
             counts[k] = 0
+    finally:
+        if conn:
+            conn.close()
     return counts
 
 # =============================================================================
@@ -108,12 +111,12 @@ def confirm_hard_delete_dialog(table_name, pk_col, rec_id, category_label, summa
             st.rerun()
     with c2:
         if st.button("🔥 ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_hd_{rec_id}"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
                     cur.execute(f"DELETE FROM {table_name} WHERE {pk_col} = %s", (rec_id,))
                     conn.commit()
-                conn.close()
                 
                 st.cache_data.clear()
                 log_activity(
@@ -128,6 +131,9 @@ def confirm_hard_delete_dialog(table_name, pk_col, rec_id, category_label, summa
                 st.rerun()
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาดในการลบถาวร: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
 # =============================================================================
 # 🚨 Popup ยืนยันการล้างถังขยะทั้งหมดในหมวดหมู่ (Empty Trash)
@@ -144,12 +150,12 @@ def confirm_empty_category_dialog(table_name, category_label, item_count):
             st.rerun()
     with c2:
         if st.button("🔥 ยืนยันล้างถังขยะถาวร", type="primary", use_container_width=True, key=f"confirm_emp_{table_name}"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
                     cur.execute(f"DELETE FROM {table_name} WHERE is_deleted = 1")
                     conn.commit()
-                conn.close()
                 st.cache_data.clear()
                 log_activity(
                     st.session_state.user_id,
@@ -163,15 +169,37 @@ def confirm_empty_category_dialog(table_name, category_label, item_count):
                 st.rerun()
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาด: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
 # =============================================================================
 # 🎯 ฟังก์ชันหลักแสดงหน้าถังขยะกู้คืนข้อมูล
 # =============================================================================
 def render_recycle_bin_module():
+    # 🎯 ซ่อนแถบ Header หลักของ Streamlit และปรับระยะห่างขอบบนสุดให้เท่ากับหน้าอื่น
     st.markdown("""
         <style>
         header[data-testid="stHeader"] { display: none !important; }
-        .block-container { padding-top: 1rem !important; }
+        #header { visibility: hidden !important; }
+        #MainMenu { visibility: hidden !important; }
+        .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
+
+        div[data-testid="stTooltipHoverTarget"] svg,
+        div[data-testid="stTooltipIcon"] svg,
+        label[data-testid="stWidgetLabel"] svg {
+            fill: none !important;
+            stroke: #64748B !important;
+            color: #64748B !important;
+            background: transparent !important;
+        }
+        div[data-testid="stTooltipHoverTarget"] svg *,
+        div[data-testid="stTooltipIcon"] svg *,
+        label[data-testid="stWidgetLabel"] svg * {
+            fill: none !important;
+            stroke: #64748B !important;
+            stroke-width: 2px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -180,7 +208,6 @@ def render_recycle_bin_module():
 
     # 1. ดึงจำนวนรายการที่ถูกลบในแต่ละหมวดหมู่มาแสดงเป็นการ์ดสรุปด้านบน
     trash_counts = get_trash_counts()
-    total_trash = sum(trash_counts.values())
 
     cols_metric = st.columns(5)
     for idx, (cat_key, cfg_item) in enumerate(TABLE_CONFIG.items()):
@@ -201,7 +228,8 @@ def render_recycle_bin_module():
         "📂 เลือกหมวดหมู่ข้อมูลที่ต้องการตรวจสอบ:",
         options=category_keys,
         format_func=lambda k: f"{k}  —  ({'🔴 พบ ' + str(trash_counts.get(k, 0)) + ' รายการ' if trash_counts.get(k, 0) > 0 else '🟢 ว่าง'})",
-        key="rb_sel_cat"
+        key="rb_sel_cat",
+        help="เลือกหมวดหมู่รายงานเพื่อตรวจสอบรายการที่ถูกย้ายลงถังขยะ"
     )
 
     cfg = TABLE_CONFIG[selected_category]
@@ -210,6 +238,7 @@ def render_recycle_bin_module():
     # 3. ดึงข้อมูลและ Primary Key ของตารางที่เลือก
     deleted_rows = []
     pk_col = "id"
+    conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
@@ -221,10 +250,12 @@ def render_recycle_bin_module():
             dynamic_sql = cfg["sql"].replace(".id AS rec_id", f".{pk_col} AS rec_id")
             cur.execute(dynamic_sql)
             deleted_rows = cur.fetchall()
-        conn.close()
     except Exception as e:
         st.error(f"⚠️ เกิดข้อผิดพลาดในการดึงข้อมูลถังขยะ: {e}")
         return
+    finally:
+        if conn:
+            conn.close()
 
     if not deleted_rows:
         st.info(f"✨ ไม่มีข้อมูลที่ถูกลบค้างอยู่ในหมวดหมู่ **{selected_category}**")
@@ -241,12 +272,12 @@ def render_recycle_bin_module():
     with c_b1:
         st.write("")
         if st.button("♻️ กู้คืนทั้งหมดในหมวดนี้", use_container_width=True, key="rb_restore_all"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
                     cur.execute(f"UPDATE {table_name} SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE is_deleted = 1")
                     conn.commit()
-                conn.close()
                 st.cache_data.clear()
                 log_activity(
                     st.session_state.user_id,
@@ -260,6 +291,9 @@ def render_recycle_bin_module():
                 st.rerun()
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาด: {e}")
+            finally:
+                if conn:
+                    conn.close()
     with c_b2:
         st.write("")
         if st.button("🔥 ล้างถังขยะหมวดนี้", type="primary", use_container_width=True, key="rb_empty_all"):
@@ -308,6 +342,7 @@ def render_recycle_bin_module():
 
             c_res, c_del = cols[6].columns(2, gap="small")
             if c_res.button("♻️ กู้คืน", key=f"res_{table_name}_{rec_id}", use_container_width=True, help="กู้คืนข้อมูลกลับเข้ารายงาน"):
+                conn = None
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
@@ -316,7 +351,6 @@ def render_recycle_bin_module():
                             (rec_id,)
                         )
                         conn.commit()
-                    conn.close()
                     st.cache_data.clear()
                     log_activity(
                         st.session_state.user_id,
@@ -330,6 +364,9 @@ def render_recycle_bin_module():
                     st.rerun()
                 except Exception as e:
                     st.error(f"กู้คืนไม่สำเร็จ: {e}")
+                finally:
+                    if conn:
+                        conn.close()
 
             if c_del.button("🔥 ลบ", key=f"hd_{table_name}_{rec_id}", type="primary", use_container_width=True, help="ลบถาวรออกจากฐานข้อมูล"):
                 summary_str = f"วันที่ {rec_date} | สาขา {b_name} | {item_name} ({details})"

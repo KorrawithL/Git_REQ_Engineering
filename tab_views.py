@@ -5,7 +5,6 @@ import pandas as pd
 from datetime import datetime
 from database import get_db_connection, log_activity
 from config import branch_dict
-# 🎯 1. นำเข้าฟังก์ชันดึงรายงาน เพื่อเอามาล้างแคชเฉพาะจุด (Targeted Cache Clearing)
 from all_reports import process_t1, process_t2, process_t3, process_t4
 
 # =========================================================================
@@ -18,18 +17,30 @@ time.sleep(0.05)
 ui_flusher.empty() 
 # =========================================================================
 
-# 📌 เพิ่มรับค่า parameter 'selected_sub_menu=None' เข้ามา
 def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
-    # 🎯 เพิ่ม CSS ชุดนี้เพื่อบังคับซ่อนแถบ Header ด้านบน (พื้นที่สีแดง)
+    # 🎯 ซ่อนแถบ Header ด้านบน, ปรับ Padding Top ชิดขอบบนสุด และแก้ไอคอน Help (?)
     st.markdown("""
         <style>
-        /* ซ่อนแถบ Header หลักของ Streamlit */
         header[data-testid="stHeader"] { display: none !important; }
         #header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
-        
-        /* ขยับคอนเทนต์ (พื้นที่สีน้ำเงิน) ขึ้นไปชิดขอบบนสุดแทน */
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
+
+        div[data-testid="stTooltipHoverTarget"] svg,
+        div[data-testid="stTooltipIcon"] svg,
+        label[data-testid="stWidgetLabel"] svg {
+            fill: none !important;
+            stroke: #64748B !important;
+            color: #64748B !important;
+            background: transparent !important;
+        }
+        div[data-testid="stTooltipHoverTarget"] svg *,
+        div[data-testid="stTooltipIcon"] svg *,
+        label[data-testid="stWidgetLabel"] svg * {
+            fill: none !important;
+            stroke: #64748B !important;
+            stroke-width: 2px !important;
+        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -38,7 +49,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     allowed_tabs_list = st.session_state.get('allowed_tabs', [])
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.get('branch_id'))])
 
-    # 📌 แมปชื่อหัวข้อย่อยจาก Sidebar ให้ตรงกับ Key ข้อมูลระบบเดิม (1, 2, 3, 4)
     mapping = {
         "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์": "1",
         "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)": "2",
@@ -82,7 +92,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         t1_branch_invalid = False
                 
                 with c_top2:
-                    # จุดที่ 1 (Tab 1)
                     m_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="m_date", disabled=t1_branch_invalid)
 
                 machine_dict = {}
@@ -100,7 +109,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                     AND id NOT IN (
                                         SELECT machine_id 
                                         FROM machine_trans 
-                                        WHERE branch_id = %s AND record_date = %s
+                                        WHERE branch_id = %s AND record_date = %s AND is_deleted = 0
                                     )
                             """
                             cur.execute(sql, (target_branch_id, target_branch_id, m_date))
@@ -140,14 +149,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 if submit_m:
                     if m_qty is None or m_work_hours is None or m_break_hours is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
-                    # 🌟 Validation: ดักจับกฎ 24 ชั่วโมง
-                    # 🌟 Validation: ดักจับกฎ 24 ชั่วโมง x จำนวนเครื่อง
                     elif (m_work_hours + m_break_hours) > (m_qty * 24.0):
                         max_hrs = m_qty * 24.0
                         total_hrs = m_work_hours + m_break_hours
                         st.error(f"⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรวมกับเบรกดาวน์ ({total_hrs} ชม.) เกินกำหนด ต้องไม่เกิน {max_hrs} ชม. (สำหรับเครื่องจักร {m_qty} เครื่อง)")
                     else:
-                        # 🌟 Feedback: แสดงวงแหวนโหลดระหว่างเซฟ
                         with st.spinner("กำลังบันทึกข้อมูล..."):
                             conn_insert = None 
                             try:
@@ -161,7 +167,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                 
                                 process_t1.clear() 
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 1 Data Entry", f"บันทึกเครื่องจักร {m_label} วันที่ {m_date}")
-                                # 🌟 Feedback: แจ้งเตือนแบบ Toast
                                 st.toast(f"✅ บันทึกข้อมูล {m_label} สำเร็จเรียบร้อย!", icon="🎉")
                                 
                                 st.session_state.reset_t1 += 1
@@ -198,7 +203,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         target_branch_id_t2 = branch_dict.get(t2_branch_lbl, int(st.session_state.branch_id))
                         t2_branch_invalid = False
                 with c_top2:
-                    # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
                     f_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="f_date", disabled=t2_branch_invalid)
                 all_engines_filtered = []
                 conn = None
@@ -221,6 +225,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                         AND fr.record_date = %s
                                         AND fr.engine_code = CONVERT(m.machine_name USING utf8mb4)
                                         AND fr.type_name = CONVERT(et.type_name USING utf8mb4)
+                                        AND fr.is_deleted = 0
                                     )
                             """
                             cur.execute(sql_eng, (target_branch_id_t2, target_branch_id_t2, f_date))
@@ -271,11 +276,9 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 if submit_f:
                     if inputs_disabled or f_liters is None or f_hours is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
-                    # 🌟 Validation: ดักจับกฎ 24 ชั่วโมง
                     elif f_hours > 24.0:
                         st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานรถยนต์ต้องไม่เกิน 24 ชั่วโมงต่อวัน")
                     else:
-                        # 🌟 Feedback: แสดงวงแหวนโหลด
                         with st.spinner("กำลังบันทึกข้อมูล..."):
                             conn_insert = None
                             try:
@@ -288,7 +291,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                 
                                 process_t2.clear() 
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 2 Data Entry", f"บันทึกเชื้อเพลิงรถ {f2_code} จำนวน {f_liters} ลิตร")
-                                # 🌟 Feedback: แจ้งเตือนแบบ Toast
                                 st.toast(f"✅ บันทึกสำเร็จ! ({f2_code})", icon="🚚")
                                 
                                 st.session_state.reset_t2 += 1
@@ -322,7 +324,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         target_branch_id = branch_dict.get(t3_branch_label, int(st.session_state.branch_id))
                         t3_branch_invalid = False
                 with c_top2:
-                    # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
                     p_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="p_date", disabled=t3_branch_invalid)
 
                 has_t3_record = False
@@ -331,7 +332,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cur:
-                            cur.execute("SELECT 1 FROM boiler_pressure_records WHERE branch_id=%s AND record_date=%s", (target_branch_id, p_date))
+                            cur.execute("SELECT 1 FROM boiler_pressure_records WHERE branch_id=%s AND record_date=%s AND is_deleted = 0", (target_branch_id, p_date))
                             if cur.fetchone(): has_t3_record = True
                     except Exception as e: 
                         pass
@@ -359,11 +360,9 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 if submit_p:
                     if total_count is None or pm_drop is None or non_pm_drop is None:
                         st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
-                    # 🌟 Validation: เช็คจำนวนครั้งที่ตก ต้องไม่เกินครั้งที่เช็คทั้งหมด
                     elif (pm_drop + non_pm_drop) > total_count:
                         st.error("⚠️ ไม่สามารถบันทึกได้: จำนวนครั้งที่ 'แรงดันตก' รวมกัน ต้องไม่มากกว่า 'จำนวนครั้งทั้งหมด'")
                     else:
-                        # 🌟 Feedback: แสดงวงแหวนโหลด
                         with st.spinner("กำลังบันทึกข้อมูล..."):
                             conn_insert = None
                             try:
@@ -376,7 +375,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                 
                                 process_t3.clear() 
                                 log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 3 Data Entry", f"บันทึกแรงดันไอน้ำตก วันที่ {p_date}")
-                                # 🌟 Feedback: แจ้งเตือนแบบ Toast
                                 st.toast("✅ บันทึกข้อมูลแรงดันไอน้ำเรียบร้อยแล้ว!", icon="💨")
                                 
                                 st.session_state.reset_t3 += 1
@@ -419,7 +417,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             target_branch_id_1 = branch_dict.get(t4_branch_lbl_1, int(st.session_state.branch_id))
                             t4_ov_invalid = False
                     with c_top2:
-                        # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
                         bf_date_1 = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="bf_dt1", disabled=t4_ov_invalid)
 
                     has_t4_ov_record = False
@@ -428,7 +425,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         try:
                             conn = get_db_connection()
                             with conn.cursor() as cur:
-                                cur.execute("SELECT id FROM daily_wood_oven_records WHERE branch_id=%s AND record_date=%s", (target_branch_id_1, bf_date_1))
+                                cur.execute("SELECT id FROM daily_wood_oven_records WHERE branch_id=%s AND record_date=%s AND is_deleted = 0", (target_branch_id_1, bf_date_1))
                                 if cur.fetchone(): has_t4_ov_record = True
                         except Exception: pass
                         finally:
@@ -454,7 +451,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         if any(x is None for x in inputs_ov):
                             st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
                         else:
-                            # 🌟 Feedback: แสดงวงแหวนโหลด
                             with st.spinner("กำลังบันทึกข้อมูล..."):
                                 conn_insert = None
                                 try:
@@ -467,7 +463,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                     
                                     process_t4.clear() 
                                     log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Oven Entry", f"บันทึกยอดรวมสาขา วันที่ {bf_date_1}")
-                                    # 🌟 Feedback: แจ้งเตือนแบบ Toast
                                     st.toast("✅ บันทึกข้อมูลยอดรวมสาขาสำเร็จแล้ว!", icon="📁")
                                     
                                     st.session_state.reset_t4 += 1
@@ -498,7 +493,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             target_branch_id_2 = branch_dict.get(t4_branch_lbl_2, int(st.session_state.branch_id))
                             t4_bf_invalid = False
                     with c_top2:
-                        # 🌟 Validation: ล็อคปฏิทินไม่ให้เลือกวันในอนาคต
                         bf_date_2 = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="bf_dt2", disabled=t4_bf_invalid)
 
                     boiler_options = []
@@ -518,6 +512,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                             WHERE bfr.branch_id = %s 
                                             AND bfr.record_date = %s
                                             AND CONVERT(bfr.boiler_name USING utf8mb4) = CONVERT(b.boiler_name USING utf8mb4)
+                                            AND bfr.is_deleted = 0
                                         ) 
                                     ORDER BY b.id ASC
                                 """
@@ -565,11 +560,9 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         inputs_bf = [saw_w, wood_w, waste_wood_w, saw_p, wood_p, waste_wood_p, prod_val, work_hours]
                         if any(x is None for x in inputs_bf):
                             st.error("⚠️ กรุณากรอกข้อมูลให้ครบถ้วนทุกช่อง!")
-                        # 🌟 Validation: ดักจับกฎ 24 ชั่วโมง
                         elif work_hours > 24.0:
                             st.error("⚠️ ไม่สามารถบันทึกได้: ชั่วโมงทำงานต้องไม่เกิน 24 ชั่วโมงต่อวัน")
                         else:
-                            # 🌟 Feedback: แสดงวงแหวนโหลด
                             with st.spinner("กำลังบันทึกข้อมูล..."):
                                 conn_insert = None
                                 try:
@@ -582,7 +575,6 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                     
                                     process_t4.clear() 
                                     log_activity(st.session_state.user_id, st.session_state.username, "INSERT", "Tab 4 Boiler Entry", f"บันทึกเชื้อเพลิง {boiler_name_input} วันที่ {bf_date_2}")
-                                    # 🌟 Feedback: แจ้งเตือนแบบ Toast
                                     st.toast(f"✅ บันทึกข้อมูล {boiler_name_input} สำเร็จแล้ว!", icon="🔥")
                                     
                                     st.session_state.reset_t4 += 1

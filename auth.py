@@ -1,7 +1,6 @@
 import streamlit as st
 import time
 from database import get_db_connection, hash_password, log_activity
-from config import branch_dict
 
 def render_login_page():
     st.title("🔐 Woodwork System - เข้าสู่ระบบ")
@@ -13,6 +12,7 @@ def render_login_page():
         btn_log = st.form_submit_button("🔓 ล็อกอินเข้าสู่ระบบ")
         
         if btn_log:
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cursor:
@@ -43,13 +43,16 @@ def render_login_page():
                         allowed_b_list = [str(user_data['branch_id'])] + [str(b['branch_id']) for b in extra_branches]
                         st.session_state.allowed_branches = list(set(allowed_b_list))
                         
+                        log_activity(user_data['user_id'], user_data['username'], "LOGIN", "Auth: System", "เข้าสู่ระบบสำเร็จ")
                         st.success("ล็อกอินสำเร็จ! กำลังนำเข้าสู่ระบบ...")
                         st.rerun()
                     else:
                         st.error("User ID หรือ Password ไม่ถูกต้อง โปรดตรวจสอบอีกครั้ง")
-                conn.close()
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาด: {e}")
+            finally:
+                if conn:
+                    conn.close()
     
     st.write("ยังไม่มีบัญชีผู้ใช้งานใช่หรือไม่?")
     if st.button("📝 สมัครสมาชิกใหม่ (Register) ที่นี่"):
@@ -57,36 +60,34 @@ def render_login_page():
         st.rerun()
 
 def render_register_page():
-    import os 
-    
-    # 🎯 เตรียมรายการเริ่มต้น
     position_list = ["-- กรุณาเลือกตำแหน่ง --"]
     active_branches = {} 
+    conn = None
     
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 🌟 1. ดึงข้อมูลตำแหน่งงาน (ใช้ ` คลุมชื่อคอลัมน์ป้องกันระบบงง)
+            # 1. ดึงข้อมูลตำแหน่งงาน
             cur.execute("SELECT DISTINCT CONVERT(`position` USING utf8mb4) AS pos FROM departments WHERE `position` IS NOT NULL AND TRIM(`position`) != '' ORDER BY pos ASC")
             for r in cur.fetchall():
                 val = r.get('pos')
                 if val and val.strip(): 
                     position_list.append(val.strip())
             
-            # 🌟 2. ดึงข้อมูลสาขา
+            # 2. ดึงข้อมูลสาขา
             cur.execute("SELECT id, CONVERT(branch_name USING utf8mb4) AS branch_name FROM branches WHERE is_active = 1 ORDER BY id ASC")
             for r in cur.fetchall():
                 active_branches[r['branch_name']] = r['id']
-        conn.close()
     except Exception as e: 
-        # 🚨 ปลดล็อคระบบแจ้งเตือน! ถ้าต่อ DB ไม่ติด จะโชว์กรอบสีแดงให้เห็นชัดๆ
-        st.error(f"🚨 ระบบไม่สามารถเชื่อมต่อฐานข้อมูลได้ (โปรดตรวจสอบไฟล์ .env หรือ Database): {e}")
+        st.error(f"🚨 ระบบไม่สามารถเชื่อมต่อฐานข้อมูลได้: {e}")
+    finally:
+        if conn:
+            conn.close()
         
-    # 🌟 ดักกรณีไม่มีข้อมูลสาขา
     if not active_branches:
         active_branches["-- ไม่พบข้อมูลสาขา --"] = None
 
-    # 🎨 CSS สำหรับตกแต่งปุ่ม (ปลอดภัย ไม่ทำให้จอพัง)
+    # CSS แต่งปุ่ม
     st.markdown("""
     <style>
     div[data-testid="stFormSubmitButton"] > button {
@@ -154,10 +155,10 @@ def render_register_page():
             if not reg_user or not reg_pass or not reg_fullname or reg_position == "-- กรุณาเลือกตำแหน่ง --" or reg_branch_id is None:
                 st.error("⚠️ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน และเลือกตำแหน่ง/สาขาให้ถูกต้อง")
             else:
-                conn = None
+                conn_reg = None
                 try:
-                    conn = get_db_connection()
-                    with conn.cursor() as cursor:
+                    conn_reg = get_db_connection()
+                    with conn_reg.cursor() as cursor:
                         cursor.execute("SELECT user_id FROM system_users WHERE CONVERT(username USING utf8mb4) = CONVERT(%s USING utf8mb4)", (reg_user,))
                         if cursor.fetchone():
                             st.error("❌ User ID นี้มีผู้ใช้งานในระบบแล้ว")
@@ -165,7 +166,11 @@ def render_register_page():
                             sql = """INSERT INTO system_users (username, password_hash, full_name, position, email, phone_number, branch_id, Role_tab, allowed_tabs, status) 
                                      VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, 'user', '', 'active')"""
                             cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_fullname, reg_position, reg_email, reg_phone, reg_branch_id))
-                            conn.commit() 
+                            conn_reg.commit() 
+                            
+                            # 🌟 บันทึก Audit Log ทันทีที่สมัครสมาชิกสำเร็จ
+                            new_uid = cursor.lastrowid or 0
+                            log_activity(new_uid, reg_user, "INSERT", "Auth: Register", f"ผู้ใช้งานลงทะเบียนบัญชีใหม่: {reg_user} (ตำแหน่ง: {reg_position}, สาขา: {reg_branch_label})")
                             
                             st.success("🎉 ลงทะเบียนสำเร็จ! กำลังพากลับไปหน้าเข้าสู่ระบบ...")
                             st.toast("สมัครสมาชิกสำเร็จ!", icon="🎉")
@@ -176,8 +181,8 @@ def render_register_page():
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาดในการลงทะเบียน: {e}")
                 finally:
-                    if conn and conn.open:
-                        conn.close()
+                    if conn_reg:
+                        conn_reg.close()
     
     st.write("")
     st.markdown('<div class="back-btn-container"></div>', unsafe_allow_html=True)
