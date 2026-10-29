@@ -28,40 +28,57 @@ ui_flusher.empty()
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 1)")
 def delete_record_dialog_t1(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
-    st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
-    st.write(f"**เครื่องจักร:** {row_data.get('machine_name')}")
-    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
+    fmt_date = pd.to_datetime(row_data.get('record_date')).strftime('%d/%m/%Y') if row_data.get('record_date') else '-'
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล **ID: {rec_id}** ?")
+    st.write(f"**📅 วันที่:** {fmt_date} | **🏢 สาขา:** {row_data.get('branch_name')}")
+    st.write(f"**⚙️ เครื่องจักร:** {row_data.get('machine_name')} (ทำงาน {row_data.get('working_hours')} ชม. / เบรกดาวน์ {row_data.get('breakdown_hours')} ชม.)")
+    st.markdown(
+        "<div style='background-color:#F8FAFC; padding:10px 12px; border-radius:8px; border-left:4px solid #64748B; font-size:13.5px; color:#475569; margin-bottom:12px;'>"
+        "💡 <b>ข้อมูลสำคัญ:</b> รายการนี้จะถูกซ่อนออกจากหน้ารายงานและย้ายไปยังเมนู <b>'🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)'</b> "
+        "โดยผู้ดูแลระบบ (Admin) สามารถกดกู้คืนกลับมาได้ในภายหลัง"
+        "</div>", 
+        unsafe_allow_html=True
+    )
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d1_{rec_id}"): st.rerun()
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d1_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้"): st.rerun()
     with c2:
-        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d1_{rec_id}"):
+        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d1_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
                     cur.execute(f"UPDATE machine_trans SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
-                conn.close()
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 1", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
                 st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
+            finally:
+                if conn: conn.close()
 
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 2)")
 def delete_record_dialog_t2(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
-    st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
-    st.write(f"**ทะเบียนรถ:** {row_data.get('engine_code')} ({row_data.get('type_name')})")
-    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
+    fmt_date = pd.to_datetime(row_data.get('record_date')).strftime('%d/%m/%Y') if row_data.get('record_date') else '-'
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล **ID: {rec_id}** ?")
+    st.write(f"**📅 วันที่:** {fmt_date} | **🏢 สาขา:** {row_data.get('branch_name')}")
+    st.write(f"**🚚 ทะเบียนรถ:** {row_data.get('engine_code')} ({row_data.get('type_name')}) — น้ำมัน {row_data.get('fuel_liters')} ลิตร")
+    st.markdown(
+        "<div style='background-color:#F8FAFC; padding:10px 12px; border-radius:8px; border-left:4px solid #64748B; font-size:13.5px; color:#475569; margin-bottom:12px;'>"
+        "💡 <b>ข้อมูลสำคัญ:</b> รายการนี้จะถูกซ่อนออกจากหน้ารายงานและย้ายไปยังเมนู <b>'🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)'</b> "
+        "โดยผู้ดูแลระบบ (Admin) สามารถกดกู้คืนกลับมาได้ในภายหลัง"
+        "</div>", 
+        unsafe_allow_html=True
+    )
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d2_{rec_id}"): st.rerun()
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d2_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้"): st.rerun()
     with c2:
-        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d2_{rec_id}"):
+        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d2_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
@@ -79,40 +96,57 @@ def delete_record_dialog_t2(row_data, pk_col):
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 3)")
 def delete_record_dialog_t3(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
-    st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
-    st.write(f"**จำนวนตรวจเช็คทั้งหมด:** {row_data.get('total_count')} ครั้ง | **ตก:** {row_data.get('total_drop')} ครั้ง")
-    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
+    fmt_date = pd.to_datetime(row_data.get('record_date')).strftime('%d/%m/%Y') if row_data.get('record_date') else '-'
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล **ID: {rec_id}** ?")
+    st.write(f"**📅 วันที่:** {fmt_date} | **🏢 สาขา:** {row_data.get('branch_name')}")
+    st.write(f"**💨 จำนวนตรวจเช็คทั้งหมด:** {row_data.get('total_count')} ครั้ง | **แรงดันตก:** {row_data.get('total_drop')} ครั้ง")
+    st.markdown(
+        "<div style='background-color:#F8FAFC; padding:10px 12px; border-radius:8px; border-left:4px solid #64748B; font-size:13.5px; color:#475569; margin-bottom:12px;'>"
+        "💡 <b>ข้อมูลสำคัญ:</b> รายการนี้จะถูกซ่อนออกจากหน้ารายงานและย้ายไปยังเมนู <b>'🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)'</b> "
+        "โดยผู้ดูแลระบบ (Admin) สามารถกดกู้คืนกลับมาได้ในภายหลัง"
+        "</div>", 
+        unsafe_allow_html=True
+    )
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d3_{rec_id}"): st.rerun()
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d3_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้"): st.rerun()
     with c2:
-        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d3_{rec_id}"):
+        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d3_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
                     cur.execute(f"UPDATE boiler_pressure_records SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
-                conn.close()
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 3", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
                 st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
+            finally:
+                if conn: conn.close()
 
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (Tab 4)")
 def delete_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
-    st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
-    st.write(f"**ผลิตไอน้ำ:** {row_data.get('steam_production')} ตัน | **ชม.ทำงาน:** {row_data.get('working_hours')} ชม.")
-    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
+    fmt_date = pd.to_datetime(row_data.get('record_date')).strftime('%d/%m/%Y') if row_data.get('record_date') else '-'
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล **ID: {rec_id}** ?")
+    st.write(f"**📅 วันที่:** {fmt_date} | **🏢 สาขา:** {row_data.get('branch_name')} ({row_data.get('boiler_name')})")
+    st.write(f"**🔥 ผลิตไอน้ำ:** {row_data.get('steam_production')} ตัน | **ชม.ทำงาน:** {row_data.get('working_hours')} ชม.")
+    st.markdown(
+        "<div style='background-color:#F8FAFC; padding:10px 12px; border-radius:8px; border-left:4px solid #64748B; font-size:13.5px; color:#475569; margin-bottom:12px;'>"
+        "💡 <b>ข้อมูลสำคัญ:</b> รายการนี้จะถูกซ่อนออกจากหน้ารายงานและย้ายไปยังเมนู <b>'🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)'</b> "
+        "โดยผู้ดูแลระบบ (Admin) สามารถกดกู้คืนกลับมาได้ในภายหลัง"
+        "</div>", 
+        unsafe_allow_html=True
+    )
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d4_{rec_id}"): st.rerun()
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_d4_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้"): st.rerun()
     with c2:
-        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d4_{rec_id}"):
+        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_d4_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
@@ -130,27 +164,36 @@ def delete_record_dialog_t4(row_data, pk_col):
 @st.dialog("⚠️ ยืนยันการลบข้อมูล (ยอดรวมสาขา)")
 def delete_record_dialog_oven(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล ID: {rec_id} ?")
-    st.write(f"**วันที่:** {row_data.get('record_date')} | **สาขา:** {row_data.get('branch_name')}")
-    st.write(f"**จำนวนเตา:** {row_data.get('oven_qty')} เตา | **ไม้เข้าอบ:** {row_data.get('wood_out_cubft')} ลบ.ฟ.")
-    st.markdown("<span style='color:#64748B; font-size:14px;'>* ข้อมูลจะถูกย้ายไปยังถังขยะ (ผู้ดูแลระบบสามารถกู้คืนได้)</span>", unsafe_allow_html=True)
+    fmt_date = pd.to_datetime(row_data.get('record_date')).strftime('%d/%m/%Y') if row_data.get('record_date') else '-'
+    st.warning(f"คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูล **ID: {rec_id}** ?")
+    st.write(f"**📅 วันที่:** {fmt_date} | **🏢 สาขา:** {row_data.get('branch_name')}")
+    st.write(f"**📁 จำนวนเตา:** {row_data.get('oven_qty')} เตา | **ไม้เข้าอบ:** {row_data.get('wood_out_cubft')} ลบ.ฟ.")
+    st.markdown(
+        "<div style='background-color:#F8FAFC; padding:10px 12px; border-radius:8px; border-left:4px solid #64748B; font-size:13.5px; color:#475569; margin-bottom:12px;'>"
+        "💡 <b>ข้อมูลสำคัญ:</b> รายการนี้จะถูกซ่อนออกจากหน้ารายงานและย้ายไปยังเมนู <b>'🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)'</b> "
+        "โดยผู้ดูแลระบบ (Admin) สามารถกดกู้คืนกลับมาได้ในภายหลัง"
+        "</div>", 
+        unsafe_allow_html=True
+    )
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"c_d_ov_{rec_id}"): st.rerun()
+        if st.button("❌ ยกเลิก", use_container_width=True, key=f"c_d_ov_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้"): st.rerun()
     with c2:
-        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"d_d_ov_{rec_id}"):
+        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"d_d_ov_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ"):
+            conn = None
             try:
                 conn = get_db_connection()
                 with conn.cursor() as cur:
                     cur.execute(f"UPDATE daily_wood_oven_records SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s", (st.session_state.username, rec_id))
                     conn.commit()
-                conn.close()
                 st.cache_data.clear()
                 log_activity(st.session_state.user_id, st.session_state.username, "DELETE", "All Report: Tab 4 Oven", f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
                 st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
                 time.sleep(1)
                 st.rerun()
             except Exception as e: st.error(f"Error: {e}")
+            finally:
+                if conn: conn.close()
 
 # ==========================================================
 # 🛠️ 2. ฟังก์ชัน Popup สำหรับแก้ไขข้อมูล (Update Dialogs)
@@ -163,7 +206,7 @@ def update_record_dialog_t1(row_data, pk_col):
     curr_branch_id = row_data.get('branch_id')
     curr_m_id = row_data.get('machine_id')
     
-    st.info(f"ID: {rec_id} | เครื่องเดิม: {curr_m} ({curr_branch})")
+    st.info(f"📌 **กำลังแก้ไขรายการ ID: {rec_id}** | เครื่องจักรเดิม: **{curr_m}** (สาขา {curr_branch})")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
@@ -180,7 +223,10 @@ def update_record_dialog_t1(row_data, pk_col):
         def_branch_idx = edit_branch_options.index(def_branch_lbl) if def_branch_lbl in edit_branch_options else 0
         
         with c_top1:
-            e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e1_br_{rec_id}")
+            e_branch_lbl = st.selectbox(
+                "🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e1_br_{rec_id}",
+                help="สิทธิ์ Admin: สามารถย้ายรายการข้อมูลนี้ไปยังสาขาอื่นได้"
+            )
             new_branch_id = branch_dict[e_branch_lbl]
         
         m_dict = {}
@@ -198,25 +244,41 @@ def update_record_dialog_t1(row_data, pk_col):
         def_m_idx = 0
         if new_branch_id == curr_branch_id and curr_m in m_options: def_m_idx = m_options.index(curr_m)
         with c_top2:
-            e_machine_lbl = st.selectbox("⚙️ 2. แก้ไขเครื่องจักร *", m_options, index=def_m_idx, key=f"e1_m_{rec_id}")
+            e_machine_lbl = st.selectbox(
+                "⚙️ 2. แก้ไขเครื่องจักร *", m_options, index=def_m_idx, key=f"e1_m_{rec_id}",
+                help="สิทธิ์ Admin: เลือกเปลี่ยนชื่อเครื่องจักรของสาขาที่เลือกได้"
+            )
             if e_machine_lbl != "-- ไม่พบเครื่องจักร --": new_m_id = m_dict.get(e_machine_lbl, curr_m_id)
             else: btn_disabled = True
     else:
-        with c_top1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e1_br_{rec_id}")
-        with c_top2: st.text_input("⚙️ 2. เครื่องจักร (ไม่อนุญาตให้แก้ไข)", value=curr_m, disabled=True, key=f"e1_m_{rec_id}")
+        with c_top1: 
+            st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e1_br_{rec_id}", help="เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถย้ายสาขาได้")
+        with c_top2: 
+            st.text_input("⚙️ 2. เครื่องจักร (ไม่อนุญาตให้แก้ไข)", value=curr_m, disabled=True, key=f"e1_m_{rec_id}", help="เฉพาะผู้ดูแลระบบ (Admin) เท่านั้นที่สามารถเปลี่ยนชื่อเครื่องจักรได้")
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
-        e_qty = st.number_input("แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1)
+        e_date = st.date_input(
+            "แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"),
+            help="เลือกวันที่ของข้อมูล (ไม่สามารถเลือกวันล่วงหน้าในอนาคตได้)"
+        )
+        e_qty = st.number_input(
+            "แก้ไข จำนวนเครื่องจักร", value=int(row_data.get('machine_qty') or 1), min_value=1,
+            help="จำนวนเครื่องจักรที่ใช้งาน (ใช้คำนวณเพดานชั่วโมงสูงสุด = จำนวนเครื่อง x 24 ชม.)"
+        )
     with col2:
-        e_work = st.number_input("แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), min_value=0.0, format="%.2f")
-        e_break = st.number_input("แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), min_value=0.0, format="%.2f")
-    e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''))
+        e_work = st.number_input(
+            "แก้ไข ชม.ทำงาน", value=float(row_data.get('working_hours') or 0.0), min_value=0.0, format="%.2f",
+            help="ชั่วโมงทำงานรวมกับชั่วโมงเบรกดาวน์ ต้องไม่เกิน 24 ชั่วโมงต่อ 1 เครื่อง"
+        )
+        e_break = st.number_input(
+            "แก้ไข ชม.เบรกดาวน์", value=float(row_data.get('breakdown_hours') or 0.0), min_value=0.0, format="%.2f",
+            help="ชั่วโมงที่เครื่องจักรหยุดซ่อมหรือขัดข้อง (หากไม่มีให้ระบุ 0.00)"
+        )
+    e_rem = st.text_area("แก้ไข หมายเหตุ", value=str(row_data.get('remarks') or ''), help="ระบุสาเหตุการชำรุดหรือหมายเหตุเพิ่มเติม (ถ้าไม่มีให้เว้นว่างหรือใส่ -)")
     
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
-        # คำนวณลิมิตชั่วโมงตามจำนวนเครื่อง
         max_hours = e_qty * 24.0
         total_hrs = e_work + e_break
         
@@ -246,7 +308,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
     curr_code = str(row_data.get('engine_code') or '')
     curr_branch_id = row_data.get('branch_id')
 
-    st.info(f"ID: {rec_id} | ทะเบียนเดิม: {curr_code} ({curr_branch})")
+    st.info(f"📌 **กำลังแก้ไขรายการ ID: {rec_id}** | ทะเบียนรถเดิม: **{curr_code}** ({curr_branch})")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     current_role = str(raw_role).strip().lower()
@@ -267,7 +329,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
 
         available_branches = sorted(list(set([e['branch_name'] for e in all_engines if e['branch_name']])))
         def_branch_idx = available_branches.index(curr_branch) + 1 if curr_branch in available_branches else 0
-        e_branch = c_sel1.selectbox("🏢 1. แก้ไขสาขา *", ["-- เลือกสาขา --"] + available_branches, index=def_branch_idx, key=f"e2_br_{rec_id}")
+        e_branch = c_sel1.selectbox("🏢 1. แก้ไขสาขา *", ["-- เลือกสาขา --"] + available_branches, index=def_branch_idx, key=f"e2_br_{rec_id}", help="สิทธิ์ Admin: เลือกสาขาที่ต้องการย้ายข้อมูล")
 
         f2_type_disabled = (e_branch == "-- เลือกสาขา --")
         if not f2_type_disabled:
@@ -276,7 +338,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         else: available_types, filtered_by_branch = [], []
             
         def_type_idx = available_types.index(curr_type) + 1 if (curr_type in available_types and e_branch == curr_branch) else 0
-        e_type = c_sel2.selectbox("🚜 2. แก้ไขชนิดรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled)
+        e_type = c_sel2.selectbox("🚜 2. แก้ไขชนิดรถ *", ["-- เลือกประเภท --"] + available_types, index=def_type_idx, key=f"e2_ty_{rec_id}", disabled=f2_type_disabled, help="เลือกยี่ห้อหรือชนิดของรถ")
 
         f2_code_disabled = (e_type == "-- เลือกประเภท --") or f2_type_disabled
         if not f2_code_disabled:
@@ -285,29 +347,26 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
         else: available_codes, filtered_by_type = [], []
             
         def_code_idx = available_codes.index(curr_code) + 1 if (curr_code in available_codes and e_type == curr_type and e_branch == curr_branch) else 0
-        e_code = c_sel3.selectbox("🏷️ 3. แก้ไขทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled)
+        e_code = c_sel3.selectbox("🏷️ 3. แก้ไขทะเบียนรถ *", ["-- เลือกรถ --"] + available_codes, index=def_code_idx, key=f"e2_cd_{rec_id}", disabled=f2_code_disabled, help="เลือกรหัสงานหรือทะเบียนรถ")
         
         inputs_disabled = (e_code == "-- เลือกรถ --") or f2_code_disabled
         if not inputs_disabled: new_type, new_code = e_type, e_code
     else:
-        with c_sel1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e2_br_{rec_id}")
-        with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}")
-        with c_sel3: st.text_input("🏷️ 3. ทะเบียนรถ", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}")
+        with c_sel1: st.text_input("🏢 1. สาขา (ไม่อนุญาตให้แก้ไข)", value=curr_branch, disabled=True, key=f"e2_br_{rec_id}", help="เฉพาะ Admin เท่านั้นที่สามารถแก้ไขสาขาได้")
+        with c_sel2: st.text_input("🚜 2. ชนิด / ประเภทรถ", value=curr_type, disabled=True, key=f"e2_ty_{rec_id}", help="เฉพาะ Admin เท่านั้นที่สามารถแก้ไขชนิดรถได้")
+        with c_sel3: st.text_input("🏷️ 3. ทะเบียนรถ", value=curr_code, disabled=True, key=f"e2_cd_{rec_id}", help="เฉพาะ Admin เท่านั้นที่สามารถแก้ไขทะเบียนรถได้")
 
-    # 🌟 ปรับ Layout หน้าต่างแก้ไขใหม่ให้สมดุล
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     
-    # แบ่งเป็น 3 ช่องเท่าๆ กันสำหรับข้อมูลตัวเลขและวันที่
     c_r1, c_r2, c_r3 = st.columns(3)
     with c_r1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"), help="เลือกวันที่ของข้อมูล")
     with c_r2:
-        e_work = st.number_input("ชม.ทำงาน *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}")
+        e_work = st.number_input("ชม.ทำงาน *", min_value=0.0, step=0.5, value=float(row_data.get('working_hours') or 0.0), key=f"e2_wk_{rec_id}", help="ชั่วโมงทำงานของรถต้องไม่เกิน 24 ชั่วโมงต่อวัน")
     with c_r3:
-        e_liters = st.number_input("น้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}")
+        e_liters = st.number_input("น้ำมัน (ลิตร) *", min_value=0.0, value=float(row_data.get('fuel_liters') or 0.0), key=f"e2_lt_{rec_id}", help="ปริมาณน้ำมันที่เติม (ระบบจะคำนวณอัตราลิตร/ชม. ใหม่ให้อัตโนมัติ)")
         
-    # ดันช่องหมายเหตุลงมาอยู่ด้านล่างสุดและให้กินพื้นที่แนวยาวเต็ม 100%
-    e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}", height=80)
+    e_rem = st.text_area("หมายเหตุ", value=str(row_data.get('remark') or ''), key=f"e2_rm_{rec_id}", height=80, help="ระบุรายละเอียดเพิ่มเติม (ถ้ามี)")
     
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=inputs_disabled, key=f"btn_save_e2_{rec_id}"):
         if e_work > 24.0:
@@ -337,7 +396,7 @@ def update_record_dialog_t2(row_data, pk_col, engine_lbl_list, engine_details_t2
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 3)", width="large")
 def update_record_dialog_t3(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | สาขาเดิม: {row_data.get('branch_name')}")
+    st.info(f"📌 **กำลังแก้ไขรายการ ID: {rec_id}** | สาขาเดิม: **{row_data.get('branch_name')}**")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
@@ -346,18 +405,18 @@ def update_record_dialog_t3(row_data, pk_col):
     
     curr_branch = str(row_data.get('branch_name') or '')
     def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
-    e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e3_br_{rec_id}")
+    e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e3_br_{rec_id}", help="เลือกสาขาของข้อมูลรายการนี้")
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
-        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))    
-        e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0))
+        e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"), help="เลือกวันที่ของข้อมูล")    
+        e_tot = st.number_input("แก้ไข จำนวนครั้งทั้งหมด", min_value=0, value=int(row_data.get('total_count') or 0), help="จำนวนครั้งที่ตรวจเช็คแรงดันทั้งหมดในวันนั้น")
     with col2:
-        e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0))
-        e_npm = st.number_input("แก้ไข ตกนอกเหนือ PM", min_value=0, value=int(row_data.get('non_pm_drop') or 0))
-    e_rem = st.text_input("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''))
+        e_pm = st.number_input("แก้ไข ตกตาม PM", min_value=0, value=int(row_data.get('pm_drop') or 0), help="จำนวนครั้งที่แรงดันตกตามรอบการบำรุงรักษา (PM)")
+        e_npm = st.number_input("แก้ไข ตกนอกเหนือ PM", min_value=0, value=int(row_data.get('non_pm_drop') or 0), help="จำนวนครั้งที่แรงดันตกนอกเหนือ PM (รวมกับตกตาม PM แล้วต้องไม่เกินจำนวนครั้งทั้งหมด)")
+    e_rem = st.text_input("แก้ไข หมายเหตุ", value=str(row_data.get('remark') or ''), help="ระบุสาเหตุ เช่น ลากขี้เถ้า หรือซ่อมบำรุง")
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary"):
         if (e_pm + e_npm) > e_tot:
@@ -381,7 +440,7 @@ def update_record_dialog_t3(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (Tab 4)", width="large")
 def update_record_dialog_t4(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | สาขาเดิม: {row_data.get('branch_name')}")
+    st.info(f"📌 **กำลังแก้ไขรายการ ID: {rec_id}** | สาขาเดิม: **{row_data.get('branch_name')}** ({row_data.get('boiler_name')})")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
@@ -393,7 +452,7 @@ def update_record_dialog_t4(row_data, pk_col):
     
     c_top1, c_top2 = st.columns([1.5, 1.5])
     with c_top1:
-        e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e4_br_{rec_id}")
+        e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e4_br_{rec_id}", help="เลือกสาขาของข้อมูลรายการนี้")
         new_branch_id = branch_dict[e_branch_lbl]
     
     b_options = []
@@ -409,27 +468,24 @@ def update_record_dialog_t4(row_data, pk_col):
     curr_b = str(row_data.get('boiler_name') or '')
     b_idx = b_options.index(curr_b) if (curr_b in b_options and e_branch_lbl == curr_branch) else 0
 
-    with c_top2: e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx)
+    with c_top2: e_boiler = st.selectbox("🔥 2. แก้ไขบอยเลอร์ *", b_options, index=b_idx, help="เลือกเครื่องบอยเลอร์")
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"), help="เลือกวันที่ของข้อมูล")
     
-    # --- แถวที่ 1 ---
     c1, c2, c3 = st.columns(3)
-    with c1: e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('sawdust_weight') or 0.0))
-    with c2: e_saw_p = st.number_input("ราคาขี้เลื่อย", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0))
-    with c3: e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.0, value=float(row_data.get('steam_production') or 1.0))
+    with c1: e_saw_w = st.number_input("ขี้เลื่อย (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('sawdust_weight') or 0.0), help="น้ำหนักขี้เลื่อยที่ใช้ (ตัน)")
+    with c2: e_saw_p = st.number_input("ราคาขี้เลื่อย (บาท/ตัน)", min_value=0.0, value=float(row_data.get('sawdust_price') or 0.0), help="ราคาขี้เลื่อยต่อตัน")
+    with c3: e_prod = st.number_input("ผลิตไอน้ำ (ตัน)", min_value=0.0, value=float(row_data.get('steam_production') or 1.0), help="ปริมาณไอน้ำที่ผลิตได้ในวันนั้น (ตัน)")
 
-    # --- แถวที่ 2 ---
     c4, c5, c6 = st.columns(3)
-    with c4: e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('wood_weight') or 0.0))
-    with c5: e_wood_p = st.number_input("ราคาปีกไม้", min_value=0.0, value=float(row_data.get('wood_price') or 0.0))
-    with c6: e_hrs = st.number_input("ชม.ทำงาน", min_value=0.0, value=float(row_data.get('working_hours') or 1.0))
+    with c4: e_wood_w = st.number_input("ปีกไม้ (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('wood_weight') or 0.0), help="น้ำหนักปีกไม้สับที่ใช้ (ตัน)")
+    with c5: e_wood_p = st.number_input("ราคาปีกไม้ (บาท/ตัน)", min_value=0.0, value=float(row_data.get('wood_price') or 0.0), help="ราคาปีกไม้ต่อตัน")
+    with c6: e_hrs = st.number_input("ชม.ทำงาน", min_value=0.0, value=float(row_data.get('working_hours') or 1.0), help="ชั่วโมงเดินเครื่องบอยเลอร์ (ต้องไม่เกิน 24 ชม./วัน)")
 
-    # --- แถวที่ 3 ---
     c7, c8, c9 = st.columns(3)
-    with c7: e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('waste_wood_weight') or 0.0))
-    with c8: e_waste_p = st.number_input("ราคาเศษไม้เสีย", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0))
+    with c7: e_waste_w = st.number_input("เศษไม้เสีย (ตัน)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('waste_wood_weight') or 0.0), help="น้ำหนักเศษไม้เสียที่ใช้ (ตัน)")
+    with c8: e_waste_p = st.number_input("ราคาเศษไม้เสีย (บาท/ตัน)", min_value=0.0, value=float(row_data.get('waste_wood_price') or 0.0), help="ราคาเศษไม้เสียต่อตัน")
         
     btn_disabled = (e_boiler == "-- ไม่มีข้อมูลบอยเลอร์ --")
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", disabled=btn_disabled):
@@ -455,7 +511,7 @@ def update_record_dialog_t4(row_data, pk_col):
 @st.dialog("🛠️ แก้ไขข้อมูล (ยอดรวมสาขา)", width="large")
 def update_record_dialog_oven(row_data, pk_col):
     rec_id = row_data[pk_col]
-    st.info(f"ID: {rec_id} | สาขาเดิม: {row_data.get('branch_name')}")
+    st.info(f"📌 **กำลังแก้ไขรายการ ID: {rec_id}** | สาขาเดิม: **{row_data.get('branch_name')}**")
     
     raw_role = st.session_state.get('role_tab') or st.session_state.get('role') or 'user'
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.branch_id)])
@@ -465,16 +521,16 @@ def update_record_dialog_oven(row_data, pk_col):
     curr_branch = str(row_data.get('branch_name') or '')
     def_branch_idx = edit_branch_options.index(curr_branch) if curr_branch in edit_branch_options else 0
     
-    e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e_ov_br_{rec_id}")
+    e_branch_lbl = st.selectbox("🏢 1. แก้ไขสาขา *", edit_branch_options, index=def_branch_idx, key=f"e_ov_br_{rec_id}", help="เลือกสาขาของข้อมูลรายการนี้")
     new_branch_id = branch_dict[e_branch_lbl]
     
     st.markdown("<hr style='margin: 10px 0;'>", unsafe_allow_html=True)
-    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"))
+    e_date = st.date_input("แก้ไข วันที่", format="DD/MM/YYYY", value=pd.to_datetime(row_data.get('record_date')), max_value=pd.to_datetime("today"), help="เลือกวันที่ของข้อมูล")
     
     c1, c2, c3 = st.columns(3)
-    with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}")
-    with c2: e_wd = st.number_input("แก้ไข ไม้เข้าอบ (ลบ.ฟ.)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('wood_out_cubft') or 0.0), key=f"e_ov_w_{rec_id}")
-    with c3: e_pr = st.number_input("แก้ไข แรงดันปลายทางเฉลี่ย", min_value=0.0, value=float(row_data.get('avg_terminal_pressure') or 0.0), key=f"e_ov_p_{rec_id}")
+    with c1: e_ov = st.number_input("แก้ไข จำนวนเตาที่อบ", min_value=0, value=int(row_data.get('oven_qty') or 0), key=f"e_ov_q_{rec_id}", help="จำนวนเตาอบที่เปิดใช้งานในวันนั้น")
+    with c2: e_wd = st.number_input("แก้ไข ไม้เข้าอบ (ลบ.ฟ.)", min_value=0.0, step=0.001, format="%.3f", value=float(row_data.get('wood_out_cubft') or 0.0), key=f"e_ov_w_{rec_id}", help="ปริมาตรไม้เข้าอบรวม (ลูกบาศก์ฟุต)")
+    with c3: e_pr = st.number_input("แก้ไข แรงดันปลายทางเฉลี่ย", min_value=0.0, value=float(row_data.get('avg_terminal_pressure') or 0.0), key=f"e_ov_p_{rec_id}", help="แรงดันไอน้ำปลายทางเฉลี่ย (Bar)")
 
     if st.button("💾 บันทึกการแก้ไข", use_container_width=True, type="primary", key=f"e_ov_save_{rec_id}"):
         with st.spinner("กำลังบันทึกข้อมูล..."):
@@ -1953,9 +2009,23 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # =========================================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
-                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t1, file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t1")
+                with col_btn1: 
+                    st.download_button(
+                        "📗 Export เป็น Excel", 
+                        data=excel_data_t1, 
+                        file_name=f"Summary_Machine_Report_{start_date_t1}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        use_container_width=True, key="dl_t1", 
+                        help="ดาวน์โหลดตารางสรุปข้อมูลทั้งเดือน (ตามเดือนของ 'ตั้งแต่วันที่') เป็นไฟล์ Excel"
+                    )
                 with col_btn2: 
-                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t1"): show_summary_report_dialog(json.loads(json_html_t1))
+                    if st.button(
+                        "📊 สรุปรายงาน", 
+                        use_container_width=True, 
+                        key="view_t1",
+                        help="เปิดหน้าต่างดูตารางสรุปผลรวมของเครื่องจักรและเบรกดาวน์ (ตามช่วงวันที่ที่เลือก)"
+                    ): 
+                        show_summary_report_dialog(json.loads(json_html_t1))
                 with col_btn3: components.html(f"""<body style="margin:0;padding:2px;overflow:hidden;"><button onclick="openPrintPreview1()" style="width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;" onmouseover="this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';" onmouseout="this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';">🖨️ ปริ้นเอกสาร</button></body><script>function openPrintPreview1(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t1}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>""", height=50)
             
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
@@ -2069,9 +2139,24 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # =========================================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
-                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t2, file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t2")
+                with col_btn1: 
+                    st.download_button(
+                        "📗 Export เป็น Excel", 
+                        data=excel_data_t2, 
+                        file_name=f"Summary_Fuel_Report_{start_date_t2}.xlsx", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        use_container_width=True, 
+                        key="dl_t2",
+                        help="ดาวน์โหลดตารางสรุปข้อมูลทั้งเดือน (ตามเดือนของ 'ตั้งแต่วันที่') เป็นไฟล์ Excel"
+                    )
                 with col_btn2: 
-                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t2"): show_summary_report_dialog(json.loads(json_html_t2))
+                    if st.button(
+                        "📊 สรุปรายงาน", 
+                        use_container_width=True, 
+                        key="view_t2",
+                        help="เปิดหน้าต่างดูตารางสรุปผลรวมของการใช้เชื้อเพลิงรถยนต์และรถยก (ตามช่วงวันที่ที่เลือก)"
+                    ): 
+                        show_summary_report_dialog(json.loads(json_html_t2))
                 with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview2()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสาร</button></body><script>function openPrintPreview2(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t2}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
@@ -2182,9 +2267,24 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # =========================================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
-                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t3, file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t3")
+                with col_btn1: 
+                    st.download_button(
+                        "📗 Export เป็น Excel", 
+                        data=excel_data_t3, 
+                        file_name=f"Summary_Pressure_Report_{start_date_t3}.xlsx", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        use_container_width=True, 
+                        key="dl_t3",
+                        help="ดาวน์โหลดตารางสรุปข้อมูลทั้งเดือน (ตามเดือนของ 'ตั้งแต่วันที่') เป็นไฟล์ Excel"
+                    )
                 with col_btn2: 
-                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t3"): show_summary_report_dialog(json.loads(json_html_t3))
+                    if st.button(
+                        "📊 สรุปรายงาน", 
+                        use_container_width=True, 
+                        key="view_t3",
+                        help="แสดงรายงานสรุปข้อมูลตามช่วงเวลาที่เลือก"
+                    ): 
+                        show_summary_report_dialog(json.loads(json_html_t3))
                 with col_btn3: components.html(f"<body style='margin:0;padding:2px;overflow:hidden;'><button onclick='openPrintPreview3()' style='width:100%; height:42px; background-color:#0F172A; border:none; border-radius:24px; color:#F8FAFC; font-family:sans-serif; font-size:14.5px; font-weight:600; cursor:pointer; box-sizing:border-box; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: all 0.2s ease;' onmouseover=\"this.style.backgroundColor='#1E293B'; this.style.transform='translateY(-1px)';\" onmouseout=\"this.style.backgroundColor='#0F172A'; this.style.transform='translateY(0)';\">🖨️ ปริ้นเอกสาร</button></body><script>function openPrintPreview3(){{var w = window.open('', '_blank', 'height=750,width=1100,scrollbars=yes'); w.document.write({json_html_t3}); w.document.close(); setTimeout(function(){{ w.print(); }}, 500);}}</script>", height=50)
             else: st.info("ไม่พบข้อมูลรายงานตามช่วงเวลาที่เลือก")
 
@@ -2194,6 +2294,10 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
     elif key == "4":
         with current_tab_ctx:
             st.subheader("📊 รายงานผลการคำนวณประสิทธิภาพเชื้อเพลิง บอยเลอร์")
+            st.caption(
+                "💡 *หมายเหตุ: แท็บ '📁 ข้อมูลยอดรวมสาขา' และรายงาน 'สรุปรวม 1+2' จะแสดงผลเฉพาะวันที่บันทึกข้อมูลครบทั้ง 3 ส่วน "
+                "(ยอดรวมเตาอบ + บอยเลอร์ 1 + บอยเลอร์ 2) เรียบร้อยแล้วเท่านั้น*"
+            )
             col_f1, col_f2, col_f3 = st.columns([1.5, 1.5, 2])
             with col_f1: start_date_t4 = st.date_input("ตั้งแต่วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date().replace(day=1), key="s_d4")
             with col_f2: end_date_t4 = st.date_input("ถึงวันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), key="e_d4")
@@ -2382,9 +2486,23 @@ def render_all_reports_module(user_branch_name, selected_sub_menu=None):
                 # ==========================================
                 st.markdown("<div style='height: 25px;'></div>", unsafe_allow_html=True)
                 col_btn1, col_btn2, col_spacer, col_btn3 = st.columns([2.0, 1.6, 4.4, 2.0])
-                with col_btn1: st.download_button("📗 Export เป็น Excel", data=excel_data_t4, file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", use_container_width=True, key="dl_t4")
+                with col_btn1: 
+                    st.download_button(
+                        "📗 Export เป็น Excel", 
+                        data=excel_data_t4, 
+                        file_name=f"Report_Boiler_Fuel_{start_date_t4}.xlsx", 
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
+                        use_container_width=True, 
+                        key="dl_t4",
+                        help="ดาวน์โหลดตารางสรุปข้อมูลทั้งเดือน (ตามเดือนของ 'ตั้งแต่วันที่') เป็นไฟล์ Excel"
+                    )
                 with col_btn2: 
-                    if st.button("📊 สรุปรายงาน", use_container_width=True, key="view_t4"): 
+                    if st.button(
+                        "📊 สรุปรายงาน", 
+                        use_container_width=True, 
+                        key="view_t4",
+                        help="ดูรายงานสรุปข้อมูลบอยเลอร์"
+                    ): 
                         parsed_data = json.loads(json_html_t4)
                         show_summary_report_dialog_t4(parsed_data["boilers"])
                 with col_btn3: 

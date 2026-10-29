@@ -7,40 +7,13 @@ from database import get_db_connection, log_activity
 from config import branch_dict
 from all_reports import process_t1, process_t2, process_t3, process_t4
 
-# =========================================================================
-# 🌟 ท่าไม้ตายล้างกราฟค้าง (Force UI Flush) 🌟
-# =========================================================================
-ui_flusher = st.empty()
-with ui_flusher:
-    st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
-time.sleep(0.05) 
-ui_flusher.empty() 
-# =========================================================================
-
 def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
-    # 🎯 ซ่อนแถบ Header ด้านบน, ปรับ Padding Top ชิดขอบบนสุด และแก้ไอคอน Help (?)
     st.markdown("""
         <style>
         header[data-testid="stHeader"] { display: none !important; }
         #header { visibility: hidden !important; }
         #MainMenu { visibility: hidden !important; }
         .block-container { padding-top: 1rem !important; margin-top: -20px !important; }
-
-        div[data-testid="stTooltipHoverTarget"] svg,
-        div[data-testid="stTooltipIcon"] svg,
-        label[data-testid="stWidgetLabel"] svg {
-            fill: none !important;
-            stroke: #64748B !important;
-            color: #64748B !important;
-            background: transparent !important;
-        }
-        div[data-testid="stTooltipHoverTarget"] svg *,
-        div[data-testid="stTooltipIcon"] svg *,
-        label[data-testid="stWidgetLabel"] svg * {
-            fill: none !important;
-            stroke: #64748B !important;
-            stroke-width: 2px !important;
-        }
         </style>
     """, unsafe_allow_html=True)
 
@@ -68,6 +41,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
         available_options = [k for k, v in branch_dict.items() if str(v) in user_allowed_branches]
 
     current_tab_ctx = st.container()
+
     # =========================================================================
     # 🔹 TAB 1: บันทึกข้อมูลเครื่องจักร & เบรกดาวน์
     # =========================================================================
@@ -77,6 +51,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
 
             with st.container(border=True):
                 st.write("### 📝 ฟอร์มบันทึกข้อมูลเครื่องจักรลงตาราง")
+                st.caption("💡 *หมายเหตุ: เครื่องจักรที่ถูกบันทึกข้อมูลในวันที่เลือกไปแล้ว จะถูกซ่อนออกจากตัวเลือกอัตโนมัติเพื่อป้องกันการบันทึกซ้ำ*")
                 
                 c_top1, c_top2 = st.columns([1.5, 1])
                 with c_top1:
@@ -92,7 +67,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         t1_branch_invalid = False
                 
                 with c_top2:
-                    m_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="m_date", disabled=t1_branch_invalid)
+                    m_date = st.date_input(
+                        "วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), 
+                        max_value=pd.to_datetime("today").date(), key="m_date", disabled=t1_branch_invalid,
+                        help="เลือกได้เฉพาะวันนี้หรือวันย้อนหลัง"
+                    )
 
                 machine_dict = {}
                 conn = None 
@@ -133,16 +112,32 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
 
                 c1, c2 = st.columns(2)
                 with c1:
-                    m_label = st.selectbox("🚜 ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0, disabled=t1_branch_invalid, key=f"t1_m_label_{rk1}")
+                    m_label = st.selectbox(
+                        "🚜 ระบุเครื่องจักรที่ใช้งาน *", options=machine_select_options, index=0, 
+                        disabled=t1_branch_invalid, key=f"t1_m_label_{rk1}",
+                        help="แสดงเฉพาะเครื่องจักรที่ยังไม่ได้บันทึกข้อมูลในวันที่เลือก (หากต้องการแก้ไขรายการที่บันทึกไปแล้ว ให้ไปที่หน้า 'รายงานรวม')"
+                    )
                     is_m_not_selected = t1_branch_invalid or (m_label in ["-- กรุณาเลือกเครื่องจักร --", "-- บันทึกข้อมูลครบทุกเครื่องแล้ว --"])
-                    m_qty = st.number_input("จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน", disabled=is_m_not_selected, key=f"t1_qty_{rk1}")
+                    m_qty = st.number_input(
+                        "จำนวนเครื่องจักร *", min_value=1, step=1, value=None, placeholder="ระบุจำนวน", 
+                        disabled=is_m_not_selected, key=f"t1_qty_{rk1}",
+                        help="จำนวนเครื่องจักรที่เปิดใช้งาน (ใช้คำนวณเพดานชั่วโมงสูงสุด = จำนวนเครื่อง x 24 ชม.)"
+                    )
                 with c2:
-                    m_work_hours = st.number_input("ชั่วโมงทำงาน *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=is_m_not_selected, key=f"t1_work_{rk1}")
-                    m_break_hours = st.number_input("ชั่วโมงเบรกดาวน์ *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงเบรกดาวน์", disabled=is_m_not_selected, key=f"t1_break_{rk1}")
+                    m_work_hours = st.number_input(
+                        "ชั่วโมงทำงาน *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", 
+                        disabled=is_m_not_selected, key=f"t1_work_{rk1}",
+                        help="ชั่วโมงทำงานรวมกับชั่วโมงเบรกดาวน์ ต้องไม่เกิน 24 ชั่วโมงต่อ 1 เครื่อง"
+                    )
+                    m_break_hours = st.number_input(
+                        "ชั่วโมงเบรกดาวน์ *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงเบรกดาวน์", 
+                        disabled=is_m_not_selected, key=f"t1_break_{rk1}",
+                        help="หากไม่มีการเสียหรือหยุดเครื่อง ให้กรอกเลข 0"
+                    )
                     
                 c3 = st.columns(1)[0]
                 with c3:
-                    m_remark = st.text_area("หมายเหตุ / สาเหตุที่ชำรุด", disabled=is_m_not_selected, key=f"t1_rem_{rk1}")
+                    m_remark = st.text_area("หมายเหตุ / สาเหตุที่ชำรุด", disabled=is_m_not_selected, key=f"t1_rem_{rk1}", placeholder="ระบุอาการเสียหรือสาเหตุการหยุดเครื่อง (ถ้ามี)...")
                     
                 submit_m = st.button("💾 บันทึกข้อมูลเครื่องจักร", use_container_width=True, type="primary", disabled=is_m_not_selected)
                 
@@ -186,6 +181,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
             
             with st.container(border=True):
                 st.write("### 📝 ฟอร์มบันทึกข้อมูลการใช้เชื้อเพลิงรถ")
+                st.caption("💡 *หมายเหตุ: รถที่ถูกบันทึกข้อมูลในวันที่เลือกไปแล้ว จะถูกซ่อนออกจากตัวเลือกอัตโนมัติ*")
                 
                 if "reset_t2" not in st.session_state: st.session_state.reset_t2 = 0
                 rk2 = st.session_state.reset_t2
@@ -203,7 +199,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         target_branch_id_t2 = branch_dict.get(t2_branch_lbl, int(st.session_state.branch_id))
                         t2_branch_invalid = False
                 with c_top2:
-                    f_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="f_date", disabled=t2_branch_invalid)
+                    f_date = st.date_input(
+                        "วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), 
+                        max_value=pd.to_datetime("today").date(), key="f_date", disabled=t2_branch_invalid,
+                        help="เลือกได้เฉพาะวันนี้หรือวันย้อนหลัง"
+                    )
                 all_engines_filtered = []
                 conn = None
                 if not t2_branch_invalid:
@@ -246,7 +246,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     f2_type_disabled = True
                     
                 with c_sel1:
-                    f2_type = st.selectbox("🚜 ระบุ ชนิด / ประเภทรถ ที่ต้องการบันทึก *", type_options, key="f2_ty", disabled=f2_type_disabled)
+                    f2_type = st.selectbox(
+                        "🚜 ระบุ ชนิด / ประเภทรถ ที่ต้องการบันทึก *", type_options, key="f2_ty", 
+                        disabled=f2_type_disabled,
+                        help="เลือกยี่ห้อหรือประเภทรถ (เช่น TOYOTA, TCK)"
+                    )
                 
                 f2_code_disabled = (f2_type in ["-- เลือกประเภท --", "-- บันทึกข้อมูลครบทุกคันแล้ว --"]) or f2_type_disabled
                 if not f2_code_disabled:
@@ -256,7 +260,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     code_options = ["-- เลือกรถ --"]
                     
                 with c_sel2:
-                    f2_code = st.selectbox("🏷️ ระบุ รหัสงาน / ทะเบียนรถ ที่ต้องการบันทึก *", code_options, key=f"f2_cd_{rk2}", disabled=f2_code_disabled)
+                    f2_code = st.selectbox(
+                        "🏷️ ระบุ รหัสงาน / ทะเบียนรถ ที่ต้องการบันทึก *", code_options, key=f"f2_cd_{rk2}", 
+                        disabled=f2_code_disabled,
+                        help="แสดงเฉพาะทะเบียนรถที่ยังไม่ได้ลงบันทึกในวันที่เลือก"
+                    )
                     
                 inputs_disabled = (f2_code == "-- เลือกรถ --") or f2_code_disabled
                 
@@ -264,9 +272,17 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
 
                 c1, c2 = st.columns(2)
                 with c1:
-                    f_liters = st.number_input("ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณน้ำมัน", disabled=inputs_disabled, key=f"t2_lit_{rk2}")
+                    f_liters = st.number_input(
+                        "ปริมาณน้ำมัน (ลิตร) *", min_value=0.0, step=1.0, value=None, placeholder="ระบุปริมาณน้ำมัน", 
+                        disabled=inputs_disabled, key=f"t2_lit_{rk2}",
+                        help="ระบุปริมาณน้ำมันดีเซลที่เติม (หากไม่ได้เติมน้ำมันในวันนั้นให้ใส่ 0)"
+                    )
                 with c2:
-                    f_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=inputs_disabled, key=f"t2_hrs_{rk2}")
+                    f_hours = st.number_input(
+                        "จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.0, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", 
+                        disabled=inputs_disabled, key=f"t2_hrs_{rk2}",
+                        help="ชั่วโมงการทำงานของรถต้องไม่เกิน 24 ชั่วโมงต่อวัน"
+                    )
                 c3 = st.columns(1)[0]
                 with c3:    
                     f_remark = st.text_area("หมายเหตุ", disabled=inputs_disabled, key=f"t2_rem_{rk2}")
@@ -310,6 +326,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
             
             with st.container(border=True):
                 st.write("### 📝 บันทึกข้อมูลแรงดันไอน้ำ")
+                st.caption("💡 *หมายเหตุ: บันทึกสรุปวันละ 1 รายการต่อสาขา โดยผลรวมจำนวนครั้งที่แรงดันตก (PM + นอก PM) ต้องไม่เกินจำนวนครั้งที่ตรวจเช็คทั้งหมด*")
                 
                 c_top1, c_top2 = st.columns([1.5, 1])
                 with c_top1:
@@ -324,7 +341,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         target_branch_id = branch_dict.get(t3_branch_label, int(st.session_state.branch_id))
                         t3_branch_invalid = False
                 with c_top2:
-                    p_date = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="p_date", disabled=t3_branch_invalid)
+                    p_date = st.date_input(
+                        "วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), 
+                        max_value=pd.to_datetime("today").date(), key="p_date", disabled=t3_branch_invalid,
+                        help="เลือกได้เฉพาะวันนี้หรือวันย้อนหลัง"
+                        )
 
                 has_t3_record = False
                 conn = None
@@ -334,7 +355,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         with conn.cursor() as cur:
                             cur.execute("SELECT 1 FROM boiler_pressure_records WHERE branch_id=%s AND record_date=%s AND is_deleted = 0", (target_branch_id, p_date))
                             if cur.fetchone(): has_t3_record = True
-                    except Exception as e: 
+                    except Exception: 
                         pass
                     finally:
                         if conn and conn.open: conn.close() 
@@ -342,17 +363,29 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                 is_t3_disabled = t3_branch_invalid or has_t3_record
 
                 if has_t3_record:
-                    st.warning("⚠️ มีการบันทึกข้อมูลแรงดันไอน้ำของสาขานี้ ในวันที่เลือกไปแล้ว (หากต้องการแก้ไข กรุณาไปที่ตารางรายงานด้านล่าง)")
+                    st.warning("⚠️ มีการบันทึกข้อมูลแรงดันไอน้ำของสาขานี้ ในวันที่เลือกไปแล้ว (หากต้องการแก้ไข กรุณาไปที่หน้า 'รายงานรวม')")
 
                 if "reset_t3" not in st.session_state: st.session_state.reset_t3 = 0
                 rk3 = st.session_state.reset_t3
 
                 col1, col2 = st.columns(2)
                 with col1:
-                    total_count = st.number_input("จำนวนครั้งทั้งหมด *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนครั้งทั้งหมด", disabled=is_t3_disabled, key=f"t3_tot_{rk3}")
-                    pm_drop = st.number_input("จำนวนที่ตกตามเงื่อนไข PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกตามเงื่อนไข PM", disabled=is_t3_disabled, key=f"t3_pm_{rk3}")
+                    total_count = st.number_input(
+                        "จำนวนครั้งทั้งหมด *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนครั้งทั้งหมด", 
+                        disabled=is_t3_disabled, key=f"t3_tot_{rk3}",
+                        help="จำนวนครั้งที่ตรวจวัดแรงดันไอน้ำทั้งหมดในวันนั้น (เช่น ตรวจทุก 15 นาที = 96 ครั้ง/วัน)"
+                    )
+                    pm_drop = st.number_input(
+                        "จำนวนที่ตกตามเงื่อนไข PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกตามเงื่อนไข PM", 
+                        disabled=is_t3_disabled, key=f"t3_pm_{rk3}",
+                        help="จำนวนครั้งที่แรงดันต่ำกว่าเกณฑ์เนื่องจากอยู่ในช่วงลากขี้เถ้าหรือบำรุงรักษาตามรอบ PM"
+                    )
                 with col2:
-                    non_pm_drop = st.number_input("จำนวนที่ตกนอกเหนือ PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกนอกเหนือ PM", disabled=is_t3_disabled, key=f"t3_npm_{rk3}")
+                    non_pm_drop = st.number_input(
+                        "จำนวนที่ตกนอกเหนือ PM *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนที่ตกนอกเหนือ PM", 
+                        disabled=is_t3_disabled, key=f"t3_npm_{rk3}",
+                        help="จำนวนครั้งที่แรงดันตกผิดปกตินอกรอบ PM (เมื่อรวมกับตกตาม PM แล้วต้องไม่เกินจำนวนครั้งทั้งหมด)"
+                    )
                     p_remark = st.text_input("หมายเหตุ (ลากขี้เถ้า / ซ่อมบำรุง)", disabled=is_t3_disabled, key=f"t3_rem_{rk3}")
                     
                 submit_p = st.button("💾 บันทึกข้อมูลแรงดันไอน้ำ", use_container_width=True, type="primary", disabled=is_t3_disabled)
@@ -391,15 +424,17 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     elif key == "4":
         with current_tab_ctx:
             st.subheader("4. ระบบการใช้เชื้อเพลิงบอยเลอร์")
+            st.info(
+                "📌 **ข้อแนะนำสำคัญ:** เพื่อให้รายงานสรุปรวม (บอยเลอร์ 1+2) คำนวณข้อมูลรายวันได้ครบถ้วน "
+                "กรุณาบันทึกข้อมูลทั้งในแท็บ **'📁 ยอดรวมสาขา'** และแท็บ **'🏭 ปริมาณเชื้อเพลิงบอยเลอร์ (ทั้งบอยเลอร์ 1 และ 2)'** ของวันนั้นให้ครบ"
+            )
 
             if "reset_t4" not in st.session_state: st.session_state.reset_t4 = 0
             rk4 = st.session_state.reset_t4
 
             sub_tab1, sub_tab2 = st.tabs(["📁 บันทึกข้อมูลยอดรวมสาขา (เตา/ไม้อบ/แรงดัน)", "🏭 บันทึกปริมาณเชื้อเพลิงบอยเลอร์"])
 
-            # ==========================================
             # แท็บย่อยที่ 1: บันทึกข้อมูลยอดรวมของสาขา
-            # ==========================================
             with sub_tab1:
                 with st.container(border=True):
                     st.write("### 📁 บันทึกข้อมูลยอดรวมของสาขาประจำวัน")
@@ -417,7 +452,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             target_branch_id_1 = branch_dict.get(t4_branch_lbl_1, int(st.session_state.branch_id))
                             t4_ov_invalid = False
                     with c_top2:
-                        bf_date_1 = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="bf_dt1", disabled=t4_ov_invalid)
+                        bf_date_1 = st.date_input(
+                            "วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), 
+                            max_value=pd.to_datetime("today").date(), key="bf_dt1", disabled=t4_ov_invalid,
+                            help="เลือกได้เฉพาะวันนี้หรือวันย้อนหลัง"
+                            )
 
                     has_t4_ov_record = False
                     conn = None
@@ -434,15 +473,27 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     is_t4_ov_disabled = t4_ov_invalid or has_t4_ov_record
                     
                     if has_t4_ov_record:
-                        st.warning("⚠️ มีการบันทึกข้อมูลยอดรวมของสาขานี้ ในวันที่เลือกไปแล้ว (หากต้องการแก้ไข กรุณาไปที่ตารางรายงานด้านล่าง)")
+                        st.warning("⚠️ มีการบันทึกข้อมูลยอดรวมของสาขานี้ ในวันที่เลือกไปแล้ว (หากต้องการแก้ไข กรุณาไปที่หน้า 'รายงานรวม')")
 
                     c_ov1, c_ov2, c_ov3 = st.columns(3)
                     with c_ov1:
-                        oven_qty = st.number_input("จำนวนเตาที่อบ (เตา) *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนเตา", disabled=is_t4_ov_disabled, key=f"t4_ov_{rk4}")
+                        oven_qty = st.number_input(
+                            "จำนวนเตาที่อบ (เตา) *", min_value=0, step=1, value=None, placeholder="ระบุจำนวนเตา", 
+                            disabled=is_t4_ov_disabled, key=f"t4_ov_{rk4}",
+                            help="จำนวนเตาอบไม้ที่เปิดเดินเครื่องในวันนั้น (ใช้คำนวณเป้าหมายไอน้ำมาตรฐาน)"
+                        )
                     with c_ov2:
-                        wood_out = st.number_input("ไม้เข้าอบ (ลบ.ฟ.) *", min_value=0.0, step=0.001, format="%.3f", value=None, placeholder="ระบุปริมาณ", disabled=is_t4_ov_disabled, key=f"t4_wo_{rk4}")
+                        wood_out = st.number_input(
+                            "ไม้เข้าอบ (ลบ.ฟ.) *", min_value=0.0, step=0.001, format="%.3f", value=None, placeholder="ระบุปริมาณ", 
+                            disabled=is_t4_ov_disabled, key=f"t4_wo_{rk4}",
+                            help="ปริมาตรไม้เข้าอบรวม (ลูกบาศก์ฟุต) รองรับทศนิยม 3 ตำแหน่ง"
+                        )
                     with c_ov3:
-                        avg_pressure = st.number_input("แรงดันปลายทางเฉลี่ย *", min_value=0.0, step=0.1, value=None, placeholder="ระบุแรงดัน", disabled=is_t4_ov_disabled, key=f"t4_avgp_{rk4}")
+                        avg_pressure = st.number_input(
+                            "แรงดันปลายทางเฉลี่ย *", min_value=0.0, step=0.1, value=None, placeholder="ระบุแรงดัน", 
+                            disabled=is_t4_ov_disabled, key=f"t4_avgp_{rk4}",
+                            help="ค่าแรงดันไอน้ำปลายทางเฉลี่ยของวันนั้น (Bar)"
+                        )
 
                     submit_oven = st.button("💾 บันทึกข้อมูลยอดรวมสาขา", use_container_width=True, type="primary", disabled=is_t4_ov_disabled)
                     
@@ -473,9 +524,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                                 finally:
                                     if conn_insert and conn_insert.open: conn_insert.close() 
 
-            # ==========================================
             # แท็บย่อยที่ 2: บันทึกปริมาณเชื้อเพลิงบอยเลอร์
-            # ==========================================
             with sub_tab2:
                 with st.container(border=True):
                     st.write("### 🏭 บันทึกปริมาณเชื้อเพลิงแยกตามบอยเลอร์")
@@ -493,7 +542,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                             target_branch_id_2 = branch_dict.get(t4_branch_lbl_2, int(st.session_state.branch_id))
                             t4_bf_invalid = False
                     with c_top2:
-                        bf_date_2 = st.date_input("วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), max_value=pd.to_datetime("today").date(), key="bf_dt2", disabled=t4_bf_invalid)
+                        bf_date_2 = st.date_input(
+                            "วันที่", format="DD/MM/YYYY", value=pd.to_datetime("today").date(), 
+                            max_value=pd.to_datetime("today").date(), key="bf_dt2", disabled=t4_bf_invalid,
+                            help="เลือกได้เฉพาะวันนี้หรือวันย้อนหลัง"
+                            )
 
                     boiler_options = []
                     conn = None
@@ -535,7 +588,10 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                         b_list = ["-- เลือกบอยเลอร์ --"]
                         is_boiler_invalid = True
                         
-                    boiler_name_input = st.selectbox("🚜 ระบุเครื่องบอยเลอร์ที่ใช้งาน *", b_list, disabled=is_boiler_invalid, key="t4_boiler")
+                    boiler_name_input = st.selectbox(
+                        "🚜 ระบุเครื่องบอยเลอร์ที่ใช้งาน *", b_list, disabled=is_boiler_invalid, key="t4_boiler",
+                        help="เลือกบอยเลอร์ที่ต้องการบันทึก (แสดงเฉพาะเครื่องที่ยังไม่ได้บันทึกในวันนั้น)"
+                    )
                     disable_t4_inputs = is_boiler_invalid or (boiler_name_input == "-- เลือกบอยเลอร์ --")
 
                     c1, c2, c3 = st.columns(3)
@@ -552,7 +608,11 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
                     with c3:
                         st.write("**💨 ส่วนที่ 4.3: การผลิตไอน้ำ (ตัน/วัน)**")
                         prod_val = st.number_input("ปริมาณการผลิต (ตัน/วัน) *", min_value=0.1, step=1.0, value=None, placeholder="ระบุการผลิตไอน้ำ", disabled=disable_t4_inputs, key=f"t4_prod_{rk4}")
-                        work_hours = st.number_input("จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", disabled=disable_t4_inputs, key=f"t4_wh_{rk4}")
+                        work_hours = st.number_input(
+                            "จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", 
+                            disabled=disable_t4_inputs, key=f"t4_wh_{rk4}",
+                            help="ชั่วโมงเดินเครื่องบอยเลอร์ต้องไม่เกิน 24 ชั่วโมงต่อวัน"
+                        )
                         
                     submit_bf = st.button("💾 บันทึกข้อมูลเชื้อเพลิงบอยเลอร์", use_container_width=True, type="primary", disabled=disable_t4_inputs)
                     

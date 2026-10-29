@@ -7,7 +7,8 @@ from database import get_db_connection, log_activity
 TABLE_CONFIG = {
     "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์": {
         "table": "machine_trans",
-        "short_name": "เครื่องจักร/เบรกดาวน์",
+        "icon": "⚙️",
+        "short_name": "เครื่องจักร",
         "sql": """
             SELECT t.id AS rec_id, t.record_date, b.branch_name, m.machine_name AS item_name,
                    CONCAT('ชม.ทำงาน: ', t.working_hours, ' | เบรกดาวน์: ', t.breakdown_hours) AS details,
@@ -21,6 +22,7 @@ TABLE_CONFIG = {
     },
     "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)": {
         "table": "fuel_records",
+        "icon": "🚚",
         "short_name": "เชื้อเพลิงรถ",
         "sql": """
             SELECT r.id AS rec_id, r.record_date, b.branch_name, CONCAT(r.engine_code, ' (', r.type_name, ')') AS item_name,
@@ -34,6 +36,7 @@ TABLE_CONFIG = {
     },
     "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์": {
         "table": "boiler_pressure_records",
+        "icon": "💨",
         "short_name": "แรงดันไอน้ำ",
         "sql": """
             SELECT r.id AS rec_id, r.record_date, b.branch_name, 'ตรวจเช็คแรงดันไอน้ำ' AS item_name,
@@ -47,6 +50,7 @@ TABLE_CONFIG = {
     },
     "🔥 4.1 การใช้เชื้อเพลิง บอยเลอร์": {
         "table": "boiler_fuel_records",
+        "icon": "🔥",
         "short_name": "เชื้อเพลิงบอยเลอร์",
         "sql": """
             SELECT r.id AS rec_id, r.record_date, b.branch_name, r.boiler_name AS item_name,
@@ -60,6 +64,7 @@ TABLE_CONFIG = {
     },
     "📁 4.2 ยอดรวมสาขา (เตาอบ/ไม้เข้าอบ)": {
         "table": "daily_wood_oven_records",
+        "icon": "📁",
         "short_name": "ยอดเตาอบ/ไม้อบ",
         "sql": """
             SELECT o.id AS rec_id, o.record_date, b.branch_name, 'ยอดรวมเตาอบประจำวัน' AS item_name,
@@ -206,21 +211,39 @@ def render_recycle_bin_module():
     st.header("🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)")
     st.caption("รายการข้อมูลที่ถูกลบจากหน้ารายงาน สามารถกดกู้คืนกลับเข้าสู่ระบบ หรือสั่งลบถาวรได้")
 
-    # 1. ดึงจำนวนรายการที่ถูกลบในแต่ละหมวดหมู่มาแสดงเป็นการ์ดสรุปด้านบน
+    # =========================================================================
+    # 🌟 1. การ์ดสรุปสถานะขยะคงค้าง (ดีไซน์เดียวกับหน้า Dashboard รูปแรก)
+    # =========================================================================
     trash_counts = get_trash_counts()
 
-    cols_metric = st.columns(5)
-    for idx, (cat_key, cfg_item) in enumerate(TABLE_CONFIG.items()):
+    cards_items_html = ""
+    for cat_key, cfg_item in TABLE_CONFIG.items():
         cnt = trash_counts.get(cat_key, 0)
-        with cols_metric[idx]:
-            st.metric(
-                label=cfg_item["short_name"],
-                value=f"{cnt} รายการ",
-                delta="มีขยะค้าง" if cnt > 0 else "สะอาด",
-                delta_color="inverse" if cnt > 0 else "normal"
-            )
+        icon = cfg_item.get("icon", "📌")
+        short_name = cfg_item["short_name"]
 
-    st.write("")
+        if cnt > 0:
+            badge_html = "<span style='background-color: #FEE2E2; color: #DC2626; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;'>🔴 มีขยะค้าง</span>"
+        else:
+            badge_html = "<span style='background-color: #DCFCE7; color: #15803D; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;'>✨ สะอาด</span>"
+
+        cards_items_html += f"""
+<div style="flex: 1; min-width: 140px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">{icon} {short_name}</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{cnt:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
+{badge_html}
+</div>
+"""
+
+    custom_recycle_kpi_html = f"""
+<div style="background-color: #FCFBF8; padding: 22px 25px; border-radius: 12px; margin-bottom: 22px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
+<div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 18px;">⚡ สถานะรายการขยะคงค้างแยกตามหมวดหมู่ (ข้อมูลอัปเดตล่าสุด)</div>
+<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
+{cards_items_html}
+</div>
+</div>
+"""
+    st.markdown(custom_recycle_kpi_html, unsafe_allow_html=True)
 
     # 2. สร้างตัวเลือกหมวดหมู่พร้อมบอกจำนวนรายการชัดเจน
     category_keys = list(TABLE_CONFIG.keys())

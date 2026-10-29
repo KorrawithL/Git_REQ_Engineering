@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 from database import get_db_connection
-from config import branch_dict  # 🌟 นำเข้ารายชื่อสาขา
+from config import branch_dict
 
 # =============================================================================
 # 🚀 1. ฟังก์ชันดึงข้อมูลจริงทำหน้า Dashboard (รองรับเลือกสาขาเดียว หรือ รวมทุกสาขา)
@@ -23,7 +23,6 @@ def get_dashboard_data(branch_filter="ALL", allowed_branches=None):
         "pressure_chart_df": pd.DataFrame()
     }
     
-    # 🌟 สร้างเงื่อนไขการกรองสาขาแบบไดนามิก
     if branch_filter and branch_filter != "ALL":
         b_sql = "AND branch_id = %s"
         b_params = (int(branch_filter),)
@@ -75,9 +74,6 @@ def get_dashboard_data(branch_filter="ALL", allowed_branches=None):
             res = cur.fetchone()
             if res and res['drops']: data["boiler_drop"] = int(res['drops'])
 
-            # ==========================================
-            # 🌟 ข้อมูลเปรียบเทียบ เดือนนี้ vs เดือนที่แล้ว
-            # ==========================================
             # 5. ข้อมูลรวมเดือนนี้
             cur.execute(f"""
                 SELECT SUM(fuel_liters) as tot_fuel, SUM(working_hours) as tot_hrs 
@@ -108,16 +104,11 @@ def get_dashboard_data(branch_filter="ALL", allowed_branches=None):
                 data['prev_hrs'] = float(prev_res['tot_hrs'] or 0.0)
                 data['prev_rate'] = data['prev_fuel'] / data['prev_hrs'] if data['prev_hrs'] > 0 else 0.0
 
-            # ==========================================
-            # 🌟 สร้างโครงสร้างปฏิทิน 7 วันย้อนหลัง
-            # ==========================================
             today = pd.Timestamp.today().normalize()
             date_range = pd.date_range(end=today, periods=7)
             df_template = pd.DataFrame({'วันที่': date_range})
 
-            # ------------------------------------------
             # 📉 กราฟเชื้อเพลิง (7 วัน)
-            # ------------------------------------------
             cur.execute(f"""
                 SELECT DATE(record_date) AS log_date, SUM(fuel_liters) AS total_liters
                 FROM fuel_records  
@@ -141,9 +132,7 @@ def get_dashboard_data(branch_filter="ALL", allowed_branches=None):
             df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'] = df_fuel_full['ปริมาณเชื้อเพลิง (ลิตร)'].fillna(0.0)
             data["fuel_chart_df"] = df_fuel_full
 
-            # ------------------------------------------
             # 🚀 กราฟแรงดันตก (7 วัน)
-            # ------------------------------------------
             cur.execute(f"""
                 SELECT DATE(record_date) AS log_date, SUM(total_drop) AS total_drops
                 FROM boiler_pressure_records 
@@ -179,14 +168,12 @@ def get_dashboard_data(branch_filter="ALL", allowed_branches=None):
 def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user_position, current_access, access_color, access_desc):
     st.markdown("<h1 class='dash-title' style='color: #333333; font-weight: 800;'>หน้าหลัก (Dashboard)</h1>", unsafe_allow_html=True)
 
-    # 🌟 ตรวจสอบสิทธิ์เพื่อสร้างตัวเลือกสลับสาขา
     raw_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
     user_allowed_branches = st.session_state.get('allowed_branches', [str(current_branch_id)])
 
     target_branch_id = current_branch_id
     target_branch_name = current_branch
 
-    # ถ้าเป็น Admin หรือ User ที่มีสิทธิ์มากกว่า 1 สาขา จะมี Dropdown ให้เลือก
     if raw_role == "admin" or len(user_allowed_branches) > 1:
         if raw_role == "admin":
             branch_options = ["🌐 รวมทุกสาขาในเครือ (ภาพรวมบริษัท)"] + list(branch_dict.keys())
@@ -196,7 +183,12 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
 
         col_sel1, col_sel2 = st.columns([1.6, 2.4])
         with col_sel1:
-            sel_b_label = st.selectbox("🏢 เลือกมุมมองสาขาที่ต้องการดูแดชบอร์ด:", options=branch_options, key="dash_branch_view")
+            sel_b_label = st.selectbox(
+                "🏢 เลือกมุมมองสาขาที่ต้องการดูแดชบอร์ด:", 
+                options=branch_options, 
+                key="dash_branch_view",
+                help="สลับดูข้อมูลสถิติและกราฟของเฉพาะสาขาที่เลือก หรือดูภาพรวมทุกสาขาที่มีสิทธิ์เข้าถึง"
+            )
             
             if sel_b_label in ["🌐 รวมทุกสาขาในเครือ (ภาพรวมบริษัท)", "🏢 รวมเฉพาะสาขาที่มีสิทธิ์"]:
                 target_branch_id = "ALL"
@@ -205,7 +197,6 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
                 target_branch_id = branch_dict[sel_b_label]
                 target_branch_name = sel_b_label
 
-    # ดึงข้อมูลตามสาขาที่เลือก
     db_data = get_dashboard_data(
         branch_filter=target_branch_id,
         allowed_branches=user_allowed_branches if raw_role != "admin" else None
@@ -225,21 +216,20 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     """
     st.markdown(welcome_html, unsafe_allow_html=True)
 
-    # คำนวณส่วนต่าง (Diff) สำหรับ 3 หัวข้อรายเดือน
     diff_fuel = db_data.get('cur_fuel', 0) - db_data.get('prev_fuel', 0)
     diff_hrs = db_data.get('cur_hrs', 0) - db_data.get('prev_hrs', 0)
     diff_rate = db_data.get('cur_rate', 0) - db_data.get('prev_rate', 0)
 
     def get_diff_pill(diff, unit, invert_color=False):
         if abs(diff) < 0.01:
-            return f'<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">- 0 {unit}</span>'
+            return f'<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">- 0 {unit} (เท่าเดือนก่อน)</span>'
         is_pos = diff > 0
         arrow = "↑" if is_pos else "↓"
         if (is_pos and not invert_color) or (not is_pos and invert_color):
-            bg, text = "#D1FAE5", "#059669" # สีเขียว
+            bg, text = "#D1FAE5", "#059669"
         else:
-            bg, text = "#FEE2E2", "#DC2626" # สีแดง
-        return f'<span style="background-color: {bg}; color: {text}; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{arrow} {abs(diff):,.2f} {unit}</span>'
+            bg, text = "#FEE2E2", "#DC2626"
+        return f'<span style="background-color: {bg}; color: {text}; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;" title="ผลต่างเปรียบเทียบกับยอดรวมของเดือนที่แล้ว">{arrow} {abs(diff):,.2f} {unit}</span>'
 
     val_fuel = f"{db_data.get('cur_fuel', 0):,.2f}"
     pill_fuel = get_diff_pill(diff_fuel, "ลิตร", invert_color=True)
@@ -250,7 +240,6 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     val_rate = f"{db_data.get('cur_rate', 0):,.2f}"
     pill_rate = get_diff_pill(diff_rate, "ล/ชม.", invert_color=True)
 
-    # ข้อมูล 4 กล่องล่าง
     val_active = db_data.get('active_machines', 0)
     pill_active = '<span style="background-color: #E0F2FE; color: #0284C7; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">อัปเดตวันนี้</span>'
 
@@ -266,21 +255,24 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     custom_metric_html = f"""
 <div style="background-color: #FCFBF8; padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
 
-<!-- แถวที่ 1: ภาพรวมรายเดือน -->
-<div style="color: #D97706; font-size: 18px; font-weight: bold; margin-bottom: 15px;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน: <span style="color:#0F172A;">{target_branch_name}</span></div>
+<!-- แถวที่ 1: ภาพรวมรายเดือน พร้อมคำอธิบายป้ายเปรียบเทียบ -->
+<div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; margin-bottom: 15px;">
+    <div style="color: #D97706; font-size: 18px; font-weight: bold;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน: <span style="color:#0F172A;">{target_branch_name}</span></div>
+    <div style="color: #64748B; font-size: 13px;">💡 <i>ป้ายลูกศร (↑/↓) แสดงผลต่างเทียบกับเดือนที่แล้ว (ใช้น้ำมันลดลง = สีเขียว, เพิ่มขึ้น = สีแดง)</i></div>
+</div>
 <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-bottom: 25px;">
 <div style="flex: 1; min-width: 180px;">
-<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ปริมาณน้ำมันรวม</div>
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ปริมาณน้ำมันรวม (เดือนนี้)</div>
 <div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_fuel} <span style="font-size: 20px; font-weight: normal; color: #666666;">ลิตร</span></div>
 {pill_fuel}
 </div>
 <div style="flex: 1; min-width: 180px;">
-<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ชั่วโมงทำงานรวม</div>
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ชั่วโมงทำงานรวม (เดือนนี้)</div>
 <div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_hrs} <span style="font-size: 20px; font-weight: normal; color: #666666;">ชม.</span></div>
 {pill_hrs}
 </div>
 <div style="flex: 1; min-width: 180px;">
-<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">อัตราสิ้นเปลืองเฉลี่ย</div>
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">อัตราสิ้นเปลืองเฉลี่ย (เดือนนี้)</div>
 <div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_rate} <span style="font-size: 20px; font-weight: normal; color: #666666;">ล/ชม.</span></div>
 {pill_rate}
 </div>
@@ -289,7 +281,10 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
 <hr style="border: none; border-top: 1px dashed #D6D3D1; margin: 0 0 20px 0;">
 
 <!-- แถวที่ 2: ข้อมูลอัปเดตล่าสุด -->
-<div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 15px;">⚡ สถานะปฏิบัติงาน (ข้อมูลอัปเดตล่าสุด)</div>
+<div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; margin-bottom: 15px;">
+    <div style="color: #0F172A; font-size: 18px; font-weight: bold;">⚡ สถานะปฏิบัติงาน (ข้อมูลอัปเดตล่าสุด)</div>
+    <div style="color: #64748B; font-size: 13px;">🕒 <i>สรุปยอดการบันทึกข้อมูลของวันนี้และ 7 วันย้อนหลัง</i></div>
+</div>
 <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
 <div style="flex: 1; min-width: 150px;">
 <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักรทำงาน (วันนี้)</div>
@@ -297,12 +292,12 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
 {pill_active}
 </div>
 <div style="flex: 1; min-width: 150px;">
-<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚠️ แจ้งซ่อม (ค้างซ่อม)</div>
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚠️ แจ้งซ่อม (เบรกดาวน์วันนี้)</div>
 <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_bd} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
 {pill_bd}
 </div>
 <div style="flex: 1; min-width: 150px;">
-<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 เชื้อเพลิง 7 วัน</div>
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 เชื้อเพลิงสะสม 7 วัน</div>
 <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_f7} <span style="font-size: 16px; font-weight: normal; color: #666666;">ลิตร</span></div>
 {pill_f7}
 </div>
@@ -318,9 +313,9 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
 
     c_chart1, c_chart2 = st.columns(2)
     
-    # ---------------- กราฟที่ 1: เชื้อเพลิง ----------------
     with c_chart1:
-        st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>📉 ปริมาณเชื้อเพลิง (7 วัน) - {target_branch_name}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 2px;'>📉 ปริมาณเชื้อเพลิง (7 วัน) - {target_branch_name}</h4>", unsafe_allow_html=True)
+        st.caption("ℹ️ *นำเมาส์ชี้ที่จุดวงกลมบนกราฟเพื่อดูปริมาณการใช้น้ำมันรายวัน*")
         with st.container(border=True):
             if not db_data["fuel_chart_df"].empty:
                 df_f = db_data["fuel_chart_df"].reset_index()
@@ -332,9 +327,9 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
             else:
                 st.info("📊 ยังไม่มีข้อมูลปริมาณเชื้อเพลิงใน 7 วันล่าสุด")
             
-    # ---------------- กราฟที่ 2: แรงดันตก ----------------
     with c_chart2:
-        st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 10px;'>🚀 แรงดันไอน้ำตกสะสม (7 วัน) - {target_branch_name}</h4>", unsafe_allow_html=True)
+        st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 2px;'>🚀 แรงดันไอน้ำตกสะสม (7 วัน) - {target_branch_name}</h4>", unsafe_allow_html=True)
+        st.caption("ℹ️ *นำเมาส์ชี้ที่จุดวงกลมบนกราฟเพื่อดูจำนวนแรงดันไอน้ำตกรายวัน*")
         with st.container(border=True):
             if not db_data["pressure_chart_df"].empty:
                 df_p = db_data["pressure_chart_df"].reset_index()

@@ -67,14 +67,12 @@ def render_register_page():
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 1. ดึงข้อมูลตำแหน่งงาน
             cur.execute("SELECT DISTINCT CONVERT(`position` USING utf8mb4) AS pos FROM departments WHERE `position` IS NOT NULL AND TRIM(`position`) != '' ORDER BY pos ASC")
             for r in cur.fetchall():
                 val = r.get('pos')
                 if val and val.strip(): 
                     position_list.append(val.strip())
             
-            # 2. ดึงข้อมูลสาขา
             cur.execute("SELECT id, CONVERT(branch_name USING utf8mb4) AS branch_name FROM branches WHERE is_active = 1 ORDER BY id ASC")
             for r in cur.fetchall():
                 active_branches[r['branch_name']] = r['id']
@@ -87,7 +85,6 @@ def render_register_page():
     if not active_branches:
         active_branches["-- ไม่พบข้อมูลสาขา --"] = None
 
-    # CSS แต่งปุ่ม
     st.markdown("""
     <style>
     div[data-testid="stFormSubmitButton"] > button {
@@ -126,16 +123,29 @@ def render_register_page():
     """, unsafe_allow_html=True)
 
     st.markdown("<h1 style='margin: 0; margin-top: -5px; color: #333333; font-weight: 800;'>WOODWORK</h1>", unsafe_allow_html=True)
+    st.caption("ระบบลงทะเบียนบัญชีผู้ใช้งานใหม่ (Woodwork Engineering Records System)")
+    st.info("💡 **คำแนะนำสำหรับผู้สมัครใหม่:** กรุณากรอกข้อมูลที่มีเครื่องหมาย `*` ให้ครบถ้วน หลังจากลงทะเบียนสำเร็จ กรุณาแจ้ง **ผู้ดูแลระบบ (Admin)** เพื่อเปิดสิทธิ์การเข้าถึงแท็บงานประจำตำแหน่งของคุณ")
     
     with st.form("register_form", clear_on_submit=True):
         st.markdown("#### 👤 ข้อมูลบัญชีผู้ใช้งาน")
         col_u1, col_u2 = st.columns(2)
-        with col_u1: reg_user = st.text_input("กำหนด User ID (Username) *")
-        with col_u2: reg_pass = st.text_input("กำหนด Password *", type="password")
+        with col_u1: 
+            reg_user = st.text_input(
+                "กำหนด User ID (Username) *", 
+                placeholder="เช่น somchai_wg",
+                help="ชื่อบัญชีสำหรับใช้ล็อกอินเข้าสู่ระบบ (แนะนำให้ใช้ภาษาอังกฤษหรือตัวเลขโดยไม่เว้นวรรค)"
+            )
+        with col_u2: 
+            reg_pass = st.text_input(
+                "กำหนด Password *", 
+                type="password",
+                placeholder="ตั้งรหัสผ่าน...",
+                help="รหัสผ่านสำหรับเข้าสู่ระบบ (ควรมีความยาวอย่างน้อย 4 ตัวอักษร)"
+            )
         
         st.markdown("#### 📋 ข้อมูลส่วนตัว")
         col_p1, col_p2 = st.columns(2)
-        with col_p1: reg_fullname = st.text_input("ชื่อ-นามสกุล *")
+        with col_p1: reg_fullname = st.text_input("ชื่อ-นามสกุล *", placeholder="ระบุชื่อและนามสกุลจริง...")
         with col_p2: reg_position = st.selectbox("ตำแหน่งงาน (Position) *", options=position_list) 
         
         col_c1, col_c2 = st.columns(2)
@@ -143,7 +153,11 @@ def render_register_page():
         with col_c2: reg_phone = st.text_input("เบอร์โทรศัพท์ (ถ้ามี)")
         
         st.markdown("#### 🏢 ข้อมูลสังกัด")
-        reg_branch_label = st.selectbox("เลือกสาขาประจำตัวของคุณ *", options=list(active_branches.keys()), label_visibility="collapsed")
+        reg_branch_label = st.selectbox(
+            "เลือกสาขาประจำตัวของคุณ *", 
+            options=list(active_branches.keys()),
+            help="เลือกสาขาหลักที่คุณปฏิบัติงานประจำ"
+        )
         reg_branch_id = active_branches.get(reg_branch_label)
         
         st.write("") 
@@ -168,7 +182,6 @@ def render_register_page():
                             cursor.execute(sql, (reg_user, hash_password(reg_pass), reg_fullname, reg_position, reg_email, reg_phone, reg_branch_id))
                             conn_reg.commit() 
                             
-                            # 🌟 บันทึก Audit Log ทันทีที่สมัครสมาชิกสำเร็จ
                             new_uid = cursor.lastrowid or 0
                             log_activity(new_uid, reg_user, "INSERT", "Auth: Register", f"ผู้ใช้งานลงทะเบียนบัญชีใหม่: {reg_user} (ตำแหน่ง: {reg_position}, สาขา: {reg_branch_label})")
                             

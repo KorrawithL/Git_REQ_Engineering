@@ -186,6 +186,8 @@ div[data-testid="stForm"] { background-color: transparent !important; border: 1p
 div[data-testid="stExpander"] details { background-color: #FCFBF8 !important; border: 1px solid #D6D3D1 !important; border-radius: 10px !important; overflow: hidden !important; }
 div[data-testid="stExpander"] details summary { background-color: #FCFBF8 !important; padding: 10px !important; }
 div[data-testid="stExpander"] details summary:hover { background-color: #F5F5F5 !important; }
+div[data-testid="stNumberInput"] button { background-color: #F8FAFC !important; border: none !important; }
+div[data-testid="stNumberInput"] button svg { fill: #0F172A !important; }
 
 .stTextInput input, .stNumberInput input, .stDateInput input, .stTextArea textarea { background-color: #FFFFFF !important; color: #000000 !important; border-color: #D6D3D1 !important; }
 table th, table td { color: #333333 !important; border-color: #D6D3D1 !important; background-color: #F2EFEA !important; }
@@ -310,6 +312,23 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
     :root { color-scheme: light !important; }
     input[type="date"] { color-scheme: light !important; }
     ::-webkit-calendar-picker-indicator { background-color: #FFFFFF !important; border-radius: 4px; }
+
+    /* 🛠️ ป้องกันไอคอน Help (?) ทุกหน้าไม่ให้ถูกย้อมเป็นวงกลมสีดำทึบ */
+    div[data-testid="stTooltipHoverTarget"] svg,
+    div[data-testid="stTooltipIcon"] svg,
+    label[data-testid="stWidgetLabel"] svg {
+        fill: none !important;
+        stroke: #64748B !important;
+        color: #64748B !important;
+        background: transparent !important;
+    }
+    div[data-testid="stTooltipHoverTarget"] svg *,
+    div[data-testid="stTooltipIcon"] svg *,
+    label[data-testid="stWidgetLabel"] svg * {
+        fill: none !important;
+        stroke: #64748B !important;
+        stroke-width: 2px !important;
+    }
 
 </style>
 """, unsafe_allow_html=True)
@@ -436,20 +455,43 @@ def check_session_timeout():
             perform_logout("⏱️ หมดเวลาการใช้งาน ระบบได้ทำการออกจากระบบอัตโนมัติ")
             st.rerun()
 
-@st.dialog("🔑 เปลี่ยนรหัสผ่าน Password")
+@st.dialog("🔑 เปลี่ยนรหัสผ่าน (Change Password)")
 def change_password_dialog():
-    st.write("กรุณากรอกรหัสผ่านปัจจุบันและรหัสผ่านใหม่ของคุณ")
+    st.markdown("กรุณากรอกรหัสผ่านปัจจุบันและตั้งรหัสผ่านใหม่ของคุณ")
+    st.caption("💡 *หมายเหตุ: เมื่อเปลี่ยนรหัสผ่านสำเร็จ ระบบจะนำคุณออกจากระบบอัตโนมัติเพื่อเข้าสู่ระบบด้วยรหัสผ่านใหม่*")
+    
     with st.form("change_pwd_form"):
-        old_pwd = st.text_input("รหัสผ่านปัจจุบัน *", type="password")
-        new_pwd = st.text_input("รหัสผ่านใหม่ *", type="password")
-        confirm_pwd = st.text_input("ยืนยันรหัสผ่านใหม่ *", type="password")
+        old_pwd = st.text_input(
+            "รหัสผ่านปัจจุบัน *", 
+            type="password",
+            placeholder="กรอกรหัสผ่านที่ใช้งานอยู่ในปัจจุบัน...",
+            help="ระบุรหัสผ่านเดิมของคุณเพื่อยืนยันตัวตนก่อนเปลี่ยนรหัสใหม่"
+        )
+        new_pwd = st.text_input(
+            "รหัสผ่านใหม่ *", 
+            type="password",
+            placeholder="ตั้งรหัสผ่านใหม่ (อย่างน้อย 4 ตัวอักษร)...",
+            help="กำหนดรหัสผ่านใหม่ที่คาดเดายาก และควรมีความยาวอย่างน้อย 4 ตัวอักษร"
+        )
+        confirm_pwd = st.text_input(
+            "ยืนยันรหัสผ่านใหม่ *", 
+            type="password",
+            placeholder="กรอกรหัสผ่านใหม่อีกครั้งให้ตรงกัน...",
+            help="พิมพ์รหัสผ่านใหม่อีกครั้งเพื่อป้องกันการพิมพ์ผิดพลาด"
+        )
         
-        if st.form_submit_button("💾 บันทึกรหัสผ่านใหม่", use_container_width=True):
+        st.write("")
+        if st.form_submit_button("💾 บันทึกรหัสผ่านใหม่", type="primary", use_container_width=True):
             if not old_pwd or not new_pwd or not confirm_pwd:
                 st.error("⚠️ กรุณากรอกข้อมูลให้ครบทุกช่อง")
+            elif len(new_pwd) < 4:
+                st.warning("⚠️ รหัสผ่านใหม่ควรมีความยาวอย่างน้อย 4 ตัวอักษร")
             elif new_pwd != confirm_pwd:
-                st.error("⚠️ รหัสผ่านใหม่และการยืนยันไม่ตรงกัน")
+                st.error("⚠️ รหัสผ่านใหม่และการยืนยันรหัสผ่านไม่ตรงกัน")
+            elif old_pwd == new_pwd:
+                st.warning("⚠️ รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านปัจจุบัน")
             else:
+                conn = None
                 try:
                     conn = get_db_connection()
                     with conn.cursor() as cur:
@@ -461,7 +503,6 @@ def change_password_dialog():
                             cur.execute("UPDATE system_users SET password_hash = %s WHERE user_id = %s", (hash_password(new_pwd), st.session_state.user_id))
                             conn.commit()
                             
-                            # 🌟 เพิ่มบรรทัดนี้: บันทึกลงตาราง activity_logs ทันที
                             log_activity(
                                 st.session_state.user_id,
                                 st.session_state.username,
@@ -474,9 +515,11 @@ def change_password_dialog():
                             time.sleep(1.5)
                             perform_logout()
                             st.rerun()
-                    conn.close()
                 except Exception as e:
                     st.error(f"เกิดข้อผิดพลาด: {e}")
+                finally:
+                    if conn:
+                        conn.close()
 
 # 🍪 เรียกใช้งานการดึงคุกกี้เมื่อเปิดหน้าเว็บ
 restore_session_from_cookie()
@@ -590,11 +633,14 @@ if not st.session_state.get('logged_in'):
 # 🎯 4. หน้าจอหลักของระบบ (Main Layout) 
 # -----------------------------------------------------------------------------
 else:
-    st.session_state['last_activity'] = time.time()
+    now_ts = time.time()
+    st.session_state['last_activity'] = now_ts
 
-    # 🌟 ท่าไม้ตายป้องกัน F5 เด้งหลุด: ย้ำการฝังคุกกี้เข้าเบราว์เซอร์อย่างเด็ดขาด!
-    if st.session_state.get('username'):
+    # 🌟 แก้ปัญหาหน้าเด้งกลับ: ฝังคุกกี้ซ้ำเฉพาะเมื่อผ่านไปเกิน 5 นาที (300 วินาที) ไม่สั่งฝังทุกคลิก
+    last_cookie_sync = st.session_state.get('last_cookie_sync', 0)
+    if st.session_state.get('username') and (now_ts - last_cookie_sync > 300):
         safe_set_cookie("auth_user", st.session_state.get('username'), SESSION_TIMEOUT_SECONDS)
+        st.session_state['last_cookie_sync'] = now_ts
 
     disp_name = st.session_state.get('full_name') or st.session_state.get('username')
     current_role = str(st.session_state.get('role_tab', 'user')).strip().lower()
@@ -629,7 +675,6 @@ else:
         "3": "💨 3. รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
         "4": "🔥 4. รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์"
     }
-    # 🌟 รายการเมนูย่อยภายใต้ "🎛️ แผงควบคุมและจัดการระบบ"
     setting_names_map = {
         "users": "👥 1. จัดการผู้ใช้และสิทธิ์",
         "equip": "🛠️ 2. จัดการข้อมูลอุปกรณ์",
@@ -661,9 +706,6 @@ else:
     rep_opts = get_report_sub_options(current_role, user_allowed_tabs)
     set_opts = get_setting_sub_options(current_role, user_allowed_tabs)
 
-    # =========================================================================
-    # 🌟 เตรียมรายการเมนูหลัก 
-    # =========================================================================
     report_menu_label = "📑 รายงานรวม (All Report)"
     setting_menu_label = "🎛️ แผงควบคุมและจัดการระบบ"
 
@@ -679,32 +721,28 @@ else:
     else:
         report_menu_label = "📑 รายงานประจำสาขา" if current_role == 'manager' else "📑 รายงานประจำบัญชี"
         main_choices = ["📊 แดชบอร์ดภาพรวม (Dashboard)", "📝 บันทึกข้อมูลประจำวัน", report_menu_label]
-        
-        # 🌟 หากผู้ใช้งานได้รับสิทธิ์แท็บ 5 (จัดการอุปกรณ์) หรือ แท็บ 6 (STD Settings) จะเห็นปุ่มแผงควบคุม
         if set_opts:
             main_choices.append(setting_menu_label)
 
-    # =========================================================================
-    # 🌟 ฟื้นความจำ: ดึงชื่อ Tab ล่าสุดจากคุกกี้ ป้องกันการเด้งกลับหน้า Dashboard
-    # =========================================================================
     saved_main_tab = safe_get_cookie("last_main_tab")
     
     if 'sidebar_main' not in st.session_state or st.session_state['sidebar_main'] not in main_choices:
         if saved_main_tab and saved_main_tab in main_choices:
             st.session_state['sidebar_main'] = saved_main_tab
         else:
-            st.session_state['sidebar_main'] = main_choices[0] # ค่าเริ่มต้น
+            st.session_state['sidebar_main'] = main_choices[0]
             safe_set_cookie("last_main_tab", main_choices[0], SESSION_TIMEOUT_SECONDS) 
             
-    if 'sidebar_sub_entry' not in st.session_state:
+    # ตรวจสอบค่าเริ่มต้นของเมนูย่อยให้ถูกต้องก่อนสร้าง st.radio
+    if 'sidebar_sub_entry' not in st.session_state or st.session_state['sidebar_sub_entry'] not in sub_opts:
         st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์"
-    if 'sidebar_sub_report' not in st.session_state:
+    if 'sidebar_sub_report' not in st.session_state or st.session_state['sidebar_sub_report'] not in rep_opts:
         st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
-    if 'sidebar_sub_setting' not in st.session_state:
+    if 'sidebar_sub_setting' not in st.session_state or st.session_state['sidebar_sub_setting'] not in set_opts:
         st.session_state['sidebar_sub_setting'] = set_opts[0] if set_opts else setting_names_map["users"]
 
     with st.sidebar:
-        st.markdown(f"<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WOOD WORK</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WOOD WORK</h3>", unsafe_allow_html=True)
 
         for choice in main_choices:
             is_main_active = (st.session_state['sidebar_main'] == choice)
@@ -712,32 +750,28 @@ else:
             
             if st.button(choice, key=f"sb_main_{choice}", use_container_width=True, type=btn_type):
                 st.session_state['sidebar_main'] = choice
-                # 🌟 ท่าไม้ตาย: สั่งจำชื่อหน้าเว็บนี้ฝังลงในเบราว์เซอร์ทันที!
                 safe_set_cookie("last_main_tab", choice, SESSION_TIMEOUT_SECONDS)
                 st.rerun()
                 
+            # 🌟 ถอดพารามิเตอร์ index= ออก ให้ st.radio อ้างอิงจาก key โดยตรง ป้องกันอาการเด้งกลับ
             if choice == "📝 บันทึกข้อมูลประจำวัน" and is_main_active and sub_opts:
-                default_idx = sub_opts.index(st.session_state['sidebar_sub_entry']) if st.session_state['sidebar_sub_entry'] in sub_opts else 0
-                st.radio("เมนูย่อย", sub_opts, index=default_idx, key="sidebar_sub_entry", label_visibility="collapsed")
+                st.radio("เมนูย่อย", sub_opts, key="sidebar_sub_entry", label_visibility="collapsed")
                 
             if choice == report_menu_label and is_main_active and rep_opts:
-                default_idx_rep = rep_opts.index(st.session_state['sidebar_sub_report']) if st.session_state['sidebar_sub_report'] in rep_opts else 0
-                st.radio("เมนูย่อยรายงาน", rep_opts, index=default_idx_rep, key="sidebar_sub_report", label_visibility="collapsed")
+                st.radio("เมนูย่อยรายงาน", rep_opts, key="sidebar_sub_report", label_visibility="collapsed")
 
-            # 🌟 กางเมนูย่อยของ "🎛️ แผงควบคุมและจัดการระบบ"
             if choice == setting_menu_label and is_main_active and set_opts:
-                default_idx_set = set_opts.index(st.session_state['sidebar_sub_setting']) if st.session_state['sidebar_sub_setting'] in set_opts else 0
-                st.radio("เมนูย่อยแผงควบคุม", set_opts, index=default_idx_set, key="sidebar_sub_setting", label_visibility="collapsed")
+                st.radio("เมนูย่อยแผงควบคุม", set_opts, key="sidebar_sub_setting", label_visibility="collapsed")
 
         st.markdown("<div style='margin-top: 40px;'></div>", unsafe_allow_html=True)
-        st.markdown(f"<hr style='border-color: #D6D3D1; margin: 10px 0;'>", unsafe_allow_html=True)
+        st.markdown("<hr style='border-color: #D6D3D1; margin: 10px 0;'>", unsafe_allow_html=True)
         
         col_sb_pw, col_sb_out = st.columns(2, gap="small")
         with col_sb_pw:
-            if st.button("🔑 เปลี่ยนรหัส", use_container_width=True, key="sb_btn_pw"): 
+            if st.button("🔑 เปลี่ยนรหัส", use_container_width=True, key="sb_btn_pw", help="คลิกเพื่อเปลี่ยนรหัสผ่านบัญชีของคุณ"): 
                 change_password_dialog()
         with col_sb_out:
-            if st.button("🚪 ออกจากระบบ", use_container_width=True, key="sb_btn_out"):
+            if st.button("🚪 ออกจากระบบ", use_container_width=True, key="sb_btn_out", help="ออกจากระบบและเคลียร์สถานะการเข้าใช้งาน"):
                 perform_logout()
                 st.rerun()
 
@@ -746,29 +780,17 @@ else:
     sub_menu_report = st.session_state.get('sidebar_sub_report')
     sub_menu_setting = st.session_state.get('sidebar_sub_setting')
 
-    # =========================================================================
-    # 🌟 ท่าไม้ตายล้างกราฟค้าง (Force UI Flush) 🌟
-    # =========================================================================
-    ui_flusher = st.empty()
-    with ui_flusher:
-        st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
-    time.sleep(0.01) 
-    ui_flusher.empty() 
-    # =========================================================================
-
-    # 🌟 สร้าง Key เพื่อเช็คว่า "เพิ่งมีการเปลี่ยนหน้า Tab" หรือไม่
+    # 🌟 แสดงม่าน Loading เฉพาะตอนเปลี่ยน "เมนูหลัก" หรือเปลี่ยนหน้าใน "แผงควบคุม"
+    # (ส่วนการสลับแท็บย่อยในหน้าบันทึกข้อมูลประจำวัน ให้สลับทันทีแบบไม่ต้องคั่นจังหวะ)
     current_view_state = f"{selected_main}_{sub_menu_setting if selected_main == setting_menu_label else ''}"
 
-    # =========================================================================
-    # 🌟 พื้นที่แสดงผลหลัก (ระบบโหลดข้อมูลจริง Real-time)
-    # =========================================================================
     loading_box = st.empty()
     main_view = st.empty()
 
-    # 🎯 1. เช็คว่าเพิ่งเปลี่ยนหน้ามาใหม่ใช่ไหม? 
     is_changing_page = (st.session_state.get('last_view_state') != current_view_state)
 
     if is_changing_page:
+        main_view.empty()
         loading_box.markdown("""
             <div style='position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #F2EFEA; z-index: 999999; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family:"Sarabun", sans-serif;'>
                 <h1 style='color:#D97706; font-weight:800; font-size:35px; margin-bottom: 5px;'>กำลังเตรียมข้อมูล...</h1>
@@ -777,17 +799,8 @@ else:
                 <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
             </div>
         """, unsafe_allow_html=True)
-        
-        ui_flusher = st.empty()
-        with ui_flusher:
-            st.markdown("<div style='height: 1px;'></div>", unsafe_allow_html=True)
-            
-        time.sleep(0.1) 
-        ui_flusher.empty()
-        
         st.session_state['last_view_state'] = current_view_state
 
-    # 🎯 2. สั่งรันเนื้อหาจริง
     with main_view.container():
         if selected_main == "📊 แดชบอร์ดภาพรวม (Dashboard)":
             user_position = st.session_state.get('position', '-')
@@ -803,7 +816,6 @@ else:
         elif selected_main == report_menu_label: 
             render_all_reports_module(st.session_state.get('branch_name'), sub_menu_report)
 
-        # 🌟 เปิดหน้าจอตามเมนูย่อยใน "🎛️ แผงควบคุมและจัดการระบบ"
         elif selected_main == setting_menu_label:
             if sub_menu_setting == setting_names_map["users"]:
                 render_admin_user_management()
@@ -816,6 +828,5 @@ else:
             elif sub_menu_setting == setting_names_map["bin"]:
                 render_recycle_bin_module()
 
-    # 🎯 3. เมื่อดึงข้อมูลและสร้างตารางเสร็จสมบูรณ์ 100% แล้ว ให้ทำลายม่าน Loading ทิ้ง!
     if is_changing_page:
         loading_box.empty()
