@@ -220,25 +220,26 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     diff_hrs = db_data.get('cur_hrs', 0) - db_data.get('prev_hrs', 0)
     diff_rate = db_data.get('cur_rate', 0) - db_data.get('prev_rate', 0)
 
-    def get_diff_pill(diff, unit, invert_color=False):
+    def get_diff_pill(diff, unit, invert_color=False, metric_name=""):
         if abs(diff) < 0.01:
             return f'<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">- 0 {unit} (เท่าเดือนก่อน)</span>'
         is_pos = diff > 0
         arrow = "↑" if is_pos else "↓"
+        direction_txt = "เพิ่มขึ้นจากเดือนที่แล้ว" if is_pos else "ลดลงจากเดือนที่แล้ว"
         if (is_pos and not invert_color) or (not is_pos and invert_color):
             bg, text = "#D1FAE5", "#059669"
         else:
             bg, text = "#FEE2E2", "#DC2626"
-        return f'<span style="background-color: {bg}; color: {text}; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;" title="ผลต่างเปรียบเทียบกับยอดรวมของเดือนที่แล้ว">{arrow} {abs(diff):,.2f} {unit}</span>'
+        return f'<span style="background-color: {bg}; color: {text}; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold; cursor: help;" title="{metric_name}: {direction_txt} {abs(diff):,.2f} {unit}">{arrow} {abs(diff):,.2f} {unit}</span>'
 
     val_fuel = f"{db_data.get('cur_fuel', 0):,.2f}"
-    pill_fuel = get_diff_pill(diff_fuel, "ลิตร", invert_color=True)
+    pill_fuel = get_diff_pill(diff_fuel, "ลิตร", invert_color=True, metric_name="ปริมาณน้ำมันรวม")
 
     val_hrs = f"{db_data.get('cur_hrs', 0):,.2f}"
-    pill_hrs = get_diff_pill(diff_hrs, "ชม.", invert_color=False)
+    pill_hrs = get_diff_pill(diff_hrs, "ชม.", invert_color=False, metric_name="ชั่วโมงทำงานรวม")
 
     val_rate = f"{db_data.get('cur_rate', 0):,.2f}"
-    pill_rate = get_diff_pill(diff_rate, "ล/ชม.", invert_color=True)
+    pill_rate = get_diff_pill(diff_rate, "ล/ชม.", invert_color=True, metric_name="อัตราสิ้นเปลืองเฉลี่ย")
 
     val_active = db_data.get('active_machines', 0)
     pill_active = '<span style="background-color: #E0F2FE; color: #0284C7; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">อัปเดตวันนี้</span>'
@@ -255,10 +256,12 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     custom_metric_html = f"""
 <div style="background-color: #FCFBF8; padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
 
-<!-- แถวที่ 1: ภาพรวมรายเดือน พร้อมคำอธิบายป้ายเปรียบเทียบ -->
-<div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; margin-bottom: 15px;">
-    <div style="color: #D97706; font-size: 18px; font-weight: bold;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน: <span style="color:#0F172A;">{target_branch_name}</span></div>
-    <div style="color: #64748B; font-size: 13px;">💡 <i>ป้ายลูกศร (↑/↓) แสดงผลต่างเทียบกับเดือนที่แล้ว (ใช้น้ำมันลดลง = สีเขียว, เพิ่มขึ้น = สีแดง)</i></div>
+<!-- แถวที่ 1: ภาพรวมรายเดือน พร้อมคำอธิบายที่ตรงกับลำดับลูกศรและแยกตามหมวดชัดเจน -->
+<div style="margin-bottom: 15px;">
+    <div style="color: #D97706; font-size: 18px; font-weight: bold; margin-bottom: 4px;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน: <span style="color:#0F172A;">{target_branch_name}</span></div>
+    <div style="color: #64748B; font-size: 13px;">
+        💡 <i>ป้ายผลต่างเทียบเดือนที่แล้ว (<b>↑ เพิ่มขึ้น</b> / <b>↓ ลดลง</b>) — <b>น้ำมัน & อัตราสิ้นเปลือง:</b> ↑ เพิ่มขึ้น = สีแดง, ↓ ลดลง = สีเขียว | <b>ชั่วโมงทำงาน:</b> ↑ เพิ่มขึ้น = สีเขียว, ↓ ลดลง = สีแดง</i>
+    </div>
 </div>
 <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-bottom: 25px;">
 <div style="flex: 1; min-width: 180px;">
@@ -315,7 +318,7 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     
     with c_chart1:
         st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 2px;'>📉 ปริมาณเชื้อเพลิง (7 วัน) - {target_branch_name}</h4>", unsafe_allow_html=True)
-        st.caption("ℹ️ *นำเมาส์ชี้ที่จุดวงกลมบนกราฟเพื่อดูปริมาณการใช้น้ำมันรายวัน*")
+        st.caption("ℹ️ *นำเมาส์ชี้ที่จุดวงกลมบนเส้นกราฟเพื่อดูปริมาณการใช้น้ำมันรายวัน*")
         with st.container(border=True):
             if not db_data["fuel_chart_df"].empty:
                 df_f = db_data["fuel_chart_df"].reset_index()
@@ -329,7 +332,7 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
             
     with c_chart2:
         st.markdown(f"<h4 style='color: #333333; font-size: 20px; font-weight:bold; margin-bottom: 2px;'>🚀 แรงดันไอน้ำตกสะสม (7 วัน) - {target_branch_name}</h4>", unsafe_allow_html=True)
-        st.caption("ℹ️ *นำเมาส์ชี้ที่จุดวงกลมบนกราฟเพื่อดูจำนวนแรงดันไอน้ำตกรายวัน*")
+        st.caption("ℹ️ *นำเมาส์ชี้ที่จุดวงกลมบนเส้นกราฟเพื่อดูจำนวนครั้งที่แรงดันไอน้ำตกรายวัน*")
         with st.container(border=True):
             if not db_data["pressure_chart_df"].empty:
                 df_p = db_data["pressure_chart_df"].reset_index()

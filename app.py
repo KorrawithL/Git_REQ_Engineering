@@ -330,6 +330,31 @@ div[data-testid="stMetric"] { background-color: #FCFBF8 !important; padding: 10p
         stroke-width: 2px !important;
     }
 
+    /* 📱 บังคับให้กล่องข้อความคำอธิบาย (?) ปรับขนาดตามหน้าจอมือถือและไม่ล้นขอบจอ */
+    div[data-testid="stTooltipContent"],
+    div[data-baseweb="tooltip"] > div,
+    div[role="tooltip"] {
+        max-width: min(340px, 82vw) !important;
+        width: max-content !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        box-sizing: border-box !important;
+        line-height: 1.45 !important;
+        font-family: 'Sarabun', Tahoma, sans-serif !important;
+        font-size: 13.5px !important;
+        padding: 10px 14px !important;
+    }
+
+    /* ป้องกันไม่ให้ตำแหน่งกล่อง Tooltip ชิดขอบขวาหรือขอบซ้ายของจอมือถือเกินไป */
+    @media (max-width: 768px) {
+        div[data-baseweb="tooltip"],
+        div[data-baseweb="popover"]:has(div[data-testid="stTooltipContent"]) {
+            max-width: 85vw !important;
+            right: 8px !important;
+        }
+    }
+
 </style>
 """, unsafe_allow_html=True)
 
