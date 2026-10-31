@@ -1,12 +1,24 @@
-import streamlit as st
-import pandas as pd
 import time
+import pandas as pd
+import streamlit as st
 from database import get_db_connection, hash_password, log_activity
 
 # =============================================================================
-# 🏢 ฟังก์ชันดึงข้อมูลสาขาจาก Database แบบ Real-time
+# 📌 1. ค่าคงที่และฟังก์ชันดึงข้อมูลจาก Database (Data Access Helpers)
 # =============================================================================
+ROLE_LIST = ["user", "reporter", "manager", "admin"]
+STATUS_LIST = ["active", "disabled"]
+DEFAULT_ROLE_TABS = {
+    "admin": "1,2,3,4,6",
+    "manager": "1,2,3,4,5,6",
+}
+TAB_KEYS = {str(i): f"t{i}_edit" for i in range(1, 7)}
+SA_KEY = "sa_edit"
+
+
+@st.cache_data(ttl=300, show_spinner=False)
 def get_db_branches():
+    """ดึงข้อมูลสาขาที่เปิดใช้งานจากฐานข้อมูล"""
     b_dict = {}
     conn = None
     try:
@@ -19,8 +31,8 @@ def get_db_branches():
                 ORDER BY id ASC
             """)
             for r in cur.fetchall():
-                if r['b_name']:
-                    b_dict[r['b_name'].strip()] = r['id']
+                if r.get("b_name"):
+                    b_dict[r["b_name"].strip()] = r["id"]
     except Exception as e:
         print(f"Error fetching branches: {e}")
     finally:
@@ -28,15 +40,60 @@ def get_db_branches():
             conn.close()
     return b_dict
 
-# =============================================================================
-# 🚨 ฟังก์ชัน Popup ยืนยันการลบบัญชีผู้ใช้งาน (เพิ่ม Safety Check ประวัติงาน)
-# =============================================================================
-@st.dialog("⚠️ ยืนยันการจัดการบัญชีผู้ใช้งาน")
-def confirm_delete_user_dialog(user_id, username):
-    st.error(f"คุณกำลังเลือกจัดการบัญชีผู้ใช้งาน: **'{username}'** (User ID: {user_id})")
-    
-    # 🌟 ตรวจสอบว่าผู้ใช้คนนี้เคยมีประวัติการบันทึกงานในระบบหรือไม่
-    total_records = 0
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_db_positions():
+    """ดึงรายชื่อตำแหน่งงานทั้งหมดจากตาราง departments"""
+    position_list = ["-- กรุณาเลือกตำแหน่ง --"]
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos 
+                FROM departments 
+                WHERE position IS NOT NULL AND position != '' 
+                ORDER BY pos ASC
+            """)
+            for r in cur.fetchall():
+                if r.get("pos"):
+                    position_list.append(r["pos"].strip())
+    except Exception as e:
+        st.warning(f"ไม่สามารถดึงข้อมูลตำแหน่งได้: {e}")
+    finally:
+        if conn:
+            conn.close()
+    return position_list
+
+
+def fetch_all_users():
+    """ดึงข้อมูลผู้ใช้งานทั้งหมดพร้อมสาขาหลักและสาขาเสริม"""
+    conn = None
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT u.user_id, u.username, u.full_name, u.position, u.email, u.phone_number, 
+                       u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status,
+                       GROUP_CONCAT(ub.branch_id) AS additional_branches
+                FROM system_users u
+                LEFT JOIN branches b ON u.branch_id = b.id
+                LEFT JOIN user_branches ub ON u.user_id = ub.user_id
+                GROUP BY u.user_id, u.username, u.full_name, u.position, u.email, u.phone_number, 
+                         u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status
+                ORDER BY u.user_id ASC
+            """)
+            return cur.fetchall()
+    except Exception as e:
+        st.error(f"ไม่สามารถดึงตารางรายชื่อผู้ใช้งานได้: {e}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def get_user_record_count(user_id):
+    """นับจำนวนรายการข้อมูลที่ผู้ใช้คนนี้เคยบันทึกไว้ในทั้ง 5 ตารางหลัก"""
     conn = None
     try:
         conn = get_db_connection()
@@ -50,28 +107,43 @@ def confirm_delete_user_dialog(user_id, username):
                     (SELECT COUNT(*) FROM daily_wood_oven_records WHERE created_by = %s) AS total_count
             """, (user_id, user_id, user_id, user_id, user_id))
             res = cur.fetchone()
-            if res and res['total_count']:
-                total_records = int(res['total_count'])
+            return int(res["total_count"]) if res and res.get("total_count") else 0
     except Exception:
-        pass
+        return 0
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
+
+# =============================================================================
+# 🚨 2. ฟังก์ชัน Popup ยืนยันการลบบัญชีผู้ใช้งาน (พร้อม Safety Check ประวัติงาน)
+# =============================================================================
+@st.dialog("⚠️ ยืนยันการจัดการบัญชีผู้ใช้งาน")
+def confirm_delete_user_dialog(user_id, username):
+    st.error(f"คุณกำลังเลือกจัดการบัญชีผู้ใช้งาน: **'{username}'** (User ID: {user_id})")
+
+    total_records = get_user_record_count(user_id)
     if total_records > 0:
         st.warning(f"⚠️ **ตรวจพบประวัติงาน:** บัญชีนี้เคยลงบันทึกข้อมูลในระบบไปแล้วทั้งหมด **{total_records}** รายการ")
-        st.markdown("<span style='color:#475569; font-size:14px;'>* ข้อแนะนำ: หากลบบัญชีถาวร ประวัติงานเดิมจะขาดข้อมูลผู้บันทึก แนะนำให้เลือก **'ระงับการใช้งาน (Disabled)'** เพื่อไม่ให้เข้าสู่ระบบได้แต่ยังรักษาประวัติเดิมไว้</span>", unsafe_allow_html=True)
+        st.markdown(
+            "<span style='color:#475569; font-size:14px;'>* ข้อแนะนำ: หากลบบัญชีถาวร ประวัติงานเดิมจะขาดข้อมูลผู้บันทึก "
+            "แนะนำให้เลือก **'ระงับการใช้งาน (Disabled)'** เพื่อไม่ให้เข้าสู่ระบบได้แต่ยังรักษาประวัติเดิมไว้</span>",
+            unsafe_allow_html=True
+        )
     else:
-        st.markdown("<span style='color:#EF4444; font-size:14px;'>* คำเตือน: ข้อมูลบัญชีผู้ใช้และสิทธิ์การเข้าถึงทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้</span>", unsafe_allow_html=True)
-    
+        st.markdown(
+            "<span style='color:#EF4444; font-size:14px;'>* คำเตือน: ข้อมูลบัญชีผู้ใช้และสิทธิ์การเข้าถึงทั้งหมดจะถูกลบถาวร ไม่สามารถกู้คืนได้</span>",
+            unsafe_allow_html=True
+        )
+
     st.write("")
-    
     col_act1, col_act2, col_act3 = st.columns([1.2, 1.8, 1.4])
+
     with col_act1:
         if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_del_u_{user_id}"):
             st.rerun()
-            
+
     with col_act2:
-        # ปุ่มทางเลือกที่ปลอดภัย: ระงับการใช้งานแทน
         if st.button("🚫 ระงับใช้งาน (Disabled)", use_container_width=True, key=f"disable_u_{user_id}"):
             conn = None
             try:
@@ -79,20 +151,19 @@ def confirm_delete_user_dialog(user_id, username):
                 with conn.cursor() as cur:
                     cur.execute("UPDATE system_users SET status = 'disabled' WHERE user_id = %s", (int(user_id),))
                     conn.commit()
-                    log_activity(
-                        st.session_state.user_id,
-                        st.session_state.username,
-                        "UPDATE",
-                        "Admin: User Management",
-                        f"ระงับการใช้งานบัญชี '{username}' (User ID: {user_id})"
-                    )
+                log_activity(
+                    st.session_state.user_id, st.session_state.username,
+                    "UPDATE", "Admin: User Management",
+                    f"ระงับการใช้งานบัญชี '{username}' (User ID: {user_id})"
+                )
                 st.success(f"ทำการระงับบัญชี '{username}' เรียบร้อยแล้ว (ไม่สามารถล็อกอินได้)")
                 time.sleep(1.2)
                 st.rerun()
             except Exception as e:
                 st.error(f"เกิดข้อผิดพลาด: {e}")
             finally:
-                if conn: conn.close()
+                if conn:
+                    conn.close()
 
     with col_act3:
         if st.button("🗑️ ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_del_u_{user_id}"):
@@ -103,21 +174,24 @@ def confirm_delete_user_dialog(user_id, username):
                     cur.execute("DELETE FROM system_users WHERE user_id = %s", (int(user_id),))
                     cur.execute("DELETE FROM user_branches WHERE user_id = %s", (int(user_id),))
                     conn.commit()
-                    log_activity(
-                        st.session_state.user_id,
-                        st.session_state.username,
-                        "DELETE",
-                        "Admin: User Management",
-                        f"ลบบัญชีผู้ใช้งาน '{username}' (User ID: {user_id}) ออกจากระบบถาวร"
-                    )
+                log_activity(
+                    st.session_state.user_id, st.session_state.username,
+                    "DELETE", "Admin: User Management",
+                    f"ลบบัญชีผู้ใช้งาน '{username}' (User ID: {user_id}) ออกจากระบบถาวร"
+                )
                 st.success(f"ทำการลบบัญชี '{username}' ออกจากฐานข้อมูลเรียบร้อยแล้ว")
                 time.sleep(1.2)
                 st.rerun()
             except Exception as e:
                 st.error(f"ไม่สามารถลบข้อมูลได้: {e}")
             finally:
-                if conn: conn.close()
+                if conn:
+                    conn.close()
 
+
+# =============================================================================
+# 👥 3. ฟังก์ชันหลักสำหรับหน้าบริหารสิทธิ์และจัดการผู้ใช้งาน
+# =============================================================================
 def render_admin_user_management():
     st.markdown("""
         <style>
@@ -130,437 +204,407 @@ def render_admin_user_management():
     st.header("👥 ระบบบริหารสิทธิ์และจัดการผู้ใช้งานระบบ")
 
     current_branch_dict = get_db_branches()
+    position_list = get_db_positions()
+    all_users = fetch_all_users()
 
-    position_list = ["-- กรุณาเลือกตำแหน่ง --"]
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute("SELECT DISTINCT CONVERT(position USING utf8mb4) AS pos FROM departments WHERE position IS NOT NULL AND position != '' ORDER BY pos ASC")
-            for r in cur.fetchall():
-                if r['pos']: position_list.append(r['pos'].strip())
-        conn.close()
-    except Exception as e:
-        st.warning(f"ไม่สามารถดึงข้อมูลตำแหน่งได้: {e}")
-
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as user_cursor:
-            user_cursor.execute("""
-                SELECT u.user_id, u.username, u.full_name, u.position, u.email, u.phone_number, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status,
-                       GROUP_CONCAT(ub.branch_id) as additional_branches
-                FROM system_users u
-                LEFT JOIN branches b ON u.branch_id = b.id
-                LEFT JOIN user_branches ub ON u.user_id = ub.user_id
-                GROUP BY u.user_id, u.username, u.full_name, u.position, u.email, u.phone_number, u.branch_id, b.branch_name, u.Role_tab, u.allowed_tabs, u.status
-                ORDER BY u.user_id ASC
-            """)
-            all_users = user_cursor.fetchall()
-        conn.close()
-    except Exception as e:
-        st.error(f"ไม่สามารถดึงตารางรายชื่อผู้ใช้งานได้: {e}")
-        all_users = []
-
-    # =========================================================================
-    # ➕ เพิ่มบัญชีผู้ใช้งานใหม่เข้าระบบ
-    # =========================================================================
+    # -------------------------------------------------------------------------
+    # ➕ ส่วนที่ 1: เพิ่มบัญชีผู้ใช้งานใหม่เข้าระบบโดยแอดมิน
+    # -------------------------------------------------------------------------
     with st.expander("➕ เพิ่มบัญชีผู้ใช้งานใหม่เข้าระบบโดยแอดมิน"):
         with st.form("admin_add_user_form", clear_on_submit=True):
             st.markdown("#### 👤 ข้อมูลบัญชีผู้ใช้งาน")
             col_u1, col_u2 = st.columns(2)
-            with col_u1: new_user = st.text_input("Username (User ID) *")
-            with col_u2: new_pass = st.text_input("Password *", type="password")
-            
+            with col_u1:
+                new_user = st.text_input("Username (User ID) *")
+            with col_u2:
+                new_pass = st.text_input("Password *", type="password")
+
             st.markdown("#### 📋 ข้อมูลส่วนตัว")
             col_p1, col_p2 = st.columns(2)
-            with col_p1: new_fullname = st.text_input("ชื่อ-นามสกุล *")
-            with col_p2: new_pos = st.selectbox("ตำแหน่ง *", options=position_list)
-            
+            with col_p1:
+                new_fullname = st.text_input("ชื่อ-นามสกุล *")
+            with col_p2:
+                new_pos = st.selectbox("ตำแหน่ง *", options=position_list)
+
             col_c1, col_c2 = st.columns(2)
-            with col_c1: new_email = st.text_input("E-mail")
-            with col_c2: new_phone = st.text_input("เบอร์โทรศัพท์")
-            
+            with col_c1:
+                new_email = st.text_input("E-mail")
+            with col_c2:
+                new_phone = st.text_input("เบอร์โทรศัพท์")
+
             st.markdown("#### 🏢 ข้อมูลสิทธิ์และสังกัด")
             new_branch_label = st.selectbox("เลือกสาขาประจำตัว (หลัก) *", options=list(current_branch_dict.keys()), key="adm_add_br")
-            new_role = st.selectbox("กำหนดระดับสิทธิ์ (Role_tab) *", options=["user", "reporter", "manager", "admin"])
-            
+            new_role = st.selectbox("กำหนดระดับสิทธิ์ (Role_tab) *", options=ROLE_LIST)
+
             st.write("")
             if st.form_submit_button("➕ เพิ่มข้อมูลผู้ใช้ระบบ"):
-                if not new_user or not new_pass or not new_fullname or new_pos == "-- กรุณาเลือกตำแหน่ง --": 
+                if not new_user.strip() or not new_pass or not new_fullname.strip() or new_pos == "-- กรุณาเลือกตำแหน่ง --":
                     st.error("⚠️ กรุณากรอกข้อมูลที่มีเครื่องหมาย * ให้ครบถ้วน และเลือกตำแหน่งให้ถูกต้อง")
                 else:
-                    # 🌟 ข้อ 5: กำหนดค่า Default allowed_tabs ตาม Role โดยอัตโนมัติ
-                    if new_role == "admin":
-                        default_tabs = "1,2,3,4,6"
-                    elif new_role == "manager":
-                        default_tabs = "1,2,3,4,5,6"
-                    else:
-                        default_tabs = "1,2,3,4"
-
+                    default_tabs = DEFAULT_ROLE_TABS.get(new_role, "1,2,3,4")
                     conn = None
                     try:
                         conn = get_db_connection()
                         with conn.cursor() as cursor:
-                            cursor.execute("SELECT user_id FROM system_users WHERE CONVERT(username USING utf8mb4) = CONVERT(%s USING utf8mb4)", (new_user,))
-                            if cursor.fetchone(): 
+                            cursor.execute(
+                                "SELECT user_id FROM system_users WHERE CONVERT(username USING utf8mb4) = CONVERT(%s USING utf8mb4)",
+                                (new_user.strip(),)
+                            )
+                            if cursor.fetchone():
                                 st.error("❌ ชื่อ Username นี้มีอยู่ในระบบแล้ว")
                             else:
-                                sql = """INSERT INTO system_users (username, password_hash, full_name, position, email, phone_number, branch_id, Role_tab, allowed_tabs, status) 
-                                         VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, %s, 'active')"""
-                                cursor.execute(sql, (new_user, hash_password(new_pass), new_fullname, new_pos, new_email, new_phone, current_branch_dict[new_branch_label], new_role, default_tabs))
+                                sql = """
+                                    INSERT INTO system_users 
+                                    (username, password_hash, full_name, position, email, phone_number, branch_id, Role_tab, allowed_tabs, status) 
+                                    VALUES (CONVERT(%s USING utf8mb4), %s, CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), 
+                                            CONVERT(%s USING utf8mb4), CONVERT(%s USING utf8mb4), %s, %s, %s, 'active')
+                                """
+                                cursor.execute(sql, (
+                                    new_user.strip(), hash_password(new_pass), new_fullname.strip(),
+                                    new_pos, new_email.strip(), new_phone.strip(),
+                                    current_branch_dict[new_branch_label], new_role, default_tabs
+                                ))
                                 conn.commit()
                                 log_activity(
-                                    st.session_state.user_id,
-                                    st.session_state.username,
-                                    "INSERT",
-                                    "Admin: User Management",
-                                    f"สร้างบัญชีใหม่: {new_user} (สิทธิ์: {new_role}, สาขาหลัก: {new_branch_label}, แท็บ: {default_tabs})"
+                                    st.session_state.user_id, st.session_state.username,
+                                    "INSERT", "Admin: User Management",
+                                    f"สร้างบัญชีใหม่: {new_user.strip()} (สิทธิ์: {new_role}, สาขาหลัก: {new_branch_label}, แท็บ: {default_tabs})"
                                 )
-                                st.success(f"เพิ่มผู้ใช้งาน {new_user} สำเร็จ! (กำหนดสิทธิ์เริ่มต้นเรียบร้อย)")
+                                st.success(f"เพิ่มผู้ใช้งาน {new_user.strip()} สำเร็จ! (กำหนดสิทธิ์เริ่มต้นเรียบร้อย)")
                                 time.sleep(1)
                                 st.rerun()
-                    except Exception as err: 
+                    except Exception as err:
                         st.error(f"เกิดข้อผิดพลาด: {err}")
                     finally:
-                        if conn: conn.close()
+                        if conn:
+                            conn.close()
 
-    # =========================================================================
-    # 🗂️ รายชื่อผู้ใช้งานและแผงค้นหา (Search & Filter)
-    # =========================================================================
-    # 🌟 จุดที่ 1 (วงสีแดงบน): แบ่ง 2 ฝั่งเพื่อใส่ข้อความแจ้งเตือนชิดขวา
+    # -------------------------------------------------------------------------
+    # 🗂️ ส่วนที่ 2: รายชื่อผู้ใช้งานและแผงค้นหา (Search & Filter)
+    # -------------------------------------------------------------------------
     col_hdr1, col_hdr2 = st.columns([2.5, 1.5])
     with col_hdr1:
         st.write("### 🗂️ รายชื่อผู้ใช้งานทั้งหมดในระบบ")
     with col_hdr2:
         st.markdown("<div style='text-align: right; padding-top: 15px;'><span style='color: #64748B; font-size: 13px;'>🔄 แผงค้นหาซิงค์ข้อมูล: <b>ตาราง & Dropdown</b></span></div>", unsafe_allow_html=True)
 
-    if all_users:
-        reverse_branch_dict = {str(v): k for k, v in current_branch_dict.items()}
-        def get_extra_branches_display(ids_str):
-            if not ids_str: return ""
-            return ", ".join([reverse_branch_dict.get(str(i).strip(), str(i).strip()) for i in str(ids_str).split(',') if i.strip()])
+    if not all_users:
+        st.info("ยังไม่มีข้อมูลบัญชีผู้ใช้ระบบคนอื่นนอกจากตัวคุณ")
+        return
 
-        raw_user_list = []
-        for u in all_users:
-            raw_user_list.append({
-                'ID': u['user_id'], 
-                'Username': u['username'],
-                'ชื่อ-นามสกุล': u.get('full_name') or '-',
-                'ตำแหน่ง': u.get('position') or '-',
-                'E-mail': u.get('email') or '-',
-                'เบอร์โทร': u.get('phone_number') or '-',
-                'สาขาประจำตัว': u.get('branch_name') or '-',
-                'ระดับสิทธิ์': u['Role_tab'],
-                'หน้ารายการที่เข้าถึงได้': u.get('allowed_tabs') or '-',
-                'สาขาเสริมที่มีสิทธิ์': get_extra_branches_display(u['additional_branches']),
-                'สถานะบัญชี': u['status']
-            })
-        
-        df_all_users = pd.DataFrame(raw_user_list)
+    reverse_branch_dict = {str(v): k for k, v in current_branch_dict.items()}
 
-        with st.expander("🔍 แผงค้นหาและตัวกรองรายชื่อผู้ใช้ (Filter Panel)", expanded=True):
-            f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-            with f_col1:
-                search_kw = st.text_input("🔍 ค้นหา (ชื่อ/User/เบอร์):", placeholder="พิมพ์เพื่อค้นหา...")
-            with f_col2:
-                filter_branch = st.selectbox("🏢 สาขาประจำตัว:", options=["ทั้งหมด"] + list(current_branch_dict.keys()))
-            with f_col3:
-                filter_role = st.selectbox("👑 ระดับสิทธิ์:", options=["ทั้งหมด", "admin", "manager", "reporter", "user"])
-            with f_col4:
-                filter_status = st.selectbox("📍 สถานะบัญชี:", options=["ทั้งหมด", "active", "disabled"])
+    def format_extra_branches(ids_str):
+        if not ids_str:
+            return ""
+        return ", ".join([reverse_branch_dict.get(str(i).strip(), str(i).strip()) for i in str(ids_str).split(",") if i.strip()])
 
-        filtered_df = df_all_users.copy()
-        if search_kw:
-            kw = search_kw.strip().lower()
-            filtered_df = filtered_df[
-                filtered_df['Username'].astype(str).str.lower().str.contains(kw) |
-                filtered_df['ชื่อ-นามสกุล'].astype(str).str.lower().str.contains(kw) |
-                filtered_df['เบอร์โทร'].astype(str).str.contains(kw)
-            ]
-        if filter_branch != "ทั้งหมด":
-            filtered_df = filtered_df[filtered_df['สาขาประจำตัว'] == filter_branch]
-        if filter_role != "ทั้งหมด":
-            filtered_df = filtered_df[filtered_df['ระดับสิทธิ์'] == filter_role]
-        if filter_status != "ทั้งหมด":
-            filtered_df = filtered_df[filtered_df['สถานะบัญชี'] == filter_status]
+    df_all_users = pd.DataFrame([{
+        "ID": u["user_id"],
+        "Username": u["username"],
+        "ชื่อ-นามสกุล": u.get("full_name") or "-",
+        "ตำแหน่ง": u.get("position") or "-",
+        "E-mail": u.get("email") or "-",
+        "เบอร์โทร": u.get("phone_number") or "-",
+        "สาขาประจำตัว": u.get("branch_name") or "-",
+        "ระดับสิทธิ์": u["Role_tab"],
+        "หน้ารายการที่เข้าถึงได้": u.get("allowed_tabs") or "-",
+        "สาขาเสริมที่มีสิทธิ์": format_extra_branches(u.get("additional_branches")),
+        "สถานะบัญชี": u["status"]
+    } for u in all_users])
 
-        st.caption(f"แสดงผล **{len(filtered_df)}** รายการ (จากทั้งหมด {len(df_all_users)} บัญชี)")
-        display_user_cols = ['ID', 'Username', 'ชื่อ-นามสกุล', 'ตำแหน่ง', 'E-mail', 'เบอร์โทร', 'สาขาประจำตัว', 'ระดับสิทธิ์', 'หน้ารายการที่เข้าถึงได้', 'สาขาเสริมที่มีสิทธิ์', 'สถานะบัญชี']
-        st.dataframe(filtered_df[display_user_cols], use_container_width=True, height=280)
-        
-        # 🌟 จุดที่ 2 (วงสีแดงล่าง): เพิ่มป้าย Badge สีฟ้าชิดขวาเหนือ Dropdown
-        col_tool1, col_tool2 = st.columns([2.5, 1.5])
-        with col_tool1:
-            st.write("#### 🛠️ เครื่องมืออนุมัติและปรับเปลี่ยนข้อมูลรายบัญชี")
-        with col_tool2:
-            st.markdown("<div style='text-align: right; padding-top: 15px;'><span style='color: #64748B; font-size: 13px;'>🔗 รายชื่อเปลี่ยนตามตัวกรองด้านบน<b>ตาราง & Dropdown</b></span></div>", unsafe_allow_html=True)
-        if not filtered_df.empty:
-            user_options = {
-                f"[{r['สถานะบัญชี']}] {r['Username']} — {r['ชื่อ-นามสกุล']} ({r['สาขาประจำตัว']})": r['ID']
-                for _, r in filtered_df.iterrows()
-            }
-            selected_label = st.selectbox("เลือกบัญชีผู้ใช้งานที่ต้องการปรับปรุง:", options=list(user_options.keys()),help="รายชื่อในกล่องนี้จะปรับเพิ่ม/ลด ตามคำค้นหาและตัวกรองที่เลือกไว้ในแผงด้านบนอัตโนมัติ")
-            target_id = user_options[selected_label]
-            selected_target_user = [r['Username'] for _, r in filtered_df.iterrows() if r['ID'] == target_id][0]
-        else:
-            st.warning("⚠️ ไม่พบบัญชีผู้ใช้งานที่ตรงกับเงื่อนไขการค้นหา")
-            return
-        
-        # ค้นหาข้อมูลเต็มของแถวที่เลือก
-        current_user_row = [r for r in all_users if r['user_id'] == target_id][0]
-        current_user_tabs = [x.strip() for x in str(current_user_row.get('allowed_tabs', '') or '').split(',') if x.strip()]
+    with st.expander("🔍 แผงค้นหาและตัวกรองรายชื่อผู้ใช้ (Filter Panel)", expanded=True):
+        f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+        with f_col1:
+            search_kw = st.text_input("🔍 ค้นหา (ชื่อ/User/เบอร์):", placeholder="พิมพ์เพื่อค้นหา...")
+        with f_col2:
+            filter_branch = st.selectbox("🏢 สาขาประจำตัว:", options=["ทั้งหมด"] + list(current_branch_dict.keys()))
+        with f_col3:
+            filter_role = st.selectbox("👑 ระดับสิทธิ์:", options=["ทั้งหมด", "admin", "manager", "reporter", "user"])
+        with f_col4:
+            filter_status = st.selectbox("📍 สถานะบัญชี:", options=["ทั้งหมด"] + STATUS_LIST)
 
-        sa_key = "sa_edit"
-        t1_key = "t1_edit"
-        t2_key = "t2_edit"
-        t3_key = "t3_edit"
-        t4_key = "t4_edit"
-        t5_key = "t5_edit"
-        t6_key = "t6_edit"
+    filtered_df = df_all_users.copy()
+    if search_kw:
+        kw = search_kw.strip().lower()
+        filtered_df = filtered_df[
+            filtered_df["Username"].astype(str).str.lower().str.contains(kw) |
+            filtered_df["ชื่อ-นามสกุล"].astype(str).str.lower().str.contains(kw) |
+            filtered_df["เบอร์โทร"].astype(str).str.contains(kw)
+        ]
+    if filter_branch != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["สาขาประจำตัว"] == filter_branch]
+    if filter_role != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["ระดับสิทธิ์"] == filter_role]
+    if filter_status != "ทั้งหมด":
+        filtered_df = filtered_df[filtered_df["สถานะบัญชี"] == filter_status]
 
-        # 🌟 ป้องกัน KeyError: ตั้งค่าเริ่มต้นให้ทุกคีย์
-        for k in [sa_key, t1_key, t2_key, t3_key, t4_key, t5_key, t6_key]:
-            if k not in st.session_state:
-                st.session_state[k] = False
+    st.caption(f"แสดงผล **{len(filtered_df)}** รายการ (จากทั้งหมด {len(df_all_users)} บัญชี)")
+    display_user_cols = ["ID", "Username", "ชื่อ-นามสกุล", "ตำแหน่ง", "E-mail", "เบอร์โทร", "สาขาประจำตัว", "ระดับสิทธิ์", "หน้ารายการที่เข้าถึงได้", "สาขาเสริมที่มีสิทธิ์", "สถานะบัญชี"]
+    st.dataframe(filtered_df[display_user_cols], use_container_width=True, height=280)
 
-        if st.session_state.get('loaded_edit_user') != target_id:
-            st.session_state['loaded_edit_user'] = target_id
-            st.session_state[sa_key] = (len(current_user_tabs) >= 4)
-            st.session_state[t1_key] = ("1" in current_user_tabs)
-            st.session_state[t2_key] = ("2" in current_user_tabs)
-            st.session_state[t3_key] = ("3" in current_user_tabs)
-            st.session_state[t4_key] = ("4" in current_user_tabs)
-            st.session_state[t5_key] = ("5" in current_user_tabs)
-            st.session_state[t6_key] = ("6" in current_user_tabs)
+    # -------------------------------------------------------------------------
+    # 🛠️ ส่วนที่ 3: เครื่องมืออนุมัติและปรับเปลี่ยนข้อมูลรายบัญชี
+    # -------------------------------------------------------------------------
+    col_tool1, col_tool2 = st.columns([2.5, 1.5])
+    with col_tool1:
+        st.write("#### 🛠️ เครื่องมืออนุมัติและปรับเปลี่ยนข้อมูลรายบัญชี")
+    with col_tool2:
+        st.markdown("<div style='text-align: right; padding-top: 15px;'><span style='color: #64748B; font-size: 13px;'>🔗 รายชื่อเปลี่ยนตามตัวกรองด้านบน<b>ตาราง & Dropdown</b></span></div>", unsafe_allow_html=True)
 
-        def on_select_all():
-            val = st.session_state.get(sa_key, False)
-            st.session_state[t1_key] = val
-            st.session_state[t2_key] = val
-            st.session_state[t3_key] = val
-            st.session_state[t4_key] = val
-            st.session_state[t5_key] = val
-            st.session_state[t6_key] = val
+    if filtered_df.empty:
+        st.warning("⚠️ ไม่พบบัญชีผู้ใช้งานที่ตรงกับเงื่อนไขการค้นหา")
+        return
 
-        def on_tab_change():
-            # 🌟 ดึงค่าแบบปลอดภัยด้วย .get()
-            t1 = st.session_state.get(t1_key, False)
-            t2 = st.session_state.get(t2_key, False)
-            t3 = st.session_state.get(t3_key, False)
-            t4 = st.session_state.get(t4_key, False)
-            st.session_state[sa_key] = (t1 and t2 and t3 and t4)
+    user_options = {
+        f"[{r['สถานะบัญชี']}] {r['Username']} — {r['ชื่อ-นามสกุล']} ({r['สาขาประจำตัว']})": r["ID"]
+        for _, r in filtered_df.iterrows()
+    }
+    selected_label = st.selectbox(
+        "เลือกบัญชีผู้ใช้งานที่ต้องการปรับปรุง:",
+        options=list(user_options.keys()),
+        help="รายชื่อในกล่องนี้จะปรับเพิ่ม/ลด ตามคำค้นหาและตัวกรองที่เลือกไว้ในแผงด้านบนอัตโนมัติ"
+    )
+    target_id = user_options[selected_label]
+    current_user_row = next(r for r in all_users if r["user_id"] == target_id)
+    selected_target_user = current_user_row["username"]
+    current_user_tabs = [x.strip() for x in str(current_user_row.get("allowed_tabs") or "").split(",") if x.strip()]
 
-        role_list = ["user", "reporter", "manager", "admin"]
-        curr_role_idx = role_list.index(current_user_row['Role_tab']) if current_user_row['Role_tab'] in role_list else 0
-        status_list = ["active", "disabled"]
-        curr_status_idx = status_list.index(current_user_row['status']) if current_user_row['status'] in status_list else 0
+    # จัดการสถานะ Checkbox ของสิทธิ์การเข้าถึงแท็บ
+    for k in [SA_KEY] + list(TAB_KEYS.values()):
+        if k not in st.session_state:
+            st.session_state[k] = False
 
-        raw_allowed_branches = str(current_user_row.get('additional_branches', '')) or ''
-        extra_b_ids = [int(x.strip()) for x in raw_allowed_branches.split(',') if x.strip().isdigit()]
-        all_allowed_ids = set([current_user_row['branch_id']] + extra_b_ids)
-        current_allowed_branch_names = [k for k, v in current_branch_dict.items() if v in all_allowed_ids]
+    if st.session_state.get("loaded_edit_user") != target_id:
+        st.session_state["loaded_edit_user"] = target_id
+        for tab_num, key_name in TAB_KEYS.items():
+            st.session_state[key_name] = (tab_num in current_user_tabs)
+        st.session_state[SA_KEY] = all(st.session_state[TAB_KEYS[str(i)]] for i in range(1, 5))
 
-        with st.container(border=True): 
-            # 🔑 รีเซ็ตรหัสผ่านใหม่โดย Admin
-            with st.expander("🔑 รีเซ็ตรหัสผ่านใหม่ให้บัญชีนี้ (Admin Reset Password)", expanded=False):
-                st.caption(f"กำหนดรหัสผ่านใหม่ให้กับคุณ **{selected_target_user}** (กรณีพนักงานลืมรหัสผ่าน)")
-                r_c1, r_c2 = st.columns([2.5, 1.5])
-                with r_c1:
-                    new_reset_pass = st.text_input("ระบุรหัสผ่านใหม่:", type="password", key=f"rst_pwd_{target_id}", placeholder="กรอกรหัสผ่านใหม่ที่ต้องการ...")
-                with r_c2:
-                    st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                    btn_reset = st.button("🔑 ยืนยันเปลี่ยนรหัส", key=f"btn_rst_{target_id}", type="primary", use_container_width=True)
-                
-                if btn_reset:
-                    if not new_reset_pass:
-                        st.error("⚠️ กรุณาระบุรหัสผ่านใหม่ก่อนกดบันทึก")
-                    elif len(new_reset_pass) < 4:
-                        st.warning("⚠️ รหัสผ่านควรมีความยาวอย่างน้อย 4 ตัวอักษร")
-                    else:
-                        conn_rst = None
-                        try:
-                            conn_rst = get_db_connection()
-                            with conn_rst.cursor() as cur:
-                                cur.execute("UPDATE system_users SET password_hash = %s WHERE user_id = %s", 
-                                            (hash_password(new_reset_pass), int(target_id)))
-                                conn_rst.commit()
-                                
-                                log_activity(
-                                    st.session_state.user_id,
-                                    st.session_state.username,
-                                    "UPDATE",
-                                    "Admin: Password Reset",
-                                    f"แอดมินรีเซ็ตรหัสผ่านใหม่ให้กับ '{selected_target_user}' (User ID: {target_id})"
-                                )
-                            st.success(f"✅ ทำการรีเซ็ตรหัสผ่านของ '{selected_target_user}' สำเร็จเรียบร้อย!")
-                            time.sleep(1.2)
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน: {e}")
-                        finally:
-                            if conn_rst: conn_rst.close()
+    def on_select_all():
+        val = st.session_state.get(SA_KEY, False)
+        for key_name in TAB_KEYS.values():
+            st.session_state[key_name] = val
 
-            st.markdown("**📋 แก้ไขข้อมูลส่วนตัว**")
-            c_info1, c_info2 = st.columns(2)
-            with c_info1: edit_fullname = st.text_input("ชื่อ-สกุล:", value=current_user_row.get('full_name') or '', key=f"fn_{target_id}")
-            
-            raw_pos = str(current_user_row.get('position') or '').strip()
-            if not raw_pos or raw_pos == "-" or raw_pos.lower() == "none":
-                curr_pos = "-- กรุณาเลือกตำแหน่ง --"
-            else:
-                curr_pos = raw_pos
-                
-            edit_pos_list = position_list.copy() 
-            if curr_pos not in edit_pos_list:
-                edit_pos_list.insert(1, curr_pos) 
-            
-            pos_idx = edit_pos_list.index(curr_pos)
-            
-            with c_info2: edit_pos = st.selectbox("ตำแหน่ง:", options=edit_pos_list, index=pos_idx, key=f"pos_{target_id}")
-            
-            c_info3, c_info4 = st.columns(2)
-            with c_info3: edit_email = st.text_input("E-mail:", value=current_user_row.get('email') or '', key=f"em_{target_id}")
-            with c_info4: edit_phone = st.text_input("เบอร์โทรศัพท์:", value=current_user_row.get('phone_number') or '', key=f"ph_{target_id}")
-            
-            st.markdown("---")
-            st.markdown("**🔐 ปรับเปลี่ยนสิทธิ์การเข้าถึงและสังกัด**")
-            
-            branch_names_list = list(current_branch_dict.keys())
-            curr_b_name = next((k for k, v in current_branch_dict.items() if v == current_user_row['branch_id']), branch_names_list[0] if branch_names_list else "")
-            curr_b_idx = branch_names_list.index(curr_b_name) if curr_b_name in branch_names_list else 0
+    def on_tab_change():
+        st.session_state[SA_KEY] = all(st.session_state.get(TAB_KEYS[str(i)], False) for i in range(1, 5))
 
-            c_edit0, c_edit1, c_edit2 = st.columns(3)
-            with c_edit0: 
-                edit_primary_branch = st.selectbox("🏢 สาขาประจำตัว (หลัก) *", options=branch_names_list, index=curr_b_idx, key=f"pbr_{target_id}")
-            with c_edit1: 
-                edit_role = st.selectbox("ระดับสิทธิ์ (Role_tab):", options=role_list, index=curr_role_idx, key=f"ro_{target_id}", help=(
+    curr_role_idx = ROLE_LIST.index(current_user_row["Role_tab"]) if current_user_row["Role_tab"] in ROLE_LIST else 0
+    curr_status_idx = STATUS_LIST.index(current_user_row["status"]) if current_user_row["status"] in STATUS_LIST else 0
+
+    raw_allowed_branches = str(current_user_row.get("additional_branches") or "")
+    extra_b_ids = [int(x.strip()) for x in raw_allowed_branches.split(",") if x.strip().isdigit()]
+    all_allowed_ids = {current_user_row["branch_id"]} | set(extra_b_ids)
+    current_allowed_branch_names = [k for k, v in current_branch_dict.items() if v in all_allowed_ids]
+
+    with st.container(border=True):
+        # 🔑 รีเซ็ตรหัสผ่านใหม่โดย Admin
+        with st.expander("🔑 รีเซ็ตรหัสผ่านใหม่ให้บัญชีนี้ (Admin Reset Password)", expanded=False):
+            st.caption(f"กำหนดรหัสผ่านใหม่ให้กับคุณ **{selected_target_user}** (กรณีพนักงานลืมรหัสผ่าน)")
+            r_c1, r_c2 = st.columns([2.5, 1.5])
+            with r_c1:
+                new_reset_pass = st.text_input("ระบุรหัสผ่านใหม่:", type="password", key=f"rst_pwd_{target_id}", placeholder="กรอกรหัสผ่านใหม่ที่ต้องการ...")
+            with r_c2:
+                st.write("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+                btn_reset = st.button("🔑 ยืนยันเปลี่ยนรหัส", key=f"btn_rst_{target_id}", type="primary", use_container_width=True)
+
+            if btn_reset:
+                if not new_reset_pass:
+                    st.error("⚠️ กรุณาระบุรหัสผ่านใหม่ก่อนกดบันทึก")
+                elif len(new_reset_pass) < 4:
+                    st.warning("⚠️ รหัสผ่านควรมีความยาวอย่างน้อย 4 ตัวอักษร")
+                else:
+                    conn_rst = None
+                    try:
+                        conn_rst = get_db_connection()
+                        with conn_rst.cursor() as cur:
+                            cur.execute(
+                                "UPDATE system_users SET password_hash = %s WHERE user_id = %s",
+                                (hash_password(new_reset_pass), int(target_id))
+                            )
+                            conn_rst.commit()
+                        log_activity(
+                            st.session_state.user_id, st.session_state.username,
+                            "UPDATE", "Admin: Password Reset",
+                            f"แอดมินรีเซ็ตรหัสผ่านใหม่ให้กับ '{selected_target_user}' (User ID: {target_id})"
+                        )
+                        st.success(f"✅ ทำการรีเซ็ตรหัสผ่านของ '{selected_target_user}' สำเร็จเรียบร้อย!")
+                        time.sleep(1.2)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"เกิดข้อผิดพลาดในการเปลี่ยนรหัสผ่าน: {e}")
+                    finally:
+                        if conn_rst:
+                            conn_rst.close()
+
+        # 📋 แก้ไขข้อมูลส่วนตัว
+        st.markdown("**📋 แก้ไขข้อมูลส่วนตัว**")
+        c_info1, c_info2 = st.columns(2)
+        with c_info1:
+            edit_fullname = st.text_input("ชื่อ-สกุล:", value=current_user_row.get("full_name") or "", key=f"fn_{target_id}")
+
+        raw_pos = str(current_user_row.get("position") or "").strip()
+        curr_pos = "-- กรุณาเลือกตำแหน่ง --" if (not raw_pos or raw_pos == "-" or raw_pos.lower() == "none") else raw_pos
+        edit_pos_list = position_list.copy()
+        if curr_pos not in edit_pos_list:
+            edit_pos_list.insert(1, curr_pos)
+
+        with c_info2:
+            edit_pos = st.selectbox("ตำแหน่ง:", options=edit_pos_list, index=edit_pos_list.index(curr_pos), key=f"pos_{target_id}")
+
+        c_info3, c_info4 = st.columns(2)
+        with c_info3:
+            edit_email = st.text_input("E-mail:", value=current_user_row.get("email") or "", key=f"em_{target_id}")
+        with c_info4:
+            edit_phone = st.text_input("เบอร์โทรศัพท์:", value=current_user_row.get("phone_number") or "", key=f"ph_{target_id}")
+
+        # 🔐 ปรับเปลี่ยนสิทธิ์การเข้าถึงและสังกัด
+        st.markdown("---")
+        st.markdown("**🔐 ปรับเปลี่ยนสิทธิ์การเข้าถึงและสังกัด**")
+
+        branch_names_list = list(current_branch_dict.keys())
+        curr_b_name = next((k for k, v in current_branch_dict.items() if v == current_user_row["branch_id"]), branch_names_list[0] if branch_names_list else "")
+        curr_b_idx = branch_names_list.index(curr_b_name) if curr_b_name in branch_names_list else 0
+
+        c_edit0, c_edit1, c_edit2 = st.columns(3)
+        with c_edit0:
+            edit_primary_branch = st.selectbox("🏢 สาขาประจำตัว (หลัก) *", options=branch_names_list, index=curr_b_idx, key=f"pbr_{target_id}")
+        with c_edit1:
+            edit_role = st.selectbox(
+                "ระดับสิทธิ์ (Role_tab):",
+                options=ROLE_LIST,
+                index=curr_role_idx,
+                key=f"ro_{target_id}",
+                help=(
                     "👑 admin: เข้าถึงได้ทุกหน้าและทุกสาขาอัตโนมัติ\n\n"
                     "👔 manager: ดูรายงานหลายสาขา, จัดการอุปกรณ์ (หน้า 5) และตั้งค่า STD (หน้า 6)\n\n"
                     "📊 reporter: ดูและ Export รายงานได้ตามสาขาที่ได้รับสิทธิ์\n\n"
                     "✍️ user: พนักงานทั่วไป ลงบันทึกงานประจำวันเฉพาะสาขาของตนเอง"
+                )
+            )
+        with c_edit2:
+            edit_status = st.selectbox("สถานะบัญชี:", options=STATUS_LIST, index=curr_status_idx, key=f"st_{target_id}")
+
+        st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 0px;'>🏷️ เลือกจัดสรรแท็บงานประจำบัญชี:</p>", unsafe_allow_html=True)
+        st.caption("☑️ ติ๊กเลือกแท็บที่ต้องการให้บัญชีนี้เข้าถึงได้ (หากไม่เลือกเลย ระบบจะทำการ 'ล็อกสิทธิ์' อัตโนมัติ)")
+
+        st.markdown("<div style='background-color: #F8FAFC; padding: 5px 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 10px;'>", unsafe_allow_html=True)
+        st.checkbox("☑️ **Select all (เลือกทั้งหมด)**", key=SA_KEY, on_change=on_select_all)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        cb_col1, cb_col2 = st.columns(2)
+        with cb_col1:
+            st.checkbox(
+                "⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์",
+                key=TAB_KEYS["1"],
+                on_change=on_tab_change,
+                help="บันทึกชั่วโมงการทำงาน, การหยุดเครื่อง และการแจ้งซ่อมเครื่องจักรหลัก"
+            )
+            st.checkbox(
+                "🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ",
+                key=TAB_KEYS["2"],
+                on_change=on_tab_change,
+                help="บันทึกชั่วโมงมิเตอร์, ปริมาณการเติมน้ำมันดีเซล และคำนวณอัตราสิ้นเปลือง (ลิตร/ชม.)"
+            )
+            if edit_role == "manager":
+                st.checkbox(
+                    "🛠️ หน้า 5: จัดการข้อมูลอุปกรณ์",
+                    key=TAB_KEYS["5"],
+                    help="สิทธิ์เพิ่ม/แก้ไข/ระงับ รายชื่อเครื่องจักรและยานพาหนะของสาขาที่รับผิดชอบ"
+                )
+        with cb_col2:
+            st.checkbox(
+                "💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์",
+                key=TAB_KEYS["3"],
+                on_change=on_tab_change,
+                help="บันทึกสถิติแรงดันตก (Pressure Drop) และเกณฑ์มาตรฐานแรงดัน"
+            )
+            st.checkbox(
+                "🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)",
+                key=TAB_KEYS["4"],
+                on_change=on_tab_change,
+                help="บันทึกเชื้อเพลิงหม้อต้มชีวมวล และยอดรวมการอบไม้ประจำวัน"
+            )
+            if edit_role in ["manager", "admin"]:
+                st.checkbox(
+                    "⚙️ หน้า 6: กำหนดเกณฑ์มาตรฐาน (STD Settings)",
+                    key=TAB_KEYS["6"],
+                    help="สิทธิ์ปรับปรุงค่า Target KPI, ค่าแรงดันมาตรฐาน และเกณฑ์การใช้น้ำมัน"
+                )
+        st.write("")
+
+        if edit_role == "admin":
+            st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 5px;'>📍 กำหนดสาขาที่มีสิทธิ์:</p>", unsafe_allow_html=True)
+            st.success("🌟 **Full Access** (สิทธิ์ระดับ Admin สามารถเข้าถึงและจัดการข้อมูลได้ทุกสาขาอัตโนมัติ)")
+            edit_allowed_branches = []
+        else:
+            edit_allowed_branches = st.multiselect(
+                "📍 กำหนดสาขาที่มีสิทธิ์ (รวมสาขาหลักของ User คนนี้แล้ว):",
+                options=list(current_branch_dict.keys()),
+                default=current_allowed_branch_names,
+                key=f"br_{target_id}",
+                help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
+            )
+            st.caption("ℹ️ *หากเลือกหลายสาขา ผู้ใช้จะเห็น Dropdown สลับดูข้อมูลของสาขาเหล่านั้นในหน้ารายงานและหน้าบันทึกได้ทันที*")
+
+        if st.button("💾 บันทึกและอนุมัติสิทธิ์การเข้าถึง", type="primary", use_container_width=True):
+            allowed_tabs_list = [str(i) for i in range(1, 5) if st.session_state.get(TAB_KEYS[str(i)])]
+            if edit_role == "manager" and st.session_state.get(TAB_KEYS["5"]):
+                allowed_tabs_list.append("5")
+            if edit_role in ["manager", "admin"] and st.session_state.get(TAB_KEYS["6"]):
+                allowed_tabs_list.append("6")
+
+            allowed_tabs_str = ",".join(allowed_tabs_list)
+            final_edit_pos = edit_pos if edit_pos != "-- กรุณาเลือกตำแหน่ง --" else ""
+
+            conn = None
+            try:
+                conn = get_db_connection()
+                new_primary_b_id = current_branch_dict[edit_primary_branch]
+
+                with conn.cursor() as cur:
+                    cur.execute(
+                        """UPDATE system_users 
+                           SET branch_id=%s, full_name=CONVERT(%s USING utf8mb4), position=CONVERT(%s USING utf8mb4), 
+                               email=CONVERT(%s USING utf8mb4), phone_number=CONVERT(%s USING utf8mb4), 
+                               Role_tab=%s, allowed_tabs=%s, status=%s 
+                           WHERE user_id=%s""",
+                        (new_primary_b_id, edit_fullname, final_edit_pos, edit_email, edit_phone, edit_role, allowed_tabs_str, edit_status, int(target_id))
                     )
-                )
-            with c_edit2: 
-                edit_status = st.selectbox("สถานะบัญชี:", options=status_list, index=curr_status_idx, key=f"st_{target_id}")
-            
-            st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 0px;'>🏷️ เลือกจัดสรรแท็บงานประจำบัญชี:</p>", unsafe_allow_html=True)
-            st.caption("☑️ ติ๊กเลือกแท็บที่ต้องการให้บัญชีนี้เข้าถึงได้ (หากไม่เลือกเลย ระบบจะทำการ 'ล็อกสิทธิ์' อัตโนมัติ)")
-            
-            st.markdown("<div style='background-color: #F8FAFC; padding: 5px 15px; border-radius: 8px; border: 1px solid #E2E8F0; margin-bottom: 10px;'>", unsafe_allow_html=True)
-            st.checkbox("☑️ **Select all (เลือกทั้งหมด)**", key=sa_key, on_change=on_select_all)
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            cb_col1, cb_col2 = st.columns(2)
-            with cb_col1:
-                st.checkbox(
-                    "⚙️ TAB 1: รายงานสรุปเครื่องจักร & เบรกดาวน์", 
-                    key=t1_key, 
-                    on_change=on_tab_change,
-                    help="บันทึกชั่วโมงการทำงาน, การหยุดเครื่อง และการแจ้งซ่อมเครื่องจักรหลัก"
-                )
-                st.checkbox(
-                    "🚚 TAB 2: รายงานสรุปการใช้เชื้อเพลิงรถ", 
-                    key=t2_key, 
-                    on_change=on_tab_change,
-                    help="บันทึกชั่วโมงมิเตอร์, ปริมาณการเติมน้ำมันดีเซล และคำนวณอัตราสิ้นเปลือง (ลิตร/ชม.)"
-                )
-                if edit_role == "manager":
-                    st.checkbox(
-                        "🛠️ หน้า 5: จัดการข้อมูลอุปกรณ์", 
-                        key=t5_key,
-                        help="สิทธิ์เพิ่ม/แก้ไข/ระงับ รายชื่อเครื่องจักรและยานพาหนะของสาขาที่รับผิดชอบ"
-                    )
-            with cb_col2:
-                st.checkbox(
-                    "💨 TAB 3: รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
-                    key=t3_key, 
-                    on_change=on_tab_change,
-                    help="บันทึกสถิติแรงดันตก (Pressure Drop) และเกณฑ์มาตรฐานแรงดัน"
-                )
-                st.checkbox(
-                    "🔥 TAB 4: รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์ (SYSTEM)", 
-                    key=t4_key, 
-                    on_change=on_tab_change,
-                    help="บันทึกเชื้อเพลิงหม้อต้มชีวมวล และยอดรวมการอบไม้ประจำวัน"
-                )
-                if edit_role in ["manager", "admin"]:
-                    st.checkbox(
-                        "⚙️ หน้า 6: กำหนดเกณฑ์มาตรฐาน (STD Settings)", 
-                        key=t6_key,
-                        help="สิทธิ์ปรับปรุงค่า Target KPI, ค่าแรงดันมาตรฐาน และเกณฑ์การใช้น้ำมัน"
-                    )
-            st.write("")
-            
-            if edit_role == "admin":
-                st.markdown("<p style='font-size: 14.5px; font-weight: 600; margin-bottom: 5px;'>📍 กำหนดสาขาที่มีสิทธิ์:</p>", unsafe_allow_html=True)
-                st.success("🌟 **Full Access** (สิทธิ์ระดับ Admin สามารถเข้าถึงและจัดการข้อมูลได้ทุกสาขาอัตโนมัติ)")
-                edit_allowed_branches = []
-            else:
-                edit_allowed_branches = st.multiselect(
-                    "📍 กำหนดสาขาที่มีสิทธิ์ (รวมสาขาหลักของ User คนนี้แล้ว):", 
-                    options=list(current_branch_dict.keys()), 
-                    default=current_allowed_branch_names,
-                    key=f"br_{target_id}",
-                    help="ผู้ใช้งานจะสามารถดูและจัดการข้อมูลของสาขาที่ถูกเลือกได้เหมือนกับเป็นสาขาของตนเอง"
-                )
-                st.caption("ℹ️ *หากเลือกหลายสาขา ผู้ใช้จะเห็น Dropdown สลับดูข้อมูลของสาขาเหล่านั้นในหน้ารายงานและหน้าบันทึกได้ทันที*")
 
-            if st.button("💾 บันทึกและอนุมัติสิทธิ์การเข้าถึง", type="primary", use_container_width=True):
-                allowed_tabs_list = []
-                if st.session_state[t1_key]: allowed_tabs_list.append("1")
-                if st.session_state[t2_key]: allowed_tabs_list.append("2")
-                if st.session_state[t3_key]: allowed_tabs_list.append("3")
-                if st.session_state[t4_key]: allowed_tabs_list.append("4")
-                if edit_role == "manager" and st.session_state.get(t5_key): allowed_tabs_list.append("5")
-                if edit_role in ["manager", "admin"] and st.session_state.get(t6_key): allowed_tabs_list.append("6")
+                    cur.execute("DELETE FROM user_branches WHERE user_id=%s", (int(target_id),))
+                    for b_name in edit_allowed_branches:
+                        b_id = current_branch_dict.get(b_name)
+                        if b_id and b_id != new_primary_b_id:
+                            cur.execute("INSERT INTO user_branches (user_id, branch_id) VALUES (%s, %s)", (int(target_id), b_id))
 
-                allowed_tabs_str = ",".join(allowed_tabs_list)
-                final_edit_pos = edit_pos if edit_pos != "-- กรุณาเลือกตำแหน่ง --" else ""
+                    conn.commit()
 
-                conn = None
-                try:
-                    conn = get_db_connection()
-                    new_primary_b_id = current_branch_dict[edit_primary_branch]
-                    
-                    with conn.cursor() as cur:
-                        cur.execute("""UPDATE system_users 
-                                       SET branch_id=%s, full_name=CONVERT(%s USING utf8mb4), position=CONVERT(%s USING utf8mb4), 
-                                           email=CONVERT(%s USING utf8mb4), phone_number=CONVERT(%s USING utf8mb4), 
-                                           Role_tab=%s, allowed_tabs=%s, status=%s 
-                                       WHERE user_id=%s""", 
-                                    (new_primary_b_id, edit_fullname, final_edit_pos, edit_email, edit_phone, edit_role, allowed_tabs_str, edit_status, int(target_id)))
-                        
-                        cur.execute("DELETE FROM user_branches WHERE user_id=%s", (int(target_id),))
-                        for b_name in edit_allowed_branches:
-                            b_id = current_branch_dict.get(b_name)
-                            if b_id and b_id != new_primary_b_id:
-                                cur.execute("INSERT INTO user_branches (user_id, branch_id) VALUES (%s, %s)", (int(target_id), b_id))
-                        
-                        conn.commit()
-                        log_activity(
-                            st.session_state.user_id,
-                            st.session_state.username,
-                            "UPDATE",
-                            "Admin: User Management",
-                            f"แก้ไขข้อมูล/สิทธิ์ของ '{selected_target_user}' (สาขาหลัก: {edit_primary_branch}, Role: {edit_role}, สถานะ: {edit_status}, แท็บ: {allowed_tabs_str})"
-                        )
-                    st.session_state['loaded_edit_user'] = None 
-                    st.success(f"อัปเดตสิทธิ์การใช้งานของ '{selected_target_user}' สำเร็จเรียบร้อย!")
-                    time.sleep(1)
-                    st.rerun()
-                except Exception as e: 
-                    st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
-                finally:
-                    if conn: conn.close()
-                
-        st.write("<br>", unsafe_allow_html=True)
-        with st.expander("🚨 โซนอันตราย: จัดการ / ลบบัญชีผู้ใช้นี้ออกจากระบบ"):
-            st.warning(f"การจัดการบัญชี **{selected_target_user}** กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
-            
-            is_self = (int(target_id) == int(st.session_state.user_id))
-            if is_self:
-                st.info("ℹ️ คุณไม่สามารถลบหรือระงับบัญชีของตัวเองในขณะที่กำลังเข้าสู่ระบบอยู่ได้")
+                log_activity(
+                    st.session_state.user_id, st.session_state.username,
+                    "UPDATE", "Admin: User Management",
+                    f"แก้ไขข้อมูล/สิทธิ์ของ '{selected_target_user}' (สาขาหลัก: {edit_primary_branch}, Role: {edit_role}, สถานะ: {edit_status}, แท็บ: {allowed_tabs_str})"
+                )
+                st.session_state["loaded_edit_user"] = None
+                st.success(f"อัปเดตสิทธิ์การใช้งานของ '{selected_target_user}' สำเร็จเรียบร้อย!")
+                time.sleep(1)
+                st.rerun()
+            except Exception as e:
+                st.error(f"เกิดข้อผิดพลาดในการบันทึก: {e}")
+            finally:
+                if conn:
+                    conn.close()
 
-            if st.button(f"🗑️ ขอลบบัญชี {selected_target_user}", key="btn_del_usr", type="primary", use_container_width=True, disabled=is_self):
-                confirm_delete_user_dialog(target_id, selected_target_user)               
-    else:
-        st.info("ยังไม่มีข้อมูลบัญชีผู้ใช้ระบบคนอื่นนอกจากตัวคุณ")
+    # -------------------------------------------------------------------------
+    # 🚨 ส่วนที่ 4: โซนอันตราย (จัดการ / ลบบัญชีผู้ใช้)
+    # -------------------------------------------------------------------------
+    st.write("<br>", unsafe_allow_html=True)
+    with st.expander("🚨 โซนอันตราย: จัดการ / ลบบัญชีผู้ใช้นี้ออกจากระบบ"):
+        st.warning(f"การจัดการบัญชี **{selected_target_user}** กรุณาตรวจสอบให้แน่ใจก่อนดำเนินการ")
+
+        is_self = (int(target_id) == int(st.session_state.user_id))
+        if is_self:
+            st.info("ℹ️ คุณไม่สามารถลบหรือระงับบัญชีของตัวเองในขณะที่กำลังเข้าสู่ระบบอยู่ได้")
+
+        if st.button(f"🗑️ ขอลบบัญชี {selected_target_user}", key="btn_del_usr", type="primary", use_container_width=True, disabled=is_self):
+            confirm_delete_user_dialog(target_id, selected_target_user)

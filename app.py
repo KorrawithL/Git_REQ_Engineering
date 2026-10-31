@@ -689,23 +689,23 @@ else:
         access_color = "#64748B"
 
     all_tabs_config = {
-        "1": "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์", 
-        "2": "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)",
-        "3": "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์", 
-        "4": "🔥 4. การใช้เชื้อเพลิง บอยเลอร์"
+        "1": "⚙️ ระบบเครื่องจักร / เบรกดาวน์", 
+        "2": "🚚 ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)",
+        "3": "💨 แรงดันไอน้ำปลายทาง บอยเลอร์", 
+        "4": "🔥 การใช้เชื้อเพลิง บอยเลอร์"
     }
     report_names_map = {
-        "1": "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์", 
-        "2": "🚚 2. รายงานสรุปการใช้เชื้อเพลิงรถ", 
-        "3": "💨 3. รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
-        "4": "🔥 4. รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์"
+        "1": "⚙️ รายงานสรุปเครื่องจักร / เบรกดาวน์", 
+        "2": "🚚 รายงานสรุปการใช้เชื้อเพลิงรถ", 
+        "3": "💨 รายงานสรุปแรงดันไอน้ำ บอยเลอร์", 
+        "4": "🔥 รายงานสรุปการใช้เชื้อเพลิงบอยเลอร์"
     }
     setting_names_map = {
-        "users": "👥 1. จัดการผู้ใช้และสิทธิ์",
-        "equip": "🛠️ 2. จัดการข้อมูลอุปกรณ์",
-        "std":   "⚙️ 3. กำหนดเกณฑ์มาตรฐาน (STD Settings)",
-        "logs":  "📋 4. ประวัติกิจกรรม (System Logs)",
-        "bin":   "🗑️ 5. ถังขยะกู้คืนข้อมูล (Recycle Bin)"
+        "users": "👥 จัดการผู้ใช้และสิทธิ์",
+        "equip": "🛠️ จัดการข้อมูลอุปกรณ์",
+        "std":   "⚙️ กำหนดเกณฑ์มาตรฐาน (STD Settings)",
+        "logs":  "📋 ประวัติกิจกรรม (System Logs)",
+        "bin":   "🗑️ ถังขยะกู้คืนข้อมูล (Recycle Bin)"
     }
     
     def get_sub_menu_options(role, allowed_tabs):
@@ -758,13 +758,11 @@ else:
             st.session_state['sidebar_main'] = main_choices[0]
             safe_set_cookie("last_main_tab", main_choices[0], SESSION_TIMEOUT_SECONDS) 
             
-    # ตรวจสอบค่าเริ่มต้นของเมนูย่อยให้ถูกต้องก่อนสร้าง st.radio
+    # บรรทัดที่ 490 และ 492 ใน app.py
     if 'sidebar_sub_entry' not in st.session_state or st.session_state['sidebar_sub_entry'] not in sub_opts:
-        st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์"
+        st.session_state['sidebar_sub_entry'] = sub_opts[0] if sub_opts else "⚙️ ระบบเครื่องจักร / เบรกดาวน์"
     if 'sidebar_sub_report' not in st.session_state or st.session_state['sidebar_sub_report'] not in rep_opts:
-        st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ 1. รายงานสรุปเครื่องจักร / เบรกดาวน์"
-    if 'sidebar_sub_setting' not in st.session_state or st.session_state['sidebar_sub_setting'] not in set_opts:
-        st.session_state['sidebar_sub_setting'] = set_opts[0] if set_opts else setting_names_map["users"]
+        st.session_state['sidebar_sub_report'] = rep_opts[0] if rep_opts else "⚙️ รายงานสรุปเครื่องจักร / เบรกดาวน์"
 
     with st.sidebar:
         st.markdown("<h3 style='color: #333333; margin-top: 5px; margin-bottom: 25px; font-size: 26px; font-weight: 800; letter-spacing: 0.5px;'>WOOD WORK</h3>", unsafe_allow_html=True)

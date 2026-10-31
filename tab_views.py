@@ -23,10 +23,10 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     user_allowed_branches = st.session_state.get('allowed_branches', [str(st.session_state.get('branch_id'))])
 
     mapping = {
-        "⚙️ 1. ระบบเครื่องจักร / เบรกดาวน์": "1",
-        "🚚 2. ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)": "2",
-        "💨 3. แรงดันไอน้ำปลายทาง บอยเลอร์": "3",
-        "🔥 4. การใช้เชื้อเพลิง บอยเลอร์": "4"
+        "⚙️ ระบบเครื่องจักร / เบรกดาวน์": "1",
+        "🚚 ระบบเชื้อเพลิง (รถยก/เครื่องยนต์)": "2",
+        "💨 แรงดันไอน้ำปลายทาง บอยเลอร์": "3",
+        "🔥 การใช้เชื้อเพลิง บอยเลอร์": "4"
     }
     
     key = mapping.get(selected_sub_menu, "1") if selected_sub_menu else "1"
@@ -47,7 +47,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     # =========================================================================
     if key == "1":
         with current_tab_ctx:
-            st.subheader("1. ระบบการทำงานของเครื่องจักร / เบรกดาวน์")
+            st.subheader("ระบบการทำงานของเครื่องจักร / เบรกดาวน์")
 
             with st.container(border=True):
                 st.write("### 📝 ฟอร์มบันทึกข้อมูลเครื่องจักรลงตาราง")
@@ -177,7 +177,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     # =========================================================================
     elif key == "2":
         with current_tab_ctx:
-            st.subheader("2. ระบบการใช้เชื้อเพลิง (เครื่องยนต์/รถยก)")
+            st.subheader("ระบบการใช้เชื้อเพลิง (เครื่องยนต์/รถยก)")
             
             with st.container(border=True):
                 st.write("### 📝 ฟอร์มบันทึกข้อมูลการใช้เชื้อเพลิงรถ")
@@ -322,7 +322,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     # =========================================================================
     elif key == "3":
         with current_tab_ctx:
-            st.subheader("3. ระบบแรงดันไอน้ำปลายทางของบอยเลอร์")
+            st.subheader("ระบบแรงดันไอน้ำปลายทางของบอยเลอร์")
             
             with st.container(border=True):
                 st.write("### 📝 บันทึกข้อมูลแรงดันไอน้ำ")
@@ -423,7 +423,7 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
     # =========================================================================
     elif key == "4":
         with current_tab_ctx:
-            st.subheader("4. ระบบการใช้เชื้อเพลิงบอยเลอร์")
+            st.subheader("ระบบการใช้เชื้อเพลิงบอยเลอร์")
             st.info(
                 "📌 **ข้อแนะนำสำคัญ:** เพื่อให้รายงานสรุปรวม (บอยเลอร์ 1+2) คำนวณข้อมูลรายวันได้ครบถ้วน "
                 "กรุณาบันทึกข้อมูลทั้งในแท็บ **'📁 ยอดรวมสาขา'** และแท็บ **'🏭 ปริมาณเชื้อเพลิงบอยเลอร์ (ทั้งบอยเลอร์ 1 และ 2)'** ของวันนั้นให้ครบ"
@@ -596,17 +596,17 @@ def render_engineering_system_tabs(current_branch_name, selected_sub_menu=None):
 
                     c1, c2, c3 = st.columns(3)
                     with c1:
-                        st.write("**📦 ส่วนที่ 4.1: เชื้อเพลิงที่ใช้ (ตัน/วัน)**")
+                        st.write("**📦 ส่วนที่ 1: เชื้อเพลิงที่ใช้ (ตัน/วัน)**")
                         saw_w = st.number_input("น้ำหนักขี้เลื่อย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักขี้เลื่อย", disabled=disable_t4_inputs, key=f"t4_sw_{rk4}")
                         wood_w = st.number_input("น้ำหนักปีกไม้ (ตัน) *", min_value=0.0, step=0.001, format="%.3f", value=None, placeholder="ระบุน้ำหนักปีกไม้", disabled=disable_t4_inputs, key=f"t4_ww_{rk4}")
                         waste_wood_w = st.number_input("น้ำหนักเศษไม้เสีย (ตัน) *", min_value=0.0, step=0.1, value=None, placeholder="ระบุน้ำหนักเศษไม้เสีย", disabled=disable_t4_inputs, key=f"t4_www_{rk4}")
                     with c2:
-                        st.write("**💰 ส่วนที่ 4.2: ราคาเชื้อเพลิง (ต่อตัน)**")
+                        st.write("**💰 ส่วนที่ 2: ราคาเชื้อเพลิง (ต่อตัน)**")
                         saw_p = st.number_input("ราคาขี้เลื่อย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาขี้เลื่อย", disabled=disable_t4_inputs, key=f"t4_sp_{rk4}")
                         wood_p = st.number_input("ราคาปีกไม้ (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาปีกไม้", disabled=disable_t4_inputs, key=f"t4_wp_{rk4}")
                         waste_wood_p = st.number_input("ราคาเศษไม้เสีย (บาท) *", min_value=0.0, step=50.0, value=None, placeholder="ระบุราคาเศษไม้เสีย", disabled=disable_t4_inputs, key=f"t4_wwp_{rk4}")
                     with c3:
-                        st.write("**💨 ส่วนที่ 4.3: การผลิตไอน้ำ (ตัน/วัน)**")
+                        st.write("**💨 ส่วนที่ 3: การผลิตไอน้ำ (ตัน/วัน)**")
                         prod_val = st.number_input("ปริมาณการผลิต (ตัน/วัน) *", min_value=0.1, step=1.0, value=None, placeholder="ระบุการผลิตไอน้ำ", disabled=disable_t4_inputs, key=f"t4_prod_{rk4}")
                         work_hours = st.number_input(
                             "จำนวนชั่วโมงทำงาน (ชม.) *", min_value=0.1, step=0.5, value=None, placeholder="ระบุชั่วโมงทำงาน", 
