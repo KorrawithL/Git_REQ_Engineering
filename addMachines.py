@@ -143,35 +143,35 @@ def render_equipment_kpi_card(df):
     pct_mach = (total_machines / total_items * 100) if total_items > 0 else 0.0
     pct_veh = (total_vehicles / total_items * 100) if total_items > 0 else 0.0
 
-    kpi_html = f"""
-<div style="background-color: #FCFBF8; padding: 22px 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
-    <div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 18px;">⚡ สถานะความพร้อมและหมวดหมู่อุปกรณ์ (ข้อมูลปัจจุบัน)</div>
-    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
-        <div style="flex: 1; min-width: 140px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">📦 อุปกรณ์ทั้งหมด</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_items:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
-        </div>
-        <div style="flex: 1; min-width: 140px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักร</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_machines:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">เครื่อง</span></div>
-            <span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{pct_mach:.1f}% ของระบบ</span>
-        </div>
-        <div style="flex: 1; min-width: 140px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 รถยนต์ / รถยก</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_vehicles:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">คัน</span></div>
-            <span style="background-color: #FFFBEB; color: #D97706; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{pct_veh:.1f}% ของระบบ</span>
-        </div>
-        <div style="flex: 1; min-width: 140px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">▶️ ใช้งานปกติ (Active)</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_active:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
-        </div>
-        <div style="flex: 1; min-width: 140px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🔴 ระงับการใช้งาน</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_disabled:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
-        </div>
-    </div>
-</div>
-"""
+    kpi_html = (
+        f'<div style="background-color: #FCFBF8; padding: 22px 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: \'Sarabun\', sans-serif;">'
+        f'<div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 18px;">⚡ สถานะความพร้อมและหมวดหมู่อุปกรณ์ (ข้อมูลปัจจุบัน)</div>'
+        f'<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">'
+        f'<div style="flex: 1; min-width: 140px;">'
+        f'<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">📦 อุปกรณ์ทั้งหมด</div>'
+        f'<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_items:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>'
+        f'</div>'
+        f'<div style="flex: 1; min-width: 140px;">'
+        f'<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักร</div>'
+        f'<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_machines:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">เครื่อง</span></div>'
+        f'<span style="background-color: #F1F5F9; color: #475569; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{pct_mach:.1f}% ของระบบ</span>'
+        f'</div>'
+        f'<div style="flex: 1; min-width: 140px;">'
+        f'<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 รถยนต์ / รถยก</div>'
+        f'<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_vehicles:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">คัน</span></div>'
+        f'<span style="background-color: #FFFBEB; color: #D97706; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;">{pct_veh:.1f}% ของระบบ</span>'
+        f'</div>'
+        f'<div style="flex: 1; min-width: 140px;">'
+        f'<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">▶️ ใช้งานปกติ (Active)</div>'
+        f'<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_active:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>'
+        f'</div>'
+        f'<div style="flex: 1; min-width: 140px;">'
+        f'<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🔴 ระงับการใช้งาน</div>'
+        f'<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{total_disabled:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
     st.markdown(kpi_html, unsafe_allow_html=True)
 
 

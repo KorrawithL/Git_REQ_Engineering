@@ -86,7 +86,7 @@ def get_dashboard_data(branch_filter="ALL", allowed_branches=None):
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 1. เครื่องจักรทำงานวันนี้ & แจ้งซ่อม/เบรกดาวน์วันนี้ (รวมในคิวรีเดียว)
+            # 1. เครื่องจักรทำงานวันนี้ & แจ้งซ่อม/เบรกดาวน์วันนี้
             cur.execute(f"""
                 SELECT COUNT(id) AS active_cnt,
                        COALESCE(SUM(CASE WHEN breakdown_hours > 0 THEN 1 ELSE 0 END), 0) AS bd_cnt
@@ -225,7 +225,6 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     target_branch_id = current_branch_id
     target_branch_name = current_branch
 
-    # ตัวเลือกสลับมุมมองสาขาสำหรับ Admin หรือผู้ที่มีสิทธิ์หลายสาขา
     if raw_role == "admin" or len(user_allowed_branches) > 1:
         if raw_role == "admin":
             branch_options = ["🌐 รวมทุกสาขาในเครือ (ภาพรวมบริษัท)"] + list(branch_dict.keys())
@@ -253,22 +252,19 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
         allowed_branches=user_allowed_branches if raw_role != "admin" else None
     )
 
-    # 1. การ์ดต้อนรับผู้ใช้งาน
-    welcome_html = f"""
-    <div style="background-color: #FCFBF8; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #D6D3D1; border-left: 6px solid #D97706; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);">
-        <h3 class='welcome-title' style="color: #D97706; margin-top: 0; font-weight: 800; margin-bottom: 8px;">😊 ยินดีต้อนรับเข้าสู่ระบบ </h3>
-        <p class='welcome-desc' style="color: #666666; margin-bottom: 15px;">สวัสดีคุณ <strong style="color: #333333;">{disp_name}</strong></p>
-        <div class='welcome-details' style="color: #333333; line-height: 1.8;">
-            <div><span style="font-weight: 600; color: #64748B;">👤 กลุ่มสิทธิ์:</span> {role_th}</div>
-            <div><span style="font-weight: 600; color: #64748B;">🏢 สังกัดประจำตัว:</span> {current_branch}</div>
-            <div><span style="font-weight: 600; color: #64748B;">💼 ตำแหน่ง:</span> {user_position}</div>
-            <div style="margin-top: 4px;"><span style="font-weight: 600; color: #64748B;">👑 ระดับสิทธิ์:</span> {current_access} — <strong style="color: {access_color};">{access_desc}</strong></div>
-        </div>
-    </div>
-    """
+    # ⚠️ หมายเหตุ: ห้ามเคาะย่อหน้า 4 เคาะในสตริง HTML เพื่อป้องกัน Markdown แปลงเป็น Code Block
+    welcome_html = f"""<div style="background-color: #FCFBF8; border-radius: 12px; padding: 20px; margin-bottom: 25px; border: 1px solid #D6D3D1; border-left: 6px solid #D97706; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.08);">
+<h3 class='welcome-title' style="color: #D97706; margin-top: 0; font-weight: 800; margin-bottom: 8px;">😊 ยินดีต้อนรับเข้าสู่ระบบ </h3>
+<p class='welcome-desc' style="color: #666666; margin-bottom: 15px;">สวัสดีคุณ <strong style="color: #333333;">{disp_name}</strong></p>
+<div class='welcome-details' style="color: #333333; line-height: 1.8;">
+<div><span style="font-weight: 600; color: #64748B;">👤 กลุ่มสิทธิ์:</span> {role_th}</div>
+<div><span style="font-weight: 600; color: #64748B;">🏢 สังกัดประจำตัว:</span> {current_branch}</div>
+<div><span style="font-weight: 600; color: #64748B;">💼 ตำแหน่ง:</span> {user_position}</div>
+<div style="margin-top: 4px;"><span style="font-weight: 600; color: #64748B;">👑 ระดับสิทธิ์:</span> {current_access} — <strong style="color: {access_color};">{access_desc}</strong></div>
+</div>
+</div>"""
     st.markdown(welcome_html, unsafe_allow_html=True)
 
-    # 2. เตรียมข้อมูลตัวเลขและป้ายสถานะสำหรับการ์ด KPI
     val_fuel = f"{db_data.get('cur_fuel', 0):,.2f}"
     pill_fuel = get_diff_pill(db_data.get("cur_fuel", 0) - db_data.get("prev_fuel", 0), "ลิตร", invert_color=True, metric_name="ปริมาณน้ำมันรวม")
 
@@ -290,66 +286,60 @@ def render_dashboard(current_branch_id, disp_name, role_th, current_branch, user
     val_drop = db_data.get("boiler_drop", 0)
     pill_drop = get_badge_pill("⚠️ แจ้งเตือน", "#FEF3C7", "#D97706") if val_drop > 0 else get_badge_pill("✅ ปกติ", "#D1FAE5", "#059669")
 
-    # 3. การ์ดแสดงผลสถิติ (KPI Metrics)
-    custom_metric_html = f"""
-<div style="background-color: #FCFBF8; padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
-    <div style="margin-bottom: 15px;">
-        <div style="color: #D97706; font-size: 18px; font-weight: bold; margin-bottom: 4px;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน: <span style="color:#0F172A;">{target_branch_name}</span></div>
-        <div style="color: #64748B; font-size: 13px;">
-            💡 <i>ป้ายผลต่างเทียบเดือนที่แล้ว (<b>↑ เพิ่มขึ้น</b> / <b>↓ ลดลง</b>) — <b>น้ำมัน & อัตราสิ้นเปลือง:</b> ↑ เพิ่มขึ้น = สีแดง, ↓ ลดลง = สีเขียว | <b>ชั่วโมงทำงาน:</b> ↑ เพิ่มขึ้น = สีเขียว, ↓ ลดลง = สีแดง</i>
-        </div>
-    </div>
-    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-bottom: 25px;">
-        <div style="flex: 1; min-width: 180px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ปริมาณน้ำมันรวม (เดือนนี้)</div>
-            <div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_fuel} <span style="font-size: 20px; font-weight: normal; color: #666666;">ลิตร</span></div>
-            {pill_fuel}
-        </div>
-        <div style="flex: 1; min-width: 180px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ชั่วโมงทำงานรวม (เดือนนี้)</div>
-            <div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_hrs} <span style="font-size: 20px; font-weight: normal; color: #666666;">ชม.</span></div>
-            {pill_hrs}
-        </div>
-        <div style="flex: 1; min-width: 180px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">อัตราสิ้นเปลืองเฉลี่ย (เดือนนี้)</div>
-            <div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_rate} <span style="font-size: 20px; font-weight: normal; color: #666666;">ล/ชม.</span></div>
-            {pill_rate}
-        </div>
-    </div>
-
-    <hr style="border: none; border-top: 1px dashed #D6D3D1; margin: 0 0 20px 0;">
-
-    <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; margin-bottom: 15px;">
-        <div style="color: #0F172A; font-size: 18px; font-weight: bold;">⚡ สถานะปฏิบัติงาน (ข้อมูลอัปเดตล่าสุด)</div>
-        <div style="color: #64748B; font-size: 13px;">🕒 <i>สรุปยอดการบันทึกข้อมูลของวันนี้และ 7 วันย้อนหลัง</i></div>
-    </div>
-    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
-        <div style="flex: 1; min-width: 150px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักรทำงาน (วันนี้)</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_active} <span style="font-size: 16px; font-weight: normal; color: #666666;">เครื่อง</span></div>
-            {pill_active}
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚠️ แจ้งซ่อม (เบรกดาวน์วันนี้)</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_bd} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
-            {pill_bd}
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 เชื้อเพลิงสะสม 7 วัน</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_f7} <span style="font-size: 16px; font-weight: normal; color: #666666;">ลิตร</span></div>
-            {pill_f7}
-        </div>
-        <div style="flex: 1; min-width: 150px;">
-            <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">💨 แรงดันตก (วันนี้)</div>
-            <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_drop} <span style="font-size: 16px; font-weight: normal; color: #666666;">ครั้ง</span></div>
-            {pill_drop}
-        </div>
-    </div>
+    custom_metric_html = f"""<div style="background-color: #FCFBF8; padding: 25px; border-radius: 12px; margin-bottom: 25px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
+<div style="margin-bottom: 15px;">
+<div style="color: #D97706; font-size: 18px; font-weight: bold; margin-bottom: 4px;">📊 ภาพรวมการใช้เชื้อเพลิงประจำเดือน: <span style="color:#0F172A;">{target_branch_name}</span></div>
+<div style="color: #64748B; font-size: 13px;">
+💡 <i>ป้ายผลต่างเทียบเดือนที่แล้ว (<b>↑ เพิ่มขึ้น</b> / <b>↓ ลดลง</b>) — <b>น้ำมัน & อัตราสิ้นเปลือง:</b> ↑ เพิ่มขึ้น = สีแดง, ↓ ลดลง = สีเขียว | <b>ชั่วโมงทำงาน:</b> ↑ เพิ่มขึ้น = สีเขียว, ↓ ลดลง = สีแดง</i>
 </div>
-"""
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between; margin-bottom: 25px;">
+<div style="flex: 1; min-width: 180px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ปริมาณน้ำมันรวม (เดือนนี้)</div>
+<div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_fuel} <span style="font-size: 20px; font-weight: normal; color: #666666;">ลิตร</span></div>
+{pill_fuel}
+</div>
+<div style="flex: 1; min-width: 180px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">ชั่วโมงทำงานรวม (เดือนนี้)</div>
+<div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_hrs} <span style="font-size: 20px; font-weight: normal; color: #666666;">ชม.</span></div>
+{pill_hrs}
+</div>
+<div style="flex: 1; min-width: 180px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">อัตราสิ้นเปลืองเฉลี่ย (เดือนนี้)</div>
+<div style="color: #333333; font-size: 36px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_rate} <span style="font-size: 20px; font-weight: normal; color: #666666;">ล/ชม.</span></div>
+{pill_rate}
+</div>
+</div>
+<hr style="border: none; border-top: 1px dashed #D6D3D1; margin: 0 0 20px 0;">
+<div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; margin-bottom: 15px;">
+<div style="color: #0F172A; font-size: 18px; font-weight: bold;">⚡ สถานะปฏิบัติงาน (ข้อมูลอัปเดตล่าสุด)</div>
+<div style="color: #64748B; font-size: 13px;">🕒 <i>สรุปยอดการบันทึกข้อมูลของวันนี้และ 7 วันย้อนหลัง</i></div>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚙️ เครื่องจักรทำงาน (วันนี้)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_active} <span style="font-size: 16px; font-weight: normal; color: #666666;">เครื่อง</span></div>
+{pill_active}
+</div>
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">⚠️ แจ้งซ่อม (เบรกดาวน์วันนี้)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_bd} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
+{pill_bd}
+</div>
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">🚚 เชื้อเพลิงสะสม 7 วัน</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_f7} <span style="font-size: 16px; font-weight: normal; color: #666666;">ลิตร</span></div>
+{pill_f7}
+</div>
+<div style="flex: 1; min-width: 150px;">
+<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">💨 แรงดันตก (วันนี้)</div>
+<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{val_drop} <span style="font-size: 16px; font-weight: normal; color: #666666;">ครั้ง</span></div>
+{pill_drop}
+</div>
+</div>
+</div>"""
     st.markdown(custom_metric_html, unsafe_allow_html=True)
 
-    # 4. ส่วนแสดงกราฟแนวโน้ม 7 วัน
     c_chart1, c_chart2 = st.columns(2)
 
     with c_chart1:

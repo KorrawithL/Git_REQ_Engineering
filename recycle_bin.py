@@ -278,22 +278,22 @@ def render_recycle_kpi_cards(trash_counts):
         else:
             badge_html = "<span style='background-color: #DCFCE7; color: #15803D; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: bold;'>✨ สะอาด</span>"
 
-        cards_items_html += f"""
-<div style="flex: 1; min-width: 140px;">
-    <div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">{icon} {short_name}</div>
-    <div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{cnt:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>
-    {badge_html}
-</div>
-"""
+        cards_items_html += (
+            f'<div style="flex: 1; min-width: 140px;">'
+            f'<div style="color: #64748B; font-size: 14px; font-weight: 600; margin-bottom: 8px;">{icon} {short_name}</div>'
+            f'<div style="color: #333333; font-size: 28px; font-weight: bold; margin-bottom: 10px; line-height: 1;">{cnt:,} <span style="font-size: 16px; font-weight: normal; color: #666666;">รายการ</span></div>'
+            f'{badge_html}'
+            f'</div>'
+        )
 
-    custom_recycle_kpi_html = f"""
-<div style="background-color: #FCFBF8; padding: 22px 25px; border-radius: 12px; margin-bottom: 22px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: 'Sarabun', sans-serif;">
-    <div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 18px;">⚡ สถานะรายการขยะคงค้างแยกตามหมวดหมู่ (ข้อมูลอัปเดตล่าสุด)</div>
-    <div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">
-        {cards_items_html}
-    </div>
-</div>
-"""
+    custom_recycle_kpi_html = (
+        f'<div style="background-color: #FCFBF8; padding: 22px 25px; border-radius: 12px; margin-bottom: 22px; border: 1px solid #D6D3D1; box-shadow: 0 4px 12px rgba(217, 119, 6, 0.05); font-family: \'Sarabun\', sans-serif;">'
+        f'<div style="color: #0F172A; font-size: 18px; font-weight: bold; margin-bottom: 18px;">⚡ สถานะรายการขยะคงค้างแยกตามหมวดหมู่ (ข้อมูลอัปเดตล่าสุด)</div>'
+        f'<div style="display: flex; flex-wrap: wrap; gap: 15px; justify-content: space-between;">'
+        f'{cards_items_html}'
+        f'</div>'
+        f'</div>'
+    )
     st.markdown(custom_recycle_kpi_html, unsafe_allow_html=True)
 
 
