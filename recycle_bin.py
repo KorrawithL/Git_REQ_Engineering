@@ -219,22 +219,26 @@ def confirm_hard_delete_dialog(table_name, pk_col, rec_id, category_label, summa
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_hd_{rec_id}"):
-            st.rerun()
+        cancel_btn = st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_hd_{rec_id}")
     with c2:
-        if st.button("🔥 ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_hd_{rec_id}"):
-            ok, err = execute_recycle_action(
-                sql=f"DELETE FROM {table_name} WHERE {pk_col} = %s",
-                params=(rec_id,),
-                action_type="DELETE",
-                log_detail=f"ลบข้อมูลถาวรจาก [{category_label}] ID: {rec_id} ({summary_text})"
-            )
-            if ok:
-                st.success(f"🔥 ลบข้อมูล ID: {rec_id} ถาวรเรียบร้อยแล้ว!")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error(f"เกิดข้อผิดพลาดในการลบถาวร: {err}")
+        confirm_btn = st.button("🔥 ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_hd_{rec_id}")
+
+    if cancel_btn:
+        st.rerun()
+
+    if confirm_btn:
+        ok, err = execute_recycle_action(
+            sql=f"DELETE FROM {table_name} WHERE {pk_col} = %s",
+            params=(rec_id,),
+            action_type="DELETE",
+            log_detail=f"ลบข้อมูลถาวรจาก [{category_label}] ID: {rec_id} ({summary_text})"
+        )
+        if ok:
+            st.success(f"🔥 ลบข้อมูล ID: {rec_id} ถาวรเรียบร้อยแล้ว!")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error(f"เกิดข้อผิดพลาดในการลบถาวร: {err}")
 
 
 @st.dialog("🔥 ยืนยันการล้างถังขยะหมวดหมู่นี้")
@@ -245,22 +249,26 @@ def confirm_empty_category_dialog(table_name, category_label, item_count):
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_emp_{table_name}"):
-            st.rerun()
+        cancel_btn = st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_emp_{table_name}")
     with c2:
-        if st.button("🔥 ยืนยันล้างถังขยะถาวร", type="primary", use_container_width=True, key=f"confirm_emp_{table_name}"):
-            ok, err = execute_recycle_action(
-                sql=f"DELETE FROM {table_name} WHERE is_deleted = 1",
-                params=(),
-                action_type="DELETE",
-                log_detail=f"ล้างถังขยะถาวรทั้งหมดในหมวด [{category_label}] จำนวน {item_count} รายการ"
-            )
-            if ok:
-                st.success(f"🔥 ล้างถังขยะหมวด {category_label} เรียบร้อยแล้ว!")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error(f"เกิดข้อผิดพลาด: {err}")
+        confirm_btn = st.button("🔥 ยืนยันล้างถังขยะถาวร", type="primary", use_container_width=True, key=f"confirm_emp_{table_name}")
+
+    if cancel_btn:
+        st.rerun()
+
+    if confirm_btn:
+        ok, err = execute_recycle_action(
+            sql=f"DELETE FROM {table_name} WHERE is_deleted = 1",
+            params=(),
+            action_type="DELETE",
+            log_detail=f"ล้างถังขยะถาวรทั้งหมดในหมวด [{category_label}] จำนวน {item_count} รายการ"
+        )
+        if ok:
+            st.success(f"🔥 ล้างถังขยะหมวด {category_label} เรียบร้อยแล้ว!")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error(f"เกิดข้อผิดพลาด: {err}")
 
 
 # =============================================================================
@@ -332,30 +340,33 @@ def render_recycle_bin_module():
     # 4. ส่วนตัวกรองค้นหา (สาขา + คำค้นหา) และปุ่มจัดการแบบกลุ่ม (Bulk Actions)
     available_branches = ["ทั้งหมด"] + sorted(list({str(r.get("branch_name") or "-") for r in deleted_rows}))
 
-    c_f1, c_f2, c_b1, c_b2 = st.columns([1.2, 2.0, 1.3, 1.3])
+    # 🌟 ใช้ vertical_alignment="bottom" เพื่อให้ปุ่มและช่องกรองอยู่ในระดับเดียวกันพอดี
+    c_f1, c_f2, c_b1, c_b2 = st.columns([1.2, 2.0, 1.3, 1.3], vertical_alignment="bottom")
     with c_f1:
         sel_branch = st.selectbox("🏢 กรองสาขา:", options=available_branches, key="rb_fil_br")
     with c_f2:
         search_kw = st.text_input("🔎 ค้นหารายการ / ผู้ลบ / วันที่:", placeholder="พิมพ์คำค้นหา...", key="rb_search_kw")
     with c_b1:
-        st.write("")
-        if st.button("♻️ กู้คืนทั้งหมดในหมวดนี้", use_container_width=True, key="rb_restore_all"):
-            ok, err = execute_recycle_action(
-                sql=f"UPDATE {table_name} SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE is_deleted = 1",
-                params=(),
-                action_type="UPDATE",
-                log_detail=f"กู้คืนข้อมูลทั้งหมดในหมวด [{selected_category}] จำนวน {len(deleted_rows)} รายการ"
-            )
-            if ok:
-                st.toast(f"♻️ กู้คืนข้อมูลทั้งหมด {len(deleted_rows)} รายการสำเร็จ!", icon="✅")
-                time.sleep(1)
-                st.rerun()
-            else:
-                st.error(f"เกิดข้อผิดพลาด: {err}")
+        restore_all_btn = st.button("♻️ กู้คืนทั้งหมดในหมวดนี้", use_container_width=True, key="rb_restore_all")
     with c_b2:
-        st.write("")
-        if st.button("🔥 ล้างถังขยะหมวดนี้", type="primary", use_container_width=True, key="rb_empty_all"):
-            confirm_empty_category_dialog(table_name, selected_category, len(deleted_rows))
+        empty_all_btn = st.button("🔥 ล้างถังขยะหมวดนี้", type="primary", use_container_width=True, key="rb_empty_all")
+
+    if restore_all_btn:
+        ok, err = execute_recycle_action(
+            sql=f"UPDATE {table_name} SET is_deleted = 0, deleted_at = NULL, deleted_by = NULL WHERE is_deleted = 1",
+            params=(),
+            action_type="UPDATE",
+            log_detail=f"กู้คืนข้อมูลทั้งหมดในหมวด [{selected_category}] จำนวน {len(deleted_rows)} รายการ"
+        )
+        if ok:
+            st.toast(f"♻️ กู้คืนข้อมูลทั้งหมด {len(deleted_rows)} รายการสำเร็จ!", icon="✅")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error(f"เกิดข้อผิดพลาด: {err}")
+
+    if empty_all_btn:
+        confirm_empty_category_dialog(table_name, selected_category, len(deleted_rows))
 
     # กรองข้อมูลตามสาขาและคำค้นหา
     kw = search_kw.strip().lower()
@@ -373,7 +384,7 @@ def render_recycle_bin_module():
     st.markdown(f"**แสดงข้อมูล:** `{len(filtered_rows)}` จาก `{len(deleted_rows)}` รายการ")
 
     # 5. หัวตารางแสดงผล
-    h_cols = st.columns([0.8, 1.2, 1.0, 1.5, 2.2, 1.5, 1.6])
+    h_cols = st.columns([1.0, 1.2, 0.8, 1.5, 2.2, 1.5, 1.6])
     headers = ["ID", "วันที่ข้อมูล", "สาขา", "รายการ", "รายละเอียด", "ผู้ลบ / เวลาที่ลบ", "จัดการ"]
     for col, text in zip(h_cols, headers):
         col.markdown(f"<span style='color:#64748B; font-weight:bold; font-size:14px;'>{text}</span>", unsafe_allow_html=True)
@@ -390,7 +401,7 @@ def render_recycle_bin_module():
             del_by = r.get("deleted_by") or "ไม่ระบุ"
             del_at = format_dt(r.get("deleted_at"), "%d/%m/%y %H:%M")
 
-            cols = st.columns([0.8, 1.2, 1.0, 1.5, 2.2, 1.5, 1.6])
+            cols = st.columns([1.0, 1.2, 0.8, 1.5, 2.2, 1.5, 1.6])
             cols[0].write(f"**{rec_id}**")
             cols[1].write(rec_date)
             cols[2].write(b_name)

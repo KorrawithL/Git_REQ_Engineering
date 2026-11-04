@@ -71,31 +71,37 @@ def confirm_soft_delete_dialog(table_name, pk_col, row_data, detail_text, log_mo
         "</div>",
         unsafe_allow_html=True
     )
+    
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_{key_prefix}_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้"):
-            st.rerun()
+        cancel_btn = st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_{key_prefix}_{rec_id}", help="ยกเลิกและปิดหน้าต่างนี้")
     with c2:
-        if st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_{key_prefix}_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ"):
-            conn = None
-            try:
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute(
-                        f"UPDATE {table_name} SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s",
-                        (st.session_state.username, rec_id)
-                    )
-                    conn.commit()
-                st.cache_data.clear()
-                log_activity(st.session_state.user_id, st.session_state.username, "DELETE", log_module, f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
-                st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
-                time.sleep(1)
-                st.rerun()
-            except Exception as e:
-                st.error(f"Error: {e}")
-            finally:
-                if conn:
-                    conn.close()
+        confirm_btn = st.button("🗑️ ยืนยันการลบ", type="primary", use_container_width=True, key=f"confirm_{key_prefix}_{rec_id}", help="ย้ายข้อมูลรายการนี้ลงถังขยะ")
+
+    if cancel_btn:
+        st.rerun()
+
+    # แยกการทำงานและข้อความแจ้งเตือนออกมานอก st.columns เพื่อไม่ให้ปุ่มขยับเบี้ยว
+    if confirm_btn:
+        conn = None
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {table_name} SET is_deleted=1, deleted_at=NOW(), deleted_by=%s WHERE {pk_col}=%s",
+                    (st.session_state.username, rec_id)
+                )
+                conn.commit()
+            st.cache_data.clear()
+            log_activity(st.session_state.user_id, st.session_state.username, "DELETE", log_module, f"ย้ายข้อมูลลงถังขยะ ID: {rec_id}")
+            st.success("🗑️ ย้ายข้อมูลลงถังขยะเรียบร้อยแล้ว!")
+            time.sleep(1)
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error: {e}")
+        finally:
+            if conn:
+                conn.close()
 
 
 # ==========================================================

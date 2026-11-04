@@ -140,53 +140,57 @@ def confirm_delete_user_dialog(user_id, username):
     col_act1, col_act2, col_act3 = st.columns([1.2, 1.8, 1.4])
 
     with col_act1:
-        if st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_del_u_{user_id}"):
-            st.rerun()
-
+        cancel_btn = st.button("❌ ยกเลิก", use_container_width=True, key=f"cancel_del_u_{user_id}")
     with col_act2:
-        if st.button("🚫 ระงับใช้งาน (Disabled)", use_container_width=True, key=f"disable_u_{user_id}"):
-            conn = None
-            try:
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute("UPDATE system_users SET status = 'disabled' WHERE user_id = %s", (int(user_id),))
-                    conn.commit()
-                log_activity(
-                    st.session_state.user_id, st.session_state.username,
-                    "UPDATE", "Admin: User Management",
-                    f"ระงับการใช้งานบัญชี '{username}' (User ID: {user_id})"
-                )
-                st.success(f"ทำการระงับบัญชี '{username}' เรียบร้อยแล้ว (ไม่สามารถล็อกอินได้)")
-                time.sleep(1.2)
-                st.rerun()
-            except Exception as e:
-                st.error(f"เกิดข้อผิดพลาด: {e}")
-            finally:
-                if conn:
-                    conn.close()
-
+        disable_btn = st.button("🚫 ระงับใช้งาน (Disabled)", use_container_width=True, key=f"disable_u_{user_id}")
     with col_act3:
-        if st.button("🗑️ ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_del_u_{user_id}"):
-            conn = None
-            try:
-                conn = get_db_connection()
-                with conn.cursor() as cur:
-                    cur.execute("DELETE FROM system_users WHERE user_id = %s", (int(user_id),))
-                    cur.execute("DELETE FROM user_branches WHERE user_id = %s", (int(user_id),))
-                    conn.commit()
-                log_activity(
-                    st.session_state.user_id, st.session_state.username,
-                    "DELETE", "Admin: User Management",
-                    f"ลบบัญชีผู้ใช้งาน '{username}' (User ID: {user_id}) ออกจากระบบถาวร"
-                )
-                st.success(f"ทำการลบบัญชี '{username}' ออกจากฐานข้อมูลเรียบร้อยแล้ว")
-                time.sleep(1.2)
-                st.rerun()
-            except Exception as e:
-                st.error(f"ไม่สามารถลบข้อมูลได้: {e}")
-            finally:
-                if conn:
-                    conn.close()
+        delete_btn = st.button("🗑️ ยืนยันลบถาวร", type="primary", use_container_width=True, key=f"confirm_del_u_{user_id}")
+
+    if cancel_btn:
+        st.rerun()
+
+    if disable_btn:
+        conn = None
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute("UPDATE system_users SET status = 'disabled' WHERE user_id = %s", (int(user_id),))
+                conn.commit()
+            log_activity(
+                st.session_state.user_id, st.session_state.username,
+                "UPDATE", "Admin: User Management",
+                f"ระงับการใช้งานบัญชี '{username}' (User ID: {user_id})"
+            )
+            st.success(f"ทำการระงับบัญชี '{username}' เรียบร้อยแล้ว (ไม่สามารถล็อกอินได้)")
+            time.sleep(1.2)
+            st.rerun()
+        except Exception as e:
+            st.error(f"เกิดข้อผิดพลาด: {e}")
+        finally:
+            if conn:
+                conn.close()
+
+    if delete_btn:
+        conn = None
+        try:
+            conn = get_db_connection()
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM system_users WHERE user_id = %s", (int(user_id),))
+                cur.execute("DELETE FROM user_branches WHERE user_id = %s", (int(user_id),))
+                conn.commit()
+            log_activity(
+                st.session_state.user_id, st.session_state.username,
+                "DELETE", "Admin: User Management",
+                f"ลบบัญชีผู้ใช้งาน '{username}' (User ID: {user_id}) ออกจากระบบถาวร"
+            )
+            st.success(f"ทำการลบบัญชี '{username}' ออกจากฐานข้อมูลเรียบร้อยแล้ว")
+            time.sleep(1.2)
+            st.rerun()
+        except Exception as e:
+            st.error(f"ไม่สามารถลบข้อมูลได้: {e}")
+        finally:
+            if conn:
+                conn.close()
 
 
 # =============================================================================
